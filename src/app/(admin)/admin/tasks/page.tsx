@@ -1,8 +1,6 @@
-import { getAdminTasks } from "@/lib/database";
 import { TaskList } from "./task-list";
 
-export default async function AdminTasksPage() {
-    const tasks = await getAdminTasks();
+export default function AdminTasksPage() {
     return (
         <div>
             <div className="flex justify-between items-center">
@@ -12,7 +10,7 @@ export default async function AdminTasksPage() {
                 </div>
             </div>
             <div className="mt-8">
-                <TaskList initialTasks={tasks} />
+                <TaskList />
             </div>
         </div>
     );

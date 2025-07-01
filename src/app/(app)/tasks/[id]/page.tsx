@@ -1,14 +1,69 @@
+"use client";
+
+import { useEffect, useState } from 'react';
 import { getTask } from "@/lib/database";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TaskForms } from "./task-forms";
+import { Task } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default async function TaskPage({ params }: { params: { id: string } }) {
-  const task = await getTask(params.id);
+function LoadingSkeleton() {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-start mb-2">
+                    <Skeleton className="h-8 w-3/4" />
+                    <Skeleton className="h-6 w-20" />
+                </div>
+                <Skeleton className="h-7 w-24" />
+                <div className="pt-2 space-y-2">
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-5 w-2/3" />
+                </div>
+            </CardHeader>
+            <CardContent>
+              <div className="mt-6 pt-6 border-t">
+                <Skeleton className="h-8 w-1/4 mb-4" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            </CardContent>
+        </Card>
+      </div>
+    )
+}
 
+export default function TaskPage({ params }: { params: { id: string } }) {
+  const [task, setTask] = useState<Task | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchTask() {
+      try {
+        const fetchedTask = await getTask(params.id);
+        if (!fetchedTask) {
+          notFound();
+        } else {
+          setTask(fetchedTask);
+        }
+      } catch (error) {
+        console.error("Failed to fetch task:", error);
+        notFound();
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTask();
+  }, [params.id]);
+
+  if (loading) {
+      return <LoadingSkeleton />;
+  }
+  
   if (!task) {
-    notFound();
+      return notFound();
   }
 
   return (
