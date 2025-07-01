@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import {
   SidebarProvider,
   Sidebar,
@@ -25,6 +26,7 @@ import {
   Settings,
   LogOut,
   BarChart,
+  Loader2,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -36,6 +38,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/hooks/use-auth";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
@@ -47,7 +52,21 @@ const navItems = [
 ];
 
 const AppHeader = () => {
-  const { isMobile, toggleSidebar } = useSidebar();
+  const { isMobile } = useSidebar();
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    router.push('/login');
+  };
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "U";
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  }
+
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
       {isMobile && <SidebarTrigger />}
@@ -56,15 +75,15 @@ const AppHeader = () => {
       </div>
       <div className="flex items-center gap-4">
         <div className="text-right">
-          <p className="font-semibold text-sm">Jane Doe</p>
-          <p className="text-xs text-muted-foreground">1,234 Points</p>
+          <p className="font-semibold text-sm">{user?.displayName || "User"}</p>
+          <p className="text-xs text-muted-foreground">{user?.email}</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
               <Avatar>
-                <AvatarImage src="https://placehold.co/40x40.png" alt="@janedoe" />
-                <AvatarFallback>JD</AvatarFallback>
+                <AvatarImage src={user?.photoURL || `https://placehold.co/40x40.png`} alt={user?.displayName || "user"} />
+                <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
               </Avatar>
               <span className="sr-only">Toggle user menu</span>
             </Button>
@@ -75,7 +94,7 @@ const AppHeader = () => {
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuItem>Support</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -86,6 +105,28 @@ const AppHeader = () => {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+  
+  const handleLogout = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    router.push('/login');
+  };
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <SidebarProvider>
@@ -128,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Settings />
               <span>Settings</span>
             </SidebarMenuButton>
-            <SidebarMenuButton tooltip="Logout">
+            <SidebarMenuButton tooltip="Logout" onClick={handleLogout}>
               <LogOut />
               <span>Logout</span>
             </SidebarMenuButton>

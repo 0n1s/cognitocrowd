@@ -1,10 +1,33 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
+import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect } from "react";
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, loading, router]);
+
+  if (loading || user) {
+     return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Skeleton className="h-[450px] w-full max-w-sm rounded-lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <div className="absolute top-4 left-4">
@@ -13,7 +36,7 @@ export default function AuthLayout({
                 <span className="font-bold font-headline text-lg">CognitoCrowd</span>
             </Link>
         </div>
-        {children}
+        {!loading && !user && children}
     </div>
   );
 }

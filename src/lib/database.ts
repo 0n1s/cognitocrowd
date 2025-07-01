@@ -9,6 +9,7 @@ function fromDoc<T extends { id: string }>(doc: DocumentData): T {
 }
 
 export async function getTasks(): Promise<Task[]> {
+    if (!db) return Promise.resolve([]);
     const tasksCol = collection(db, 'tasks');
     const q = query(tasksCol, where('status', '==', 'Active'));
     const snapshot = await getDocs(q);
@@ -31,12 +32,14 @@ export async function getTasks(): Promise<Task[]> {
 }
 
 export async function getTask(id: string): Promise<Task | null> {
+    if (!db) return Promise.resolve(null);
     const docRef = doc(db, 'tasks', id);
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? fromDoc<Task>(docSnap) : null;
 }
 
 export async function getAdminTasks(): Promise<AdminTask[]> {
+    if (!db) return Promise.resolve([]);
     const tasksCol = collection(db, 'tasks');
     const snapshot = await getDocs(tasksCol);
     

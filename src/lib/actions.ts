@@ -15,6 +15,9 @@ export type CreateTaskInput = {
 };
 
 export async function createAdminTask(data: CreateTaskInput) {
+    if (!db) {
+        return { success: false, message: 'Database not configured. Please check your environment variables.' };
+    }
     try {
         const taskToAdd: Omit<Task, 'id'|'difficulty'> = {
             title: data.title,
@@ -38,6 +41,9 @@ export async function createAdminTask(data: CreateTaskInput) {
 }
 
 export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
+    if (!db) {
+        return { success: false, message: 'Database not configured. Please check your environment variables.' };
+    }
     try {
         const generatedData = await bulkGenerateTasks(data);
 
