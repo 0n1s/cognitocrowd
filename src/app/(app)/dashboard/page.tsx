@@ -161,9 +161,16 @@ export default function DashboardPage() {
       </div>
       
       <div className="mt-12">
-        <h2 className="text-2xl font-bold font-headline">Available Tasks</h2>
-        <p className="text-muted-foreground mt-1">Select a task to complete and earn points.</p>
-        {loading ? <LoadingTaskGridSkeleton /> : <TaskGrid tasks={tasks} />}
+        <div className="flex justify-between items-center">
+            <div>
+                <h2 className="text-2xl font-bold font-headline">Available Tasks</h2>
+                <p className="text-muted-foreground mt-1">A preview of the latest tasks available.</p>
+            </div>
+            <Button asChild variant="outline">
+                <Link href="/tasks">View All Tasks <ArrowRight className="ml-2 h-4 w-4"/></Link>
+            </Button>
+        </div>
+        {loading ? <LoadingTaskGridSkeleton /> : <TaskGrid tasks={tasks.slice(0, 3)} />}
       </div>
     </div>
   );

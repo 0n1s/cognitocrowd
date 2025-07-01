@@ -27,6 +27,7 @@ import {
   LogOut,
   BarChart,
   Loader2,
+  ClipboardList,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ import { signOut } from "firebase/auth";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
+  { href: "/tasks", icon: ClipboardList, label: "Tasks" },
   { href: "/rewards", icon: Award, label: "Rewards" },
   { href: "/leaderboard", icon: Users, label: "Leaderboard" },
   { href: "/redeem", icon: Gift, label: "Redeem" },
