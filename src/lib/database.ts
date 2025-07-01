@@ -8,24 +8,25 @@ import { v4 as uuidv4 } from 'uuid';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     const data = doc.data();
-    // Convert Firestore Timestamps to serializable format if they exist
+    
+    // Serialize top-level timestamps
     for (const key in data) {
-        if (data[key] instanceof Object && 'toDate' in data[key]) {
+        if (data[key] && typeof data[key].toDate === 'function') {
             data[key] = data[key].toDate().toISOString();
         }
     }
-    const result = { ...data, id: doc.id } as T;
 
-    // A bit of a hack to handle nested timestamps in chat messages
-    if ('messages' in result && Array.isArray((result as any).messages)) {
-        (result as any).messages = (result as any).messages.map((m: any) => {
-            if(m.createdAt && typeof m.createdAt === 'object') {
-                m.createdAt = new Date(m.createdAt.seconds * 1000).toISOString();
+    // Specifically serialize timestamps within the 'messages' array
+    if (data.messages && Array.isArray(data.messages)) {
+        data.messages = data.messages.map((message: any) => {
+            if (message.createdAt && typeof message.createdAt.toDate === 'function') {
+                return { ...message, createdAt: message.createdAt.toDate().toISOString() };
             }
-            return m;
-        })
+            return message;
+        });
     }
-    return result;
+
+    return { ...data, id: doc.id } as T;
 }
 
 export async function getTasks(userId?: string): Promise<Task[]> {
