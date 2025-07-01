@@ -140,6 +140,15 @@ export type WithdrawalRequest = {
   processedAt?: any; // Firestore Timestamp
 };
 
+export type Deposit = {
+  id: string;
+  userId: string;
+  amount: number;
+  method: string;
+  status: 'completed' | 'pending' | 'failed';
+  createdAt: any; // Firestore Timestamp or ISO String
+};
+
 export type ChatMessage = {
   id: string;
   text: string;

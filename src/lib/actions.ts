@@ -131,10 +131,11 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
             }
 
             let dailyCount = userData.dailyCompletedCount || 0;
-            const lastReset = userData.lastCompletionReset?.toDate() || new Date(0);
+            const lastResetString = userData.lastCompletionReset;
+            const lastReset = lastResetString ? new Date(lastResetString) : new Date(0);
 
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Midnight today, local time
+            today.setHours(0, 0, 0, 0);
 
             if (lastReset < today) {
                 dailyCount = 0; // Reset for the new day
@@ -331,6 +332,7 @@ export async function updateAdminUser(userId: string, data: Partial<Pick<User, '
         const userDoc = doc(db, 'users', userId);
         await updateDoc(userDoc, data);
         revalidatePath("/admin/users");
+        revalidatePath(`/admin/users/${userId}`);
         return { success: true, message: 'User updated successfully.' };
     } catch (error) {
         console.error(error);
@@ -545,4 +547,50 @@ export async function getInitialChatHistory(userId: string): Promise<ChatSession
         console.error("Error fetching initial chat history:", error);
         return null;
     }
+}
+
+export async function initiateDeposit(
+  userId: string,
+  amount: number,
+  method: string
+) {
+  if (!db) return { success: false, message: "Database not configured." };
+  if (!userId) return { success: false, message: "User not authenticated." };
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const userRef = doc(db, "users", userId);
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists()) {
+        throw new Error("User not found.");
+      }
+      
+      const userData = userDoc.data() as User;
+      const currentBalance = userData.depositBalance || 0;
+      const newBalance = currentBalance + amount;
+
+      // Update user's deposit balance
+      transaction.update(userRef, { depositBalance: newBalance });
+
+      // Create a record of the deposit
+      const depositRef = doc(collection(db, "deposits"));
+      transaction.set(depositRef, {
+        userId,
+        amount,
+        method,
+        status: "completed", // Assuming immediate completion for this simulated flow
+        createdAt: Timestamp.now(),
+      });
+    });
+
+    revalidatePath("/wallet");
+    revalidatePath(`/admin/users/${userId}`);
+
+    return { success: true, message: "Deposit successful." };
+  } catch (error) {
+    console.error("Error initiating deposit:", error);
+    const message = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { success: false, message };
+  }
 }

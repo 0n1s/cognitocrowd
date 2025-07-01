@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession } from './types';
+import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -336,16 +336,25 @@ export async function getMostRecentChat(userId: string): Promise<ChatSession | n
     }
 }
 
+export async function getDepositHistory(userId: string): Promise<Deposit[]> {
+    if (!db) return [];
+    const depositsCol = collection(db, 'deposits');
+    const q = query(depositsCol, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => fromDoc<Deposit>(d));
+}
+
 export async function getAdminUserDetail(userId: string) {
     if (!db) return null;
 
     const userData = await getUserData(userId);
     if (!userData) return null;
 
-    const [completedTasks, withdrawalRequests, userPackage] = await Promise.all([
+    const [completedTasks, withdrawalRequests, userPackage, depositHistory] = await Promise.all([
         getCompletedTaskDetails(userData.completedTasks || []),
         getUserWithdrawalRequests(userId),
         userData.packageId ? getPackage(userData.packageId) : null,
+        getDepositHistory(userId),
     ]);
 
     return {
@@ -353,5 +362,6 @@ export async function getAdminUserDetail(userId: string) {
         completedTasks,
         withdrawalRequests,
         package: userPackage,
+        depositHistory,
     };
 }

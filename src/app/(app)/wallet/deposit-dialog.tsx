@@ -18,14 +18,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { initiateDeposit } from "@/lib/actions";
 
 type DepositDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     settings: AppSettings;
+    userId: string;
+    onDeposit: () => void;
 };
 
-export function DepositDialog({ open, onOpenChange, settings }: DepositDialogProps) {
+export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit }: DepositDialogProps) {
     const { toast } = useToast();
     const [amount, setAmount] = useState("");
     const [method, setMethod] = useState("");
@@ -46,23 +49,20 @@ export function DepositDialog({ open, onOpenChange, settings }: DepositDialogPro
 
         setIsSubmitting(true);
         
-        // This is a placeholder for the actual deposit logic.
-        // In a real app, you would call a server action to interact with a payment provider API.
         try {
-            // Fake delay to simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            const result = { success: true, redirectUrl: method.toLowerCase().includes('plisio') ? 'https://plisio.net' : null };
+            const result = await initiateDeposit(userId, depositAmount, method);
 
             if (result.success) {
-                toast({ title: "Deposit Initiated", description: `Follow the instructions to complete your deposit of $${depositAmount.toFixed(2)}.` });
-                if (result.redirectUrl) {
-                    window.location.href = result.redirectUrl;
+                toast({ title: "Success", description: result.message });
+                 if (method.toLowerCase().includes('plisio')) {
+                    toast({ title: "Redirecting...", description: `You will be redirected to Plisio to complete your deposit.` });
+                    setTimeout(() => window.location.href = 'https://plisio.net', 2000);
                 } else {
                     onOpenChange(false);
                 }
+                onDeposit();
             } else {
-                toast({ title: "Error", description: "Could not initiate deposit.", variant: "destructive" });
+                toast({ title: "Error", description: result.message, variant: "destructive" });
             }
         } catch (error) {
             toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });

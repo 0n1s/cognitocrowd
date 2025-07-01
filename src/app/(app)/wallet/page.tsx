@@ -32,13 +32,12 @@ export default function WalletPage() {
   const { user, loading: authLoading } = useAuth();
   const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
 
-  useEffect(() => {
-    async function fetchWalletData() {
+  const fetchWalletData = async () => {
       if (!user) {
         setLoading(false);
         return;
       };
-      
+      setLoading(true);
       try {
         const [userData, appSettings] = await Promise.all([
             getUserData(user.uid),
@@ -58,7 +57,8 @@ export default function WalletPage() {
       }
     }
 
-    if (!authLoading) {
+  useEffect(() => {
+    if (!authLoading && user) {
       fetchWalletData();
     }
   }, [user, authLoading]);
@@ -67,7 +67,7 @@ export default function WalletPage() {
       return <WalletPageLoadingSkeleton />;
   }
   
-  if (!balances || !settings) {
+  if (!balances || !settings || !user) {
       return <p>Could not load wallet information.</p>
   }
 
@@ -125,6 +125,8 @@ export default function WalletPage() {
         open={isDepositDialogOpen}
         onOpenChange={setIsDepositDialogOpen}
         settings={settings}
+        userId={user.id}
+        onDeposit={fetchWalletData}
       />
     </div>
   );
