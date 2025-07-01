@@ -5,11 +5,54 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTasks } from '@/lib/database';
-import { ArrowRight } from 'lucide-react';
+import { getTasks, getUserData } from '@/lib/database';
+import { ArrowRight, Award, CheckCircle } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
+
+const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <Icon className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+            <div className="text-2xl font-bold text-primary">{value}</div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+        </CardContent>
+    </Card>
+);
+
+function UserStats({ stats, loading }: { stats: { points: number; completed: number } | null, loading: boolean}) {
+    if (loading) {
+        return (
+            <div className="grid gap-4 md:grid-cols-2">
+                <Skeleton className="h-[100px]" />
+                <Skeleton className="h-[100px]" />
+            </div>
+        )
+    }
+
+    if (!stats) return null;
+
+    return (
+        <div className="grid gap-4 md:grid-cols-2">
+            <StatCard 
+                title="Total Points" 
+                value={stats.points.toLocaleString()} 
+                icon={Award}
+                description="Points earned from completed tasks."
+            />
+            <StatCard 
+                title="Tasks Completed" 
+                value={stats.completed} 
+                icon={CheckCircle}
+                description="Total number of tasks you've submitted."
+            />
+        </div>
+    )
+}
 
 function TaskGrid({ tasks }: { tasks: Task[] }) {
   if (tasks.length === 0) {
@@ -51,7 +94,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
   );
 }
 
-function LoadingSkeleton() {
+function LoadingTaskGridSkeleton() {
     return (
         <div className="grid gap-6 mt-8 sm:grid-cols-2 lg:grid-cols-3">
             {[...Array(3)].map((_, i) => (
@@ -74,30 +117,54 @@ function LoadingSkeleton() {
 
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [userStats, setUserStats] = useState<{ points: number; completed: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
-    async function fetchTasks() {
+    async function fetchData() {
       if (!user) return;
+      setLoading(true);
       try {
-        const fetchedTasks = await getTasks(user.uid);
+        const [fetchedTasks, userData] = await Promise.all([
+            getTasks(user.uid),
+            getUserData(user.uid)
+        ]);
+        
         setTasks(fetchedTasks);
+        if (userData) {
+            setUserStats({
+                points: userData.points || 0,
+                completed: userData.completedTasks?.length || 0,
+            });
+        }
       } catch (error) {
-        console.error("Failed to fetch tasks:", error);
+        console.error("Failed to fetch dashboard data:", error);
       } finally {
         setLoading(false);
       }
     }
-    fetchTasks();
+    
+    if (user) {
+        fetchData();
+    }
   }, [user]);
 
   return (
     <div>
-      <h1 className="text-3xl font-bold font-headline">Available Tasks</h1>
-      <p className="text-muted-foreground mt-1">Select a task to complete and earn points.</p>
+      <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
+      <p className="text-muted-foreground mt-1">An overview of your contributions and available tasks.</p>
+
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold font-headline mb-4">Your Stats</h2>
+        <UserStats stats={userStats} loading={loading} />
+      </div>
       
-      {loading ? <LoadingSkeleton /> : <TaskGrid tasks={tasks} />}
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold font-headline">Available Tasks</h2>
+        <p className="text-muted-foreground mt-1">Select a task to complete and earn points.</p>
+        {loading ? <LoadingTaskGridSkeleton /> : <TaskGrid tasks={tasks} />}
+      </div>
     </div>
   );
 }
