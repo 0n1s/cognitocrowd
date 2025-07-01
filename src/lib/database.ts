@@ -113,6 +113,13 @@ export async function getPackages(): Promise<Package[]> {
     return snapshot.docs.map(doc => fromDoc<Package>(doc));
 }
 
+export async function getPackage(id: string): Promise<Package | null> {
+    if (!db) return null;
+    const docRef = doc(db, 'packages', id);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? fromDoc<Package>(docSnap) : null;
+}
+
 export async function getAdminUsers(): Promise<AdminUser[]> {
     if (!db) return [];
 

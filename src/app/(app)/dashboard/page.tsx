@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -5,9 +6,9 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTasks, getUserData } from '@/lib/database';
-import { ArrowRight, Award, CheckCircle } from 'lucide-react';
-import { Task } from '@/lib/types';
+import { getTasks, getUserData, getPackage } from '@/lib/database';
+import { ArrowRight, Award, CheckCircle, Repeat } from 'lucide-react';
+import { Task, Package } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -24,10 +25,18 @@ const StatCard = ({ title, value, icon: Icon, description }: { title: string; va
     </Card>
 );
 
-function UserStats({ stats, loading }: { stats: { points: number; completed: number } | null, loading: boolean}) {
+type UserStatsData = {
+    points: number;
+    completed: number;
+    dailyCount: number;
+    dailyLimit: number;
+};
+
+function UserStats({ stats, loading }: { stats: UserStatsData | null, loading: boolean}) {
     if (loading) {
         return (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
+                <Skeleton className="h-[100px]" />
                 <Skeleton className="h-[100px]" />
                 <Skeleton className="h-[100px]" />
             </div>
@@ -37,18 +46,24 @@ function UserStats({ stats, loading }: { stats: { points: number; completed: num
     if (!stats) return null;
 
     return (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
             <StatCard 
                 title="Total Points" 
                 value={stats.points.toLocaleString()} 
                 icon={Award}
-                description="Points earned from completed contributions."
+                description="Points earned from all contributions."
             />
             <StatCard 
                 title="Contributions Completed" 
                 value={stats.completed} 
                 icon={CheckCircle}
                 description="Total number of contributions you've submitted."
+            />
+            <StatCard
+                title="Today's Progress"
+                value={`${stats.dailyCount} / ${stats.dailyLimit}`}
+                icon={Repeat}
+                description="Contributions submitted today. Resets daily."
             />
         </div>
     )
@@ -115,9 +130,11 @@ function LoadingTaskGridSkeleton() {
     )
 }
 
+const FREE_TIER_DAILY_LIMIT = 50;
+
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [userStats, setUserStats] = useState<{ points: number; completed: number } | null>(null);
+  const [userStats, setUserStats] = useState<UserStatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -132,10 +149,24 @@ export default function DashboardPage() {
         ]);
         
         setTasks(fetchedTasks);
+
         if (userData) {
+            let userPackage: Package | null = null;
+            if (userData.packageId) {
+                userPackage = await getPackage(userData.packageId);
+            }
+            
+            const lastReset = userData.lastCompletionReset?.toDate() || new Date(0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const dailyCount = lastReset < today ? 0 : userData.dailyCompletedCount || 0;
+
             setUserStats({
                 points: userData.points || 0,
                 completed: userData.completedTasks?.length || 0,
+                dailyCount: dailyCount,
+                dailyLimit: userPackage?.taskLimit || FREE_TIER_DAILY_LIMIT,
             });
         }
       } catch (error) {

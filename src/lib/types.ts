@@ -54,6 +54,8 @@ export type User = {
   completedTasks?: string[];
   createdAt: any; // Firestore Timestamp
   role?: 'user' | 'admin';
+  dailyCompletedCount?: number;
+  lastCompletionReset?: any; // Firestore Timestamp
 };
 
 export type AdminUser = User & {

@@ -96,108 +96,130 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
         return { success: false, message: 'User not authenticated.' };
     }
 
-    const userDocRef = doc(db, 'users', userId);
-    const taskResponseColRef = collection(db, 'task_responses');
-    let newResponseRef; // Define here to be accessible in the whole function scope
+    let newResponseId: string | undefined;
 
     try {
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) {
-            return { success: false, message: 'User not found.' };
-        }
+        await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, 'users', userId);
+            const userDoc = await transaction.get(userRef);
 
-        const userData = userDoc.data() as User;
-        const completedTasks = userData.completedTasks || [];
+            if (!userDoc.exists()) {
+                throw new Error('User not found.');
+            }
 
-        if (completedTasks.includes(taskId)) {
-            return { success: false, message: 'You have already completed this contribution.' };
-        }
+            const userData = userDoc.data() as User;
+            const completedTasks = userData.completedTasks || [];
 
-        if (userData.packageId) {
-            const packageDocRef = doc(db, 'packages', userData.packageId);
-            const packageDoc = await getDoc(packageDocRef);
+            // 1. Check if task was ever completed to prevent re-dos
+            if (completedTasks.includes(taskId)) {
+                throw new Error('You have already completed this contribution.');
+            }
+            
+            // 2. Check daily limit
+            const FREE_TIER_DAILY_LIMIT = 50;
+            let packageLimit = FREE_TIER_DAILY_LIMIT;
 
-            if (packageDoc.exists()) {
-                const packageData = packageDoc.data() as Package;
-                if (completedTasks.length >= packageData.taskLimit) {
-                    return { success: false, message: 'You have reached your contribution limit for this period. Please upgrade your package to continue.' };
+            if (userData.packageId) {
+                const packageDocRef = doc(db, 'packages', userData.packageId);
+                const packageDoc = await transaction.get(packageDocRef);
+                if (packageDoc.exists()) {
+                    packageLimit = (packageDoc.data() as Package).taskLimit;
                 }
             }
-        } else {
-             const FREE_TIER_LIMIT = 50; 
-             if (completedTasks.length >= FREE_TIER_LIMIT) {
-                 return { success: false, message: 'You have reached your contribution limit for this period.' };
-             }
-        }
 
-        const batch = writeBatch(db);
+            let dailyCount = userData.dailyCompletedCount || 0;
+            const lastReset = userData.lastCompletionReset?.toDate() || new Date(0);
 
-        const responseData: Record<string, any> = {};
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Midnight today, local time
 
-        if (taskType === 'ranking') {
-            formData.forEach((value, key) => {
-                if (key !== 'ranking') responseData[key] = value;
-            });
-            responseData.ranking = formData.getAll('ranking');
-        } else if (taskType === 'label_multiple') {
-            const labels: string[] = [];
-            formData.forEach((value, key) => {
-                if (key.startsWith('label-')) {
-                    if (value === 'on') labels.push(key.replace('label-', ''));
-                } else {
+            if (lastReset < today) {
+                dailyCount = 0; // Reset for the new day
+            }
+            
+            if (dailyCount >= packageLimit) {
+                throw new Error('You have reached your daily contribution limit. Please try again tomorrow.');
+            }
+
+            // 3. Prepare response data
+            const responseData: Record<string, any> = {};
+            if (taskType === 'ranking') {
+                formData.forEach((value, key) => {
+                    if (key !== 'ranking') responseData[key] = value;
+                });
+                responseData.ranking = formData.getAll('ranking');
+            } else if (taskType === 'label_multiple') {
+                const labels: string[] = [];
+                formData.forEach((value, key) => {
+                    if (key.startsWith('label-')) {
+                        if (value === 'on') labels.push(key.replace('label-', ''));
+                    } else {
+                        responseData[key] = value;
+                    }
+                });
+                responseData.labels = labels;
+            } else {
+                formData.forEach((value, key) => {
                     responseData[key] = value;
-                }
-            });
-            responseData.labels = labels;
-        } else {
-            formData.forEach((value, key) => {
-                responseData[key] = value;
-            });
-        }
-        
-        newResponseRef = doc(taskResponseColRef);
-        batch.set(newResponseRef, {
-            userId,
-            taskId,
-            pointsEarned: points,
-            submittedAt: Timestamp.now(),
-            responseData,
-        });
-
-        const newPoints = (userData.points || 0) + points;
-        const newCompletedTasks = [...completedTasks, taskId];
-        batch.update(userDocRef, {
-            points: newPoints,
-            completedTasks: newCompletedTasks
-        });
-        
-        await batch.commit();
-
-        // After committing, trigger the AI ranking flow.
-        try {
-            const rankOutput = await rankTaskResponse({
-                taskId,
-                response: { userId, responseData }
-            });
-
-            if (rankOutput) {
-                await updateDoc(newResponseRef, {
-                    rank: rankOutput.rank,
-                    rankExplanation: rankOutput.explanation
                 });
             }
-        } catch (error) {
-            console.error("Failed to rank contribution response:", error);
-            // Don't block user return if ranking fails. It can be a background process.
-        }
 
+            // 4. Update user stats and create response document in transaction
+            const newPoints = (userData.points || 0) + points;
+            const newCompletedTasks = [...completedTasks, taskId];
+            const newDailyCount = dailyCount + 1;
+
+            transaction.update(userRef, {
+                points: newPoints,
+                completedTasks: newCompletedTasks,
+                dailyCompletedCount: newDailyCount,
+                lastCompletionReset: Timestamp.now()
+            });
+
+            const newResponseRef = doc(collection(db, "task_responses"));
+            newResponseId = newResponseRef.id;
+
+            transaction.set(newResponseRef, {
+                userId,
+                taskId,
+                pointsEarned: points,
+                submittedAt: Timestamp.now(),
+                responseData,
+            });
+        });
+
+        // 5. After transaction, trigger non-critical AI ranking
+        if (newResponseId) {
+             const newResponseDocRef = doc(db, 'task_responses', newResponseId);
+             const newResponseSnapshot = await getDoc(newResponseDocRef);
+             if (newResponseSnapshot.exists()) {
+                const responseData = newResponseSnapshot.data().responseData;
+                 try {
+                     const rankOutput = await rankTaskResponse({
+                         taskId,
+                         response: { userId, responseData }
+                     });
+                     if (rankOutput) {
+                         await updateDoc(newResponseDocRef, {
+                             rank: rankOutput.rank,
+                             rankExplanation: rankOutput.explanation
+                         });
+                     }
+                 } catch (rankError) {
+                     console.error("Failed to rank contribution response:", rankError);
+                 }
+             }
+        }
+        
         revalidatePath('/dashboard');
         revalidatePath(`/tasks/${taskId}`);
         revalidatePath('/rewards');
         return { success: true, points };
+
     } catch (error) {
         console.error("Error submitting task response:", error);
-        return { success: false, message: 'Failed to submit response.' };
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
     }
 }
 
@@ -281,7 +303,9 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             packageId,
             completedTasks: [],
             role: 'user',
-            createdAt: new Date(),
+            createdAt: Timestamp.now(),
+            dailyCompletedCount: 0,
+            lastCompletionReset: Timestamp.now(),
         });
         
         return { success: true };
