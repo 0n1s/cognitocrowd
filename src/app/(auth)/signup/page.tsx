@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
+import { setupNewUser } from '@/lib/actions';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName: name });
+        await setupNewUser(userCredential.user.uid, name, email);
       }
       toast({
         title: "Account Created!",

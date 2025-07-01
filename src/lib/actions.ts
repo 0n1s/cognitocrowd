@@ -3,7 +3,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit } from "firebase/firestore";
 import type { Task, TaskType, Package } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 
@@ -159,5 +159,38 @@ export async function deleteAdminPackage(id: string) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message: `Failed to delete package: ${errorMessage}` };
+    }
+}
+
+export async function setupNewUser(userId: string, name: string, email: string) {
+    if (!db) {
+        console.error("Database not configured.");
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const packagesCol = collection(db, 'packages');
+        const q = query(packagesCol, where('price', '==', 'Free'), limit(1));
+        const packageSnapshot = await getDocs(q);
+
+        let packageId: string | null = null;
+        if (!packageSnapshot.empty) {
+            packageId = packageSnapshot.docs[0].id;
+        }
+
+        const userDocRef = doc(db, 'users', userId);
+        await setDoc(userDocRef, {
+            name,
+            email,
+            points: 0,
+            packageId,
+            createdAt: new Date(),
+        });
+        
+        return { success: true };
+
+    } catch (error) {
+        console.error("Error setting up new user:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to set up new user: ${errorMessage}` };
     }
 }

@@ -49,6 +49,7 @@ export type User = {
   name: string;
   email: string;
   points: number;
+  packageId: string | null;
 };
 
 export type Reward = {
