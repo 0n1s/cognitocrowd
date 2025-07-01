@@ -1,7 +1,8 @@
 
 
+
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
@@ -260,17 +261,23 @@ export async function getMostRecentChat(userId: string): Promise<ChatSession | n
         const chatsCol = collection(db, 'chats');
         const q = query(
             chatsCol,
-            where('userId', '==', userId),
-            orderBy('updatedAt', 'desc'),
-            limit(1)
+            where('userId', '==', userId)
         );
         const snapshot = await getDocs(q);
         if (snapshot.empty) {
             return null;
         }
-        // Firestore Timestamps are not directly serializable for client components.
-        // Convert them to a serializable format (e.g., ISO string)
-        const chatData = fromDoc<ChatSession>(snapshot.docs[0]);
+
+        // Sort in code to avoid needing a composite index which might not exist.
+        const docs = snapshot.docs;
+        docs.sort((a, b) => {
+            const dateA = a.data().updatedAt as Timestamp;
+            const dateB = b.data().updatedAt as Timestamp;
+            return dateB.toMillis() - dateA.toMillis(); // Sort descending
+        });
+        
+        const mostRecentDoc = docs[0];
+        const chatData = fromDoc<ChatSession>(mostRecentDoc);
         return chatData;
 
     } catch (error) {
