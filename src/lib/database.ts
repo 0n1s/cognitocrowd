@@ -136,3 +136,28 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
 
     return users;
 }
+
+export async function getDashboardStats() {
+    if (!db) return { totalUsers: 0, totalTasksCompleted: 0, activeTasks: 0 };
+
+    const usersCol = collection(db, 'users');
+    const tasksCol = collection(db, 'tasks');
+    const responsesCol = collection(db, 'task_responses');
+
+    try {
+        const [usersSnapshot, tasksSnapshot, responsesSnapshot] = await Promise.all([
+            getDocs(usersCol),
+            getDocs(query(tasksCol, where('status', '==', 'Active'))),
+            getDocs(responsesCol),
+        ]);
+
+        return {
+            totalUsers: usersSnapshot.size,
+            activeTasks: tasksSnapshot.size,
+            totalTasksCompleted: responsesSnapshot.size,
+        };
+    } catch (error) {
+        console.error("Failed to fetch dashboard stats:", error);
+        return { totalUsers: 0, totalTasksCompleted: 0, activeTasks: 0 };
+    }
+}

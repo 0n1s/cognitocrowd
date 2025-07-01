@@ -1,12 +1,50 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, Users, BarChart } from 'lucide-react';
+import { ClipboardList, Users, BarChart, CheckCircle2, Users2 } from 'lucide-react';
+import { getDashboardStats } from '@/lib/database';
 
-export default function AdminDashboardPage() {
+const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description: string }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <Icon className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+            <div className="text-2xl font-bold">{value}</div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+        </CardContent>
+    </Card>
+);
+
+export default async function AdminDashboardPage() {
+    const stats = await getDashboardStats();
+
     return (
         <div>
             <h1 className="text-3xl font-bold font-headline">Admin Dashboard</h1>
             <p className="text-muted-foreground mt-1">Overview and management tools.</p>
+            
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-8">
+                <StatCard 
+                    title="Total Users" 
+                    value={stats.totalUsers} 
+                    icon={Users2}
+                    description="Total registered users on the platform."
+                />
+                <StatCard 
+                    title="Tasks Completed" 
+                    value={stats.totalTasksCompleted.toLocaleString()} 
+                    icon={CheckCircle2}
+                    description="Total responses submitted by all users."
+                />
+                <StatCard 
+                    title="Active Tasks" 
+                    value={stats.activeTasks} 
+                    icon={ClipboardList}
+                    description="Tasks currently available for users."
+                />
+            </div>
+
             <div className="grid gap-6 mt-8 sm:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader>
