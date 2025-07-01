@@ -87,7 +87,7 @@ export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
 }
 
 
-export async function submitTaskResponse(taskId: string, points: number, formData: FormData, userId: string) {
+export async function submitTaskResponse(taskId: string, points: number, formData: FormData, userId: string, taskType: TaskType) {
     if (!db) {
         return { success: false, message: 'Database not configured.' };
     }
@@ -130,7 +130,38 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
 
         const batch = writeBatch(db);
 
-        const responseData = Object.fromEntries(formData.entries());
+        const responseData: Record<string, any> = {};
+
+        if (taskType === 'ranking') {
+            // All other fields
+            formData.forEach((value, key) => {
+                if (key !== 'ranking') {
+                    responseData[key] = value;
+                }
+            });
+            // Ranking array
+            responseData.ranking = formData.getAll('ranking');
+
+        } else if (taskType === 'label_multiple') {
+            const labels: string[] = [];
+            // All other fields
+            formData.forEach((value, key) => {
+                if (key.startsWith('label-')) {
+                    if (value === 'on') { // Checkboxes send 'on' when checked
+                        labels.push(key.replace('label-', ''));
+                    }
+                } else {
+                    responseData[key] = value;
+                }
+            });
+            responseData.labels = labels;
+        } else {
+            // Default for other types
+            formData.forEach((value, key) => {
+                responseData[key] = value;
+            });
+        }
+        
         const newResponseRef = doc(taskResponseColRef);
         batch.set(newResponseRef, {
             userId,

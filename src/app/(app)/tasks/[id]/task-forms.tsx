@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Task, TaskSettings } from "@/lib/types";
@@ -10,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { submitTaskResponse } from "@/lib/actions";
 import { useAuth } from "@/hooks/use-auth";
@@ -51,6 +52,50 @@ export function TaskForms({ task }: { task: Task }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  
+  const initialRanking = task.type === 'ranking' ? task.options?.map(opt => typeof opt === 'string' ? opt : '') ?? [] : [];
+  const [rankedItems, setRankedItems] = useState(initialRanking);
+
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragItem.current = position;
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragOverItem.current = position;
+    e.currentTarget.classList.add('bg-accent');
+  };
+  
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+      e.currentTarget.classList.remove('bg-accent');
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove('bg-accent');
+    if (dragItem.current === null || dragOverItem.current === null || dragItem.current === dragOverItem.current) {
+        dragItem.current = null;
+        dragOverItem.current = null;
+        return;
+    }
+    
+    const newRankedItems = [...rankedItems];
+    const dragItemContent = newRankedItems[dragItem.current];
+    newRankedItems.splice(dragItem.current, 1);
+    newRankedItems.splice(dragOverItem.current, 0, dragItemContent);
+    
+    dragItem.current = null;
+    dragOverItem.current = null;
+    
+    setRankedItems(newRankedItems);
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +109,13 @@ export function TaskForms({ task }: { task: Task }) {
 
     const formData = new FormData(event.currentTarget);
     
-    const result = await submitTaskResponse(task.id, task.points, formData, user.uid);
+    if (task.type === 'ranking') {
+        rankedItems.forEach(item => {
+            formData.append('ranking', item);
+        });
+    }
+    
+    const result = await submitTaskResponse(task.id, task.points, formData, user.uid, task.type);
 
     if (result.success) {
         toast({
@@ -134,12 +185,19 @@ export function TaskForms({ task }: { task: Task }) {
         formContent = (
           <>
             <p className="text-muted-foreground">Drag and drop to rank the items (1 is highest).</p>
-            {/* A real implementation would use a drag-and-drop library */}
             <div className="space-y-2">
-                {task.options?.map((option, index) => (
-                    <div key={index} className="flex items-center p-3 border rounded-md bg-muted">
-                        <input type="hidden" name={`ranking-${index}`} value={option as string} />
-                        <span className="font-bold mr-4">{index + 1}</span>
+                {rankedItems.map((option, index) => (
+                    <div
+                        key={option as string}
+                        className="flex items-center p-3 border rounded-md bg-muted cursor-grab transition-colors active:cursor-grabbing"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDragLeave={handleDragLeave}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                      >
+                        <span className="font-bold mr-4 text-muted-foreground">{index + 1}</span>
                         <span>{option as string}</span>
                     </div>
                 ))}
