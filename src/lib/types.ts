@@ -1,11 +1,46 @@
-export type Task = {
+export type TaskOption =
+  | string
+  | { text: string }
+  | { label: string; text: string };
+
+export interface LikertScale {
+  min: number;
+  max: number;
+  labels: { [key: number]: string };
+}
+
+export interface TaskSettings {
+  allow_comment?: boolean;
+  allow_confidence?: boolean;
+  min_chars?: number;
+  max_chars?: number;
+  allow_multi_select?: boolean;
+}
+
+export type TaskType =
+  | 'multiple_choice_preference'
+  | 'ranking'
+  | 'likert_scale'
+  | 'classification'
+  | 'sentiment'
+  | 'topic_classification'
+  | 'open_text_feedback'
+  | 'compare_pairwise'
+  | 'label_multiple';
+
+export interface Task {
   id: string;
-  title: string;
-  description: string;
+  title: string; // Corresponds to 'question' in JSON
+  description?: string; // Corresponds to 'context' in JSON
   points: number;
   difficulty: 'Easy' | 'Medium' | 'Hard';
-  type: 'open_text_feedback' | 'multiple_choice_preference' | 'ranking' | 'classification';
-  options?: string[]; // For multiple choice or ranking
+  type: TaskType;
+  options?: TaskOption[];
+  scale?: LikertScale;
+  settings?: TaskSettings;
+  award_criteria?: {
+    explanation: string;
+  };
 };
 
 export type User = {

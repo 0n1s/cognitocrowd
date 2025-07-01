@@ -3,55 +3,102 @@ import { Task, LeaderboardEntry, Reward, CompletedTask, Package, AdminTask } fro
 export const mockTasks: Task[] = [
   {
     id: '1',
-    title: 'Describe this Image',
-    description: 'Provide a detailed description of the provided image to help train our vision models.',
-    points: 150,
+    type: 'multiple_choice_preference',
+    title: 'Which response feels more professional?',
+    description: "User: I need my invoice right now.",
+    options: [
+        { "text": "I'm on it. You'll receive it shortly." },
+        { "text": "Relax, it's coming." },
+        { "text": "Just wait a minute." }
+    ],
+    settings: {
+        allow_comment: true,
+        allow_confidence: true
+    },
+    points: 75,
     difficulty: 'Easy',
-    type: 'open_text_feedback',
   },
   {
     id: '2',
-    title: 'Which Headline is Better?',
-    description: 'Choose the most engaging headline from the options below for an article about space exploration.',
-    points: 75,
-    difficulty: 'Easy',
-    type: 'multiple_choice_preference',
-    options: ['Voyage to the Stars', 'Cosmic Journeys Unveiled', 'The Final Frontier Awaits'],
+    type: 'ranking',
+    title: 'Rank the following responses from most to least helpful.',
+    description: "User: I can't log into my account.",
+    options: [
+      "Please try resetting your password.",
+      "That's not my problem.",
+      "Make sure you're using the right username."
+    ],
+    settings: {
+      allow_comment: true
+    },
+    points: 200,
+    difficulty: 'Medium',
   },
   {
     id: '3',
-    title: 'Rank these Features',
-    description: 'Rank the following features for a new productivity app from most to least important.',
-    points: 200,
-    difficulty: 'Medium',
-    type: 'ranking',
-    options: ['Dark Mode', 'AI Assistant', 'Offline Access', 'Third-party Integrations'],
+    type: 'likert_scale',
+    title: 'Rate the clarity of this instruction.',
+    description: "Click your avatar, then choose 'Edit Profile'.",
+    scale: {
+      min: 1,
+      max: 5,
+      labels: {
+        "1": "Very unclear",
+        "5": "Very clear"
+      }
+    },
+    settings: {
+      allow_comment: true,
+      allow_confidence: true
+    },
+    points: 100,
+    difficulty: 'Easy'
   },
   {
     id: '4',
-    title: 'Classify Customer Feedback',
-    description: 'Read the customer review and classify its sentiment as positive, negative, or neutral.',
-    points: 100,
+    type: 'open_text_feedback',
+    title: 'How would you improve this assistant response?',
+    description: "I already told you what to do.",
+    settings: {
+      min_chars: 10,
+      max_chars: 300
+    },
+    points: 150,
     difficulty: 'Medium',
-    type: 'classification',
-    options: ['Positive', 'Negative', 'Neutral']
   },
   {
     id: '5',
-    title: 'Translate this Phrase',
-    description: 'Provide a natural-sounding translation of the given English phrase into French.',
-    points: 250,
-    difficulty: 'Hard',
-    type: 'open_text_feedback',
+    type: 'compare_pairwise',
+    title: 'Which response is better?',
+    description: "User: My order arrived broken.",
+    options: [
+      { "label": "Response A", "text": "Sorry to hear that! I’ll help you right away." },
+      { "label": "Response B", "text": "Not my problem. Contact the courier." }
+    ],
+    settings: {
+      allow_comment: true,
+      allow_confidence: true
+    },
+    points: 125,
+    difficulty: 'Medium',
   },
   {
     id: '6',
-    title: 'Choose the Best Logo',
-    description: 'Select the logo design you find most appealing for a new coffee brand.',
-    points: 50,
-    difficulty: 'Easy',
-    type: 'multiple_choice_preference',
-    options: ['Logo A', 'Logo B', 'Logo C'],
+    type: 'label_multiple',
+    title: 'Which of the following labels apply to this sentence?',
+    description: "I can’t believe they hired someone like her.",
+    options: [
+      "Biased",
+      "Offensive",
+      "Neutral",
+      "Needs context"
+    ],
+    settings: {
+      allow_multi_select: true,
+      allow_comment: true
+    },
+    points: 250,
+    difficulty: 'Hard',
   },
 ];
 
