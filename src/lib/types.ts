@@ -136,3 +136,19 @@ export type WithdrawalRequest = {
   requestedAt: any; // Firestore Timestamp
   processedAt?: any; // Firestore Timestamp
 };
+
+export type ChatMessage = {
+  id: string;
+  text: string;
+  sender: 'user' | 'ai';
+  createdAt: any; // Firestore Timestamp
+};
+
+export type ChatSession = {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+  messages: ChatMessage[];
+};

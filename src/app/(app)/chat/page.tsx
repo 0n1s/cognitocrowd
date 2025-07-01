@@ -1,14 +1,35 @@
 import { aiAssistantTaskGuidance } from "@/ai/flows/ai-assistant-chat";
+import { logChatInteraction } from "@/lib/actions";
 import { ChatUI } from "./chat-ui";
 
-async function handleChat(query: string) {
+type HandleChatResult = {
+    aiResponse: string;
+    newChatId: string;
+};
+
+async function handleChat(query: string, userId: string, chatId: string | null): Promise<HandleChatResult> {
     "use server";
     try {
         const result = await aiAssistantTaskGuidance({ query });
-        return result.response;
+        const aiResponse = result.response;
+
+        const logResult = await logChatInteraction(userId, chatId, query, aiResponse);
+
+        if (!logResult.success) {
+            console.error("Failed to log chat interaction:", logResult.message);
+            // We can still return the AI response to the user even if saving fails
+        }
+        
+        return { 
+            aiResponse,
+            newChatId: logResult.newChatId
+        };
     } catch (error) {
         console.error("Error in AI assistant:", error);
-        return "Sorry, I encountered an error. Please try again later.";
+        return {
+            aiResponse: "Sorry, I encountered an error. Please try again later.",
+            newChatId: chatId || ''
+        };
     }
 }
 

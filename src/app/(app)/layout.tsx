@@ -15,6 +15,7 @@ import {
   SidebarTrigger,
   SidebarInset,
   useSidebar,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   LayoutGrid,
@@ -28,6 +29,8 @@ import {
   BarChart,
   Loader2,
   ClipboardList,
+  Image,
+  Video,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -50,8 +53,14 @@ const navItems = [
   { href: "/leaderboard", icon: Users, label: "Leaderboard" },
   { href: "/redeem", icon: Gift, label: "Redeem" },
   { href: "/packages", icon: Package, label: "Packages" },
-  { href: "/chat", icon: MessageCircle, label: "AI Chat" },
 ];
+
+const aiToolsNavItems = [
+  { href: "/chat", icon: MessageCircle, label: "Chat Models" },
+  { href: "#", icon: Image, label: "Image Models" },
+  { href: "#", icon: Video, label: "Video Models" },
+];
+
 
 const AppHeader = () => {
   const { isMobile } = useSidebar();
@@ -149,6 +158,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   asChild
                   isActive={pathname.startsWith(item.href)}
                   tooltip={item.label}
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+          <SidebarSeparator className="my-2" />
+          <div className="px-2">
+            <div className="px-2 py-1 text-xs font-semibold text-sidebar-foreground/70">
+                AI Tools
+            </div>
+          </div>
+          <SidebarMenu>
+            {aiToolsNavItems.map((item) => (
+              <SidebarMenuItem key={item.label}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith(item.href) && item.href !== "#"}
+                  tooltip={item.label}
+                  disabled={item.href === "#"}
                 >
                   <Link href={item.href}>
                     <item.icon />

@@ -3,10 +3,11 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction } from "firebase/firestore";
-import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest } from "@/lib/types";
+import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
+import { v4 as uuidv4 } from "uuid";
 
 export type CreateTaskInput = {
     title: string;
@@ -459,4 +460,60 @@ export async function updateWithdrawalRequestStatus(
       const message = error instanceof Error ? error.message : "An unknown error occurred.";
       return { success: false, message };
   }
+}
+
+export async function logChatInteraction(
+    userId: string,
+    chatId: string | null,
+    userQuery: string,
+    aiResponse: string
+): Promise<{ success: boolean; newChatId: string; message?: string }> {
+    if (!db) return { success: false, newChatId: chatId || '', message: "Database not configured." };
+    if (!userId) return { success: false, newChatId: chatId || '', message: "User not authenticated." };
+
+    try {
+        const userMessage: ChatMessage = {
+            id: uuidv4(),
+            text: userQuery,
+            sender: 'user',
+            createdAt: Timestamp.now(),
+        };
+
+        const aiMessage: ChatMessage = {
+            id: uuidv4(),
+            text: aiResponse,
+            sender: 'ai',
+            createdAt: Timestamp.now(),
+        };
+        
+        let currentChatId = chatId;
+
+        if (currentChatId) {
+            // Update existing chat session
+            const chatRef = doc(db, 'chats', currentChatId);
+            await updateDoc(chatRef, {
+                messages: arrayUnion(userMessage, aiMessage),
+                updatedAt: Timestamp.now(),
+            });
+        } else {
+            // Create new chat session
+            const newChatRef = doc(collection(db, 'chats'));
+            await setDoc(newChatRef, {
+                userId,
+                title: userQuery.substring(0, 50),
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+                messages: [userMessage, aiMessage],
+            });
+            currentChatId = newChatRef.id;
+        }
+
+        revalidatePath('/chat'); // In case we add a chat history view later
+        return { success: true, newChatId: currentChatId };
+
+    } catch (error) {
+        console.error("Error logging chat interaction:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, newChatId: chatId || '', message };
+    }
 }

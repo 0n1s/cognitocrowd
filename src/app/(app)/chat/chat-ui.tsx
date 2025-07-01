@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 type Message = {
     id: string;
@@ -14,26 +15,35 @@ type Message = {
     sender: "user" | "ai";
 };
 
+type HandleChatResult = {
+    aiResponse: string;
+    newChatId: string;
+};
+
 type ChatUIProps = {
-    handleChat: (query: string) => Promise<string>;
+    handleChat: (query: string, userId: string, chatId: string | null) => Promise<HandleChatResult>;
 };
 
 export function ChatUI({ handleChat }: ChatUIProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [chatId, setChatId] = useState<string | null>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const { user } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input || isLoading) return;
+        if (!input || isLoading || !user) return;
 
         const userMessage: Message = { id: Date.now().toString(), text: input, sender: "user" };
         setMessages((prev) => [...prev, userMessage]);
+        const currentInput = input;
         setInput("");
         setIsLoading(true);
 
-        const aiResponse = await handleChat(input);
+        const { aiResponse, newChatId } = await handleChat(currentInput, user.uid, chatId);
+        setChatId(newChatId);
         
         const aiMessage: Message = { id: (Date.now() + 1).toString(), text: aiResponse, sender: "ai" };
         setMessages((prev) => [...prev, aiMessage]);
@@ -66,7 +76,7 @@ export function ChatUI({ handleChat }: ChatUIProps) {
                             </div>
                              {message.sender === "user" && (
                                 <Avatar className="h-8 w-8">
-                                    <AvatarFallback>U</AvatarFallback>
+                                    <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
                                 </Avatar>
                             )}
                         </div>
