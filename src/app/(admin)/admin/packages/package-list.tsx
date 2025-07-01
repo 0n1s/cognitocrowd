@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -198,9 +199,10 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
     const [price, setPrice] = useState(pkg.price);
     const [features, setFeatures] = useState(pkg.features.length > 0 ? pkg.features : [""]);
     const [isPrimary, setIsPrimary] = useState(pkg.isPrimary || false);
-    const [taskLimit, setTaskLimit] = useState(String(pkg.taskLimit));
+    const [taskLimit, setTaskLimit] = useState(String(pkg.taskLimit || 100));
     
-    const [initialExpiryValue, initialExpiryUnitName] = pkg.expiryPeriod.split(' ');
+    const safeExpiryPeriod = pkg.expiryPeriod || "1 months";
+    const [initialExpiryValue, initialExpiryUnitName] = safeExpiryPeriod.split(' ');
     const initialExpiryNumber = parseInt(initialExpiryValue, 10);
     const initialExpiryUnit = initialExpiryUnitName.startsWith('week') ? 'weeks' : 'months';
 
