@@ -27,7 +27,7 @@ export async function getTasks(userId?: string): Promise<Task[]> {
 
     let allTasks: Task[] = [];
     if (snapshot.empty && mockTasks.length > 0) {
-        console.log('No tasks found. Seeding database with mock data...');
+        console.log('No contributions found. Seeding database with mock data...');
         const batch = writeBatch(db);
         mockTasks.forEach((task) => {
             const { id, ...taskData } = task; // Firestore will generate its own ID

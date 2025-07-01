@@ -34,11 +34,11 @@ export async function createAdminTask(data: CreateTaskInput) {
         await addDoc(collection(db, "tasks"), taskToAdd);
 
         revalidatePath("/admin/tasks");
-        return { success: true, message: 'Task created successfully.' };
+        return { success: true, message: 'Contribution created successfully.' };
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message: `Failed to create task: ${errorMessage}` };
+        return { success: false, message: `Failed to create contribution: ${errorMessage}` };
     }
 }
 
@@ -50,7 +50,7 @@ export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
         const generatedData = await bulkGenerateTasks(data);
 
         if (!generatedData || !generatedData.tasks || generatedData.tasks.length === 0) {
-            return { success: false, message: 'AI failed to generate tasks.' };
+            return { success: false, message: 'AI failed to generate contributions.' };
         }
 
         const batch = writeBatch(db);
@@ -79,11 +79,11 @@ export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
         await batch.commit();
 
         revalidatePath("/admin/tasks");
-        return { success: true, message: `${generatedData.tasks.length} tasks created successfully.` };
+        return { success: true, message: `${generatedData.tasks.length} contributions created successfully.` };
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message: `Failed to create tasks: ${errorMessage}` };
+        return { success: false, message: `Failed to create contributions: ${errorMessage}` };
     }
 }
 
@@ -110,7 +110,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
         const completedTasks = userData.completedTasks || [];
 
         if (completedTasks.includes(taskId)) {
-            return { success: false, message: 'You have already completed this task.' };
+            return { success: false, message: 'You have already completed this contribution.' };
         }
 
         if (userData.packageId) {
@@ -120,13 +120,13 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
             if (packageDoc.exists()) {
                 const packageData = packageDoc.data() as Package;
                 if (completedTasks.length >= packageData.taskLimit) {
-                    return { success: false, message: 'You have reached your task limit for this period. Please upgrade your package to continue.' };
+                    return { success: false, message: 'You have reached your contribution limit for this period. Please upgrade your package to continue.' };
                 }
             }
         } else {
              const FREE_TIER_LIMIT = 50; 
              if (completedTasks.length >= FREE_TIER_LIMIT) {
-                 return { success: false, message: 'You have reached your task limit for this period.' };
+                 return { success: false, message: 'You have reached your contribution limit for this period.' };
              }
         }
 
@@ -187,7 +187,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
                 });
             }
         } catch (error) {
-            console.error("Failed to rank task response:", error);
+            console.error("Failed to rank contribution response:", error);
             // Don't block user return if ranking fails. It can be a background process.
         }
 

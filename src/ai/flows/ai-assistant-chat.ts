@@ -2,7 +2,7 @@
 'use server';
 
 /**
- * @fileOverview AI assistant chat flow for providing task guidance.
+ * @fileOverview AI assistant chat flow for providing contribution guidance.
  *
  * - aiAssistantTaskGuidance - A function that handles the AI assistant chat process.
  * - AiAssistantTaskGuidanceInput - The input type for the aiAssistantTaskGuidance function.
@@ -13,12 +13,12 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const AiAssistantTaskGuidanceInputSchema = z.object({
-  query: z.string().describe('The user query for task guidance.'),
+  query: z.string().describe('The user query for contribution guidance.'),
 });
 export type AiAssistantTaskGuidanceInput = z.infer<typeof AiAssistantTaskGuidanceInputSchema>;
 
 const AiAssistantTaskGuidanceOutputSchema = z.object({
-  response: z.string().describe('The AI assistant response providing task guidance.'),
+  response: z.string().describe('The AI assistant response providing contribution guidance.'),
 });
 export type AiAssistantTaskGuidanceOutput = z.infer<typeof AiAssistantTaskGuidanceOutputSchema>;
 
@@ -30,8 +30,8 @@ const prompt = ai.definePrompt({
   name: 'aiAssistantTaskGuidancePrompt',
   input: {schema: AiAssistantTaskGuidanceInputSchema},
   output: {schema: AiAssistantTaskGuidanceOutputSchema},
-  prompt: `You are a helpful AI assistant that provides guidance on available tasks.
-  A user will ask you a question about the tasks, and you should respond with helpful and informative advice.
+  prompt: `You are a helpful AI assistant that provides guidance on available contributions.
+  A user will ask you a question about the contributions, and you should respond with helpful and informative advice.
   User query: {{{query}}}`,
 });
 

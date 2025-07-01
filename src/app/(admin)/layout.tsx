@@ -43,7 +43,7 @@ import { signOut } from "firebase/auth";
 
 const navItems = [
   { href: "/admin/dashboard", icon: LayoutGrid, label: "Dashboard" },
-  { href: "/admin/tasks", icon: ClipboardList, label: "Tasks" },
+  { href: "/admin/tasks", icon: ClipboardList, label: "Contributions" },
   { href: "/admin/packages", icon: Package, label: "Packages" },
   { href: "/admin/users", icon: Users, label: "Users" },
   { href: "/admin/withdrawals", icon: Banknote, label: "Withdrawals" },

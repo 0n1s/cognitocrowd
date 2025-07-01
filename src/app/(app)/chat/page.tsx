@@ -17,7 +17,7 @@ export default function ChatPage() {
         <div className="h-full flex flex-col">
             <div className="mb-4">
                 <h1 className="text-3xl font-bold font-headline">AI Assistant</h1>
-                <p className="text-muted-foreground mt-1">Ask me anything about available tasks or how to get started.</p>
+                <p className="text-muted-foreground mt-1">Ask me anything about available contributions or how to get started.</p>
             </div>
             <ChatUI handleChat={handleChat} />
         </div>

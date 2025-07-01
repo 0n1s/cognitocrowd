@@ -48,7 +48,7 @@ export default function Home() {
             Shape the Future of AI
           </h1>
           <p className="mx-auto max-w-[700px] text-lg text-muted-foreground md:text-xl mt-4">
-            Join CognitoCrowd and help train intelligent models by completing simple, gamified tasks. Earn points, climb the leaderboard, and get real rewards for your contributions.
+            Join CognitoCrowd and help train intelligent models by completing simple, gamified contributions. Earn points, climb the leaderboard, and get real rewards for your contributions.
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Button size="lg" asChild>
@@ -67,11 +67,11 @@ export default function Home() {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                   <Zap className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="font-headline mt-4">Engaging Tasks</CardTitle>
+                <CardTitle className="font-headline mt-4">Engaging Contributions</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Complete a variety of fun and simple tasks, from image classification to text feedback, designed to be engaging and rewarding.
+                  Complete a variety of fun and simple contributions, from image classification to text feedback, designed to be engaging and rewarding.
                 </p>
               </CardContent>
             </Card>
@@ -120,8 +120,8 @@ export default function Home() {
                          <li className="flex items-start">
                             <div className="flex-shrink-0"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">2</div></div>
                             <div className="ml-4">
-                                <h3 className="text-lg font-semibold">Complete Tasks</h3>
-                                <p className="text-muted-foreground">Browse the dashboard for available tasks and complete them at your own pace.</p>
+                                <h3 className="text-lg font-semibold">Complete Contributions</h3>
+                                <p className="text-muted-foreground">Browse the dashboard for available contributions and complete them at your own pace.</p>
                             </div>
                         </li>
                          <li className="flex items-start">

@@ -16,7 +16,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
     return (
       <Card className="mt-8">
         <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">No available tasks at the moment. Check back later!</p>
+          <p className="text-center text-muted-foreground">No available contributions at the moment. Check back later!</p>
         </CardContent>
       </Card>
     );
@@ -42,7 +42,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
           </CardContent>
           <CardFooter>
             <Button asChild className="w-full">
-              <Link href={`/tasks/${task.id}`}>Start Task <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link href={`/tasks/${task.id}`}>Start Contribution <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </CardFooter>
         </Card>
@@ -98,8 +98,8 @@ export default function TasksPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold font-headline">Available Tasks</h1>
-      <p className="text-muted-foreground mt-1">Select a task to complete and earn points.</p>
+      <h1 className="text-3xl font-bold font-headline">Available Contributions</h1>
+      <p className="text-muted-foreground mt-1">Select a contribution to complete and earn points.</p>
       {loading ? <LoadingTaskGridSkeleton /> : <TaskGrid tasks={tasks} />}
     </div>
   );

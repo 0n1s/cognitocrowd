@@ -52,7 +52,7 @@ export default function TaskPage() {
       try {
         const userData = await getUserData(user.uid);
         if (userData?.completedTasks?.includes(params.id)) {
-            toast({ title: "Task unavailable", description: "You have already completed this task." });
+            toast({ title: "Contribution unavailable", description: "You have already completed this contribution." });
             router.push('/dashboard');
             return;
         }

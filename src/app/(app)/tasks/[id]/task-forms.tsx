@@ -102,7 +102,7 @@ export function TaskForms({ task }: { task: Task }) {
     setIsSubmitting(true);
     
     if (!user) {
-        toast({ title: "Authentication Error", description: "You must be logged in to submit a task.", variant: "destructive" });
+        toast({ title: "Authentication Error", description: "You must be logged in to submit a contribution.", variant: "destructive" });
         setIsSubmitting(false);
         return;
     }
@@ -119,7 +119,7 @@ export function TaskForms({ task }: { task: Task }) {
 
     if (result.success) {
         toast({
-            title: "Task Submitted!",
+            title: "Contribution Submitted!",
             description: `You've earned ${result.points} points for completing "${task.title}".`,
         });
 

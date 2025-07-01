@@ -9,7 +9,7 @@ export default function RewardsPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold font-headline">My Rewards</h1>
-      <p className="text-muted-foreground mt-1">Track your points and task history.</p>
+      <p className="text-muted-foreground mt-1">Track your points and contribution history.</p>
 
       <div className="grid gap-6 mt-8 md:grid-cols-3">
         <Card className="md:col-span-1">
@@ -26,13 +26,13 @@ export default function RewardsPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Task History</CardTitle>
+          <CardTitle>Contribution History</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Task</TableHead>
+                <TableHead>Contribution</TableHead>
                 <TableHead>Date Completed</TableHead>
                 <TableHead className="text-right">Points Earned</TableHead>
               </TableRow>

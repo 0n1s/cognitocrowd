@@ -42,13 +42,13 @@ function UserStats({ stats, loading }: { stats: { points: number; completed: num
                 title="Total Points" 
                 value={stats.points.toLocaleString()} 
                 icon={Award}
-                description="Points earned from completed tasks."
+                description="Points earned from completed contributions."
             />
             <StatCard 
-                title="Tasks Completed" 
+                title="Contributions Completed" 
                 value={stats.completed} 
                 icon={CheckCircle}
-                description="Total number of tasks you've submitted."
+                description="Total number of contributions you've submitted."
             />
         </div>
     )
@@ -59,7 +59,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
     return (
       <Card className="mt-8">
         <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">No available tasks at the moment. Check back later!</p>
+          <p className="text-center text-muted-foreground">No available contributions at the moment. Check back later!</p>
         </CardContent>
       </Card>
     );
@@ -85,7 +85,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
           </CardContent>
           <CardFooter>
             <Button asChild className="w-full">
-              <Link href={`/tasks/${task.id}`}>Start Task <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link href={`/tasks/${task.id}`}>Start Contribution <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </CardFooter>
         </Card>
@@ -163,11 +163,11 @@ export default function DashboardPage() {
       <div className="mt-12">
         <div className="flex justify-between items-center">
             <div>
-                <h2 className="text-2xl font-bold font-headline">Available Tasks</h2>
-                <p className="text-muted-foreground mt-1">A preview of the latest tasks available.</p>
+                <h2 className="text-2xl font-bold font-headline">Available Contributions</h2>
+                <p className="text-muted-foreground mt-1">A preview of the latest contributions available.</p>
             </div>
             <Button asChild variant="outline">
-                <Link href="/tasks">View All Tasks <ArrowRight className="ml-2 h-4 w-4"/></Link>
+                <Link href="/tasks">View All Contributions <ArrowRight className="ml-2 h-4 w-4"/></Link>
             </Button>
         </div>
         {loading ? <LoadingTaskGridSkeleton /> : <TaskGrid tasks={tasks.slice(0, 3)} />}

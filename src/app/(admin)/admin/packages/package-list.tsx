@@ -130,7 +130,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
             <Input id="price" value={price} onChange={e => setPrice(e.target.value)} className="col-span-3" placeholder="e.g., $10/mo or Free" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="taskLimit" className="text-right">Task Limit</Label>
+            <Label htmlFor="taskLimit" className="text-right">Contribution Limit</Label>
             <Input id="taskLimit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -273,7 +273,7 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             <Input id="price" value={price} onChange={e => setPrice(e.target.value)} className="col-span-3" placeholder="e.g., $10/mo or Free" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="taskLimit" className="text-right">Task Limit</Label>
+            <Label htmlFor="taskLimit" className="text-right">Contribution Limit</Label>
             <Input id="taskLimit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -390,7 +390,7 @@ const LoadingSkeleton = () => (
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Price</TableHead>
-              <TableHead>Task Limit</TableHead>
+              <TableHead>Contribution Limit</TableHead>
               <TableHead>Expiry</TableHead>
               <TableHead>Primary</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -453,7 +453,7 @@ export function PackageList() {
                     <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Price</TableHead>
-                    <TableHead>Task Limit</TableHead>
+                    <TableHead>Contribution Limit</TableHead>
                     <TableHead>Expiry</TableHead>
                     <TableHead>Primary</TableHead>
                     <TableHead className="text-right">Actions</TableHead>

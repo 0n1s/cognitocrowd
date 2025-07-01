@@ -72,7 +72,7 @@ export default function TaskResultsPage() {
   return (
     <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold font-headline">Task Results: {task.title}</h1>
+            <h1 className="text-3xl font-bold font-headline">Contribution Results: {task.title}</h1>
             <Button asChild variant="outline">
                 <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" />Back to Dashboard</Link>
             </Button>

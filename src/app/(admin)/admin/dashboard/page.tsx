@@ -32,7 +32,7 @@ export default async function AdminDashboardPage() {
                     description="Total registered users on the platform."
                 />
                 <StatCard 
-                    title="Tasks Completed" 
+                    title="Contributions Completed" 
                     value={stats.totalTasksCompleted.toLocaleString()} 
                     icon={CheckCircle2}
                     description="Total responses submitted by all users."
@@ -44,10 +44,10 @@ export default async function AdminDashboardPage() {
                     description="User withdrawal requests needing review."
                 />
                 <StatCard 
-                    title="Active Tasks" 
+                    title="Active Contributions" 
                     value={stats.activeTasks} 
                     icon={ClipboardList}
-                    description="Tasks currently available for users."
+                    description="Contributions currently available for users."
                 />
             </div>
 
@@ -56,13 +56,13 @@ export default async function AdminDashboardPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <ClipboardList className="h-5 w-5" />
-                            Task Management
+                            Contribution Management
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-muted-foreground">Create, edit, and manage all user tasks.</p>
+                        <p className="text-muted-foreground">Create, edit, and manage all user contributions.</p>
                         <Link href="/admin/tasks" className="text-primary font-semibold mt-4 inline-block">
-                            Go to Tasks &rarr;
+                            Go to Contributions &rarr;
                         </Link>
                     </CardContent>
                 </Card>

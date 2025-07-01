@@ -1,8 +1,8 @@
 'use server';
 /**
- * @fileOverview An AI flow to rank a user's task response against others.
+ * @fileOverview An AI flow to rank a user's contribution response against others.
  *
- * - rankTaskResponse - Ranks a new response compared to existing ones for the same task.
+ * - rankTaskResponse - Ranks a new response compared to existing ones for the same contribution.
  * - RankResponseInput - The input type for the rankTaskResponse function.
  * - RankResponseOutput - The return type for the rankTaskResponse function.
  */
@@ -13,7 +13,7 @@ import { getTask, getTaskResponses } from '@/lib/database';
 import { Task, TaskResponse } from '@/lib/types';
 
 const RankResponseInputSchema = z.object({
-  taskId: z.string().describe('The ID of the task being responded to.'),
+  taskId: z.string().describe('The ID of the contribution being responded to.'),
   response: z.object({
     userId: z.string(),
     responseData: z.record(z.any()),
@@ -41,9 +41,9 @@ const prompt = ai.definePrompt({
   name: 'rankResponsePrompt',
   input: { schema: RankPromptInputSchema },
   output: { schema: RankResponseOutputSchema },
-  prompt: `You are an expert evaluator of user-submitted task responses. Your goal is to rank a new response by comparing it to the original task and other existing responses.
+  prompt: `You are an expert evaluator of user-submitted contribution responses. Your goal is to rank a new response by comparing it to the original contribution and other existing responses.
 
-  TASK DETAILS:
+  CONTRIBUTION DETAILS:
   - Title: {{task.title}}
   - Description: {{task.description}}
   - Type: {{task.type}}
@@ -60,7 +60,7 @@ const prompt = ai.definePrompt({
     - No other responses exist yet.
   {{/if}}
 
-  Based on the task's goal, the new response, and the context from other responses, please provide a quality score from 1 (poor) to 10 (excellent) for the new response. Also provide a brief, constructive explanation for your score. Consider factors like clarity, helpfulness, adherence to instructions, and originality.
+  Based on the contribution's goal, the new response, and the context from other responses, please provide a quality score from 1 (poor) to 10 (excellent) for the new response. Also provide a brief, constructive explanation for your score. Consider factors like clarity, helpfulness, adherence to instructions, and originality.
   `,
 });
 
@@ -71,10 +71,10 @@ const rankResponseFlow = ai.defineFlow(
     outputSchema: RankResponseOutputSchema,
   },
   async (input) => {
-    // 1. Fetch the original task and existing responses
+    // 1. Fetch the original contribution and existing responses
     const task = await getTask(input.taskId);
     if (!task) {
-      throw new Error(`Task with ID ${input.taskId} not found.`);
+      throw new Error(`Contribution with ID ${input.taskId} not found.`);
     }
 
     // Fetch up to 10 other responses for context
