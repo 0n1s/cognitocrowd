@@ -46,20 +46,31 @@ const prompt = ai.definePrompt({
   name: 'bulkTaskGeneratorPrompt',
   input: {schema: BulkGenerateTasksInputSchema},
   output: {schema: BulkGenerateTasksOutputSchema},
-  prompt: `You are an AI task generator that helps admins create a batch of engaging tasks for users.
+  prompt: `You are an AI task generator that helps admins create a batch of engaging and diverse tasks for users.
 
 Generate {{count}} tasks. For each task, randomly select a task type from the following list:
 {{#each taskTypes}}
 - {{this}}
 {{/each}}
 
-For each generated task, you must provide:
-- a "taskType" from the list provided.
-- a "prompt" (which will be the task title).
-- a "description" (which provides context for the task).
-- "options" if the task type requires them (e.g., 'multiple_choice_preference', 'ranking', 'classification', etc). The options field should be an array of strings. Omit it if not applicable.
+For each generated task, you MUST provide a JSON object that strictly adheres to the output schema. The generated tasks should be diverse, covering subjects like professional communication, user support, general knowledge, and safety/bias detection.
 
-The tasks should cover a diverse range of general knowledge subjects like science, history, art, and everyday situations. Ensure the prompts are clear and concise, and the descriptions provide sufficient context for users.
+Here are the requirements for each field:
+- "taskType": (Required) The type of the generated task, from the list provided.
+- "prompt": (Required) The main question for the user. This will be the task title.
+- "description": (Required) The context or detailed instruction for the task.
+- "options": (Required for specific types) Provide an array of options. The format of objects inside the array depends on the taskType:
+    - For 'multiple_choice_preference': An array of objects, e.g., \`[{ "text": "Option A" }, { "text": "Option B" }]\`.
+    - For 'compare_pairwise': An array of objects, e.g., \`[{ "label": "A", "text": "Details for A" }, { "label": "B", "text": "Details for B" }]\`.
+    - For 'ranking', 'classification', 'sentiment', 'topic_classification', 'label_multiple': An array of strings, e.g., \`["Option 1", "Option 2"]\`.
+    - For 'open_text_feedback' and 'likert_scale': This field should be omitted.
+- "scale": (Required for 'likert_scale') An object with 'min', 'max', and 'labels'. Example: \`{ "min": 1, "max": 5, "labels": { "1": "Very unclear", "5": "Very clear" } }\`.
+- "settings": (Optional) An object to configure the task. You can include:
+    - "allow_comment": boolean
+    - "allow_confidence": boolean
+    - "allow_multi_select": boolean (only for 'label_multiple')
+    - "min_chars", "max_chars": numbers (only for 'open_text_feedback')
+- "award_criteria": (Optional) An object with an "explanation" string describing why the task is useful.
 
 Please output a JSON object with a single key "tasks", which is an array of the generated task objects.
 `,
