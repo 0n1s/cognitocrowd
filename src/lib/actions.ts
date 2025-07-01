@@ -1,8 +1,9 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, writeBatch, updateDoc } from "firebase/firestore";
+import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc } from "firebase/firestore";
 import type { Task, TaskType, Package } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 
@@ -140,5 +141,23 @@ export async function updateAdminPackage(id: string, data: UpdatePackageInput) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message: `Failed to update package: ${errorMessage}` };
+    }
+}
+
+export async function deleteAdminPackage(id: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured. Please check your environment variables.' };
+    }
+    try {
+        const packageDoc = doc(db, 'packages', id);
+        await deleteDoc(packageDoc);
+
+        revalidatePath("/admin/packages");
+        revalidatePath("/packages");
+        return { success: true, message: 'Package deleted successfully.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to delete package: ${errorMessage}` };
     }
 }

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Package } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -23,6 +23,16 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,9 +44,9 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Loader2 } from "lucide-react";
+import { PlusCircle, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createAdminPackage, updateAdminPackage } from "@/lib/actions";
+import { createAdminPackage, updateAdminPackage, deleteAdminPackage } from "@/lib/actions";
 import { getPackages } from "@/lib/database";
 
 type AddPackageDialogProps = {
@@ -328,6 +338,51 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
   );
 }
 
+type DeletePackageDialogProps = {
+  pkg: Package;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPackageDeleted: () => void;
+};
+
+function DeletePackageDialog({ pkg, open, onOpenChange, onPackageDeleted }: DeletePackageDialogProps) {
+  const { toast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    const result = await deleteAdminPackage(pkg.id);
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      onPackageDeleted();
+      onOpenChange(false);
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+    setIsDeleting(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the "{pkg.name}" package.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className={buttonVariants({ variant: "destructive" })}>
+            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 
 const LoadingSkeleton = () => (
     <Table>
@@ -349,7 +404,7 @@ const LoadingSkeleton = () => (
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-16" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
                 </TableRow>
             ))}
         </TableBody>
@@ -362,6 +417,7 @@ export function PackageList() {
     const [loading, setLoading] = useState(true);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingPackage, setEditingPackage] = useState<Package | null>(null);
+    const [deletingPackage, setDeletingPackage] = useState<Package | null>(null);
 
     const fetchPackages = async () => {
       setLoading(true);
@@ -414,9 +470,15 @@ export function PackageList() {
                         {pkg.isPrimary && <Badge variant="secondary">Yes</Badge>}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => setEditingPackage(pkg)}>
-                            Edit
-                          </Button>
+                          <div className="flex justify-end items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setEditingPackage(pkg)}>
+                              Edit
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeletingPackage(pkg)}>
+                               <Trash2 className="h-4 w-4" />
+                               <span className="sr-only">Delete</span>
+                            </Button>
+                          </div>
                         </TableCell>
                     </TableRow>
                     ))}
@@ -438,6 +500,17 @@ export function PackageList() {
             onOpenChange={(open) => !open && setEditingPackage(null)}
             onPackageUpdated={() => {
                 setEditingPackage(null);
+                fetchPackages();
+            }}
+        />
+       )}
+       {deletingPackage && (
+        <DeletePackageDialog
+            pkg={deletingPackage}
+            open={!!deletingPackage}
+            onOpenChange={(open) => !open && setDeletingPackage(null)}
+            onPackageDeleted={() => {
+                setDeletingPackage(null);
                 fetchPackages();
             }}
         />
