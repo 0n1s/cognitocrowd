@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { AdminUser, Package } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -205,15 +206,9 @@ export function UserList() {
         fetchData();
     }, []);
 
-    const formatDate = (timestamp: any) => {
-        if (!timestamp) return 'N/A';
-        if (typeof timestamp === 'string') {
-            return new Date(timestamp).toLocaleDateString();
-        }
-        if (timestamp && typeof timestamp.toDate === 'function') {
-            return timestamp.toDate().toLocaleDateString();
-        }
-        return 'N/A';
+    const formatDate = (dateString: string | undefined) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString();
     };
 
   return (
@@ -239,7 +234,9 @@ export function UserList() {
                     {users.map((user) => (
                     <TableRow key={user.id}>
                         <TableCell className="font-medium">
-                            <div>{user.name}</div>
+                            <Link href={`/admin/users/${user.id}`} className="hover:underline">
+                                {user.name}
+                            </Link>
                             <div className="text-xs text-muted-foreground">{user.email}</div>
                         </TableCell>
                         <TableCell>

@@ -335,3 +335,23 @@ export async function getMostRecentChat(userId: string): Promise<ChatSession | n
         return null;
     }
 }
+
+export async function getAdminUserDetail(userId: string) {
+    if (!db) return null;
+
+    const userData = await getUserData(userId);
+    if (!userData) return null;
+
+    const [completedTasks, withdrawalRequests, userPackage] = await Promise.all([
+        getCompletedTaskDetails(userData.completedTasks || []),
+        getUserWithdrawalRequests(userId),
+        userData.packageId ? getPackage(userData.packageId) : null,
+    ]);
+
+    return {
+        user: userData,
+        completedTasks,
+        withdrawalRequests,
+        package: userPackage,
+    };
+}
