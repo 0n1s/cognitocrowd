@@ -1,4 +1,4 @@
-import { Task, LeaderboardEntry, Reward, CompletedTask, Package, AdminTask } from './types';
+import { Task, LeaderboardEntry, Reward, CompletedTask, Package } from './types';
 
 export const mockTasks: Task[] = [
   {
@@ -53,52 +53,6 @@ export const mockTasks: Task[] = [
     },
     points: 100,
     difficulty: 'Easy'
-  },
-  {
-    id: '4',
-    type: 'open_text_feedback',
-    title: 'How would you improve this assistant response?',
-    description: "I already told you what to do.",
-    settings: {
-      min_chars: 10,
-      max_chars: 300
-    },
-    points: 150,
-    difficulty: 'Medium',
-  },
-  {
-    id: '5',
-    type: 'compare_pairwise',
-    title: 'Which response is better?',
-    description: "User: My order arrived broken.",
-    options: [
-      { "label": "Response A", "text": "Sorry to hear that! I’ll help you right away." },
-      { "label": "Response B", "text": "Not my problem. Contact the courier." }
-    ],
-    settings: {
-      allow_comment: true,
-      allow_confidence: true
-    },
-    points: 125,
-    difficulty: 'Medium',
-  },
-  {
-    id: '6',
-    type: 'label_multiple',
-    title: 'Which of the following labels apply to this sentence?',
-    description: "I can’t believe they hired someone like her.",
-    options: [
-      "Biased",
-      "Offensive",
-      "Neutral",
-      "Needs context"
-    ],
-    settings: {
-      allow_multi_select: true,
-      allow_comment: true
-    },
-    points: 250,
-    difficulty: 'Hard',
   },
 ];
 
@@ -172,10 +126,3 @@ export const mockPackages: Package[] = [
         features: ['Unlimited tasks', 'Exclusive rewards', 'Expert-level tasks', 'Direct impact reports'],
     }
 ]
-
-export const mockAdminTasks: AdminTask[] = [
-    { id: '1', title: 'Describe this Image', type: 'open_text_feedback', points: 150, status: 'Active' },
-    { id: '2', title: 'Which Headline is Better?', type: 'multiple_choice_preference', points: 75, status: 'Active' },
-    { id: '3', title: 'Rank these Features', type: 'ranking', points: 200, status: 'Active' },
-    { id: '4', title: 'Classify Customer Feedback', type: 'classification', points: 100, status: 'Archived' },
-];

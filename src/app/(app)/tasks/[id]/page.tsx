@@ -1,13 +1,8 @@
-import { mockTasks } from "@/lib/data";
+import { getTask } from "@/lib/database";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TaskForms } from "./task-forms";
-
-// This function simulates fetching data for a specific task
-async function getTask(id: string) {
-  return mockTasks.find((task) => task.id === id) || null;
-}
 
 export default async function TaskPage({ params }: { params: { id: string } }) {
   const task = await getTask(params.id);

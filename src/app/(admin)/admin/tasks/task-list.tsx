@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AdminTask, Task } from "@/lib/types";
+import { AdminTask, TaskType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,7 +18,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
@@ -35,20 +34,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Loader2, Wand2 } from "lucide-react";
 import { generateTask } from "@/ai/flows/ai-task-generator";
+import { useToast } from "@/hooks/use-toast";
+import { createAdminTask } from "@/lib/actions";
 
 type AddTaskDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onTaskAdd: (task: AdminTask) => void;
 };
 
-function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
-  const [taskType, setTaskType] = useState<Task["type"]>("open_text_feedback");
+function AddTaskDialog({ open, onOpenChange }: AddTaskDialogProps) {
+  const { toast } = useToast();
+  const [taskType, setTaskType] = useState<TaskType>("open_text_feedback");
   const [options, setOptions] = useState<string[]>([""]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [points, setPoints] = useState(100);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options];
@@ -68,33 +70,45 @@ function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
     setIsGenerating(true);
     try {
         const result = await generateTask({ topic: title, taskType });
+        setTitle(result.prompt);
         setDescription(result.description);
         if(result.options && result.options.length > 0) {
             setOptions(result.options);
         }
     } catch (e) {
         console.error(e);
+        toast({ title: "AI Generation Failed", description: "Could not generate task content.", variant: "destructive" });
     } finally {
         setIsGenerating(false);
     }
   };
-
-  const handleSubmit = () => {
-    const newTask: AdminTask = {
-      id: Date.now().toString(),
-      title,
-      type: taskType,
-      points,
-      status: "Active",
-    };
-    onTaskAdd(newTask);
-    onOpenChange(false);
-    // Reset form
+  
+  const resetForm = () => {
     setTitle("");
     setDescription("");
     setPoints(100);
     setTaskType("open_text_feedback");
     setOptions([""]);
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    const result = await createAdminTask({
+        title,
+        description,
+        points,
+        type: taskType,
+        options: taskType.includes('choice') || taskType.includes('ranking') || taskType.includes('label') ? options : [],
+    });
+    
+    if (result.success) {
+        toast({ title: "Success", description: result.message });
+        onOpenChange(false);
+        resetForm();
+    } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+    setIsSubmitting(false);
   };
 
   return (
@@ -103,13 +117,13 @@ function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
         <DialogHeader>
           <DialogTitle className="font-headline">Add New Task</DialogTitle>
           <DialogDescription>
-            Configure the details for the new task.
+            Configure the details for the new task. Use the title field to provide a topic for AI generation.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="title" className="text-right">
-              Title
+              Title/Topic
             </Label>
             <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., 'Describe a sunset'" />
           </div>
@@ -137,7 +151,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
             </Label>
             <Select
               value={taskType}
-              onValueChange={(value) => setTaskType(value as Task["type"])}
+              onValueChange={(value) => setTaskType(value as TaskType)}
             >
               <SelectTrigger id="task-type" className="col-span-3">
                 <SelectValue placeholder="Select a type" />
@@ -147,11 +161,16 @@ function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
                 <SelectItem value="multiple_choice_preference">Multiple Choice</SelectItem>
                 <SelectItem value="ranking">Ranking</SelectItem>
                 <SelectItem value="classification">Classification</SelectItem>
+                <SelectItem value="sentiment">Sentiment Analysis</SelectItem>
+                <SelectItem value="topic_classification">Topic Classification</SelectItem>
+                <SelectItem value="likert_scale">Likert Scale</SelectItem>
+                <SelectItem value="compare_pairwise">Pairwise Comparison</SelectItem>
+                <SelectItem value="label_multiple">Multi-label</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification") && (
+          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification" || taskType === "sentiment" || taskType === "topic_classification" || taskType === "compare_pairwise" || taskType === "label_multiple") && (
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">Options</Label>
               <div className="col-span-3 space-y-2">
@@ -183,7 +202,10 @@ function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleSubmit}>Create Task</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting || isGenerating}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Create Task
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -192,12 +214,8 @@ function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
 
 
 export function TaskList({ initialTasks }: { initialTasks: AdminTask[] }) {
-    const [tasks, setTasks] = useState<AdminTask[]>(initialTasks);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const handleAddTask = (task: AdminTask) => {
-        setTasks(prev => [task, ...prev]);
-    }
   return (
     <Card>
       <CardHeader className="flex flex-row justify-between items-center">
@@ -220,7 +238,7 @@ export function TaskList({ initialTasks }: { initialTasks: AdminTask[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tasks.map((task) => (
+            {initialTasks.map((task) => (
               <TableRow key={task.id}>
                 <TableCell className="font-medium">{task.title}</TableCell>
                 <TableCell>{task.type}</TableCell>
@@ -237,8 +255,13 @@ export function TaskList({ initialTasks }: { initialTasks: AdminTask[] }) {
             ))}
           </TableBody>
         </Table>
+         {initialTasks.length === 0 && (
+            <div className="text-center p-8 text-muted-foreground">
+                No tasks found. Click 'Add Task' to create one.
+            </div>
+        )}
       </CardContent>
-       <AddTaskDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} onTaskAdd={handleAddTask} />
+       <AddTaskDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
     </Card>
   );
 }

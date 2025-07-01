@@ -41,6 +41,7 @@ export interface Task {
   award_criteria?: {
     explanation: string;
   };
+  status?: 'Active' | 'Archived';
 };
 
 export type User = {
