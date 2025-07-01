@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getPackages } from '@/lib/database';
 import { Package } from '@/lib/types';
 import { Check } from 'lucide-react';
@@ -17,6 +17,7 @@ function PackagesLoadingSkeleton() {
                     <CardHeader className="items-center text-center">
                        <Skeleton className="h-7 w-24" />
                        <Skeleton className="h-9 w-20 mt-2" />
+                       <Skeleton className="h-5 w-32 mt-1" />
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
@@ -65,7 +66,7 @@ export default function PackagesPage() {
                  <>
                     {packages.length > 0 ? (
                         <div className="grid gap-8 mt-12 md:grid-cols-3 items-start">
-                            {packages.map((pkg) => (
+                            {packages.sort((a, b) => a.price.localeCompare(b.price)).map((pkg) => (
                                 <Card key={pkg.id} className={cn("flex flex-col", pkg.isPrimary && "border-primary shadow-lg")}>
                                     <CardHeader className="items-center text-center">
                                         <CardTitle className="text-2xl font-headline">{pkg.name}</CardTitle>
@@ -82,6 +83,10 @@ export default function PackagesPage() {
                                     </CardHeader>
                                     <CardContent className="flex-grow">
                                         <ul className="space-y-3">
+                                            <li className="flex items-center gap-2">
+                                                <Check className="h-5 w-5 text-green-500" />
+                                                <span className="text-muted-foreground">{`${pkg.taskLimit} tasks / ${pkg.expiryPeriod.replace('1 ', '')}`}</span>
+                                            </li>
                                             {pkg.features.map((feature, i) => (
                                                 <li key={i} className="flex items-center gap-2">
                                                     <Check className="h-5 w-5 text-green-500" />

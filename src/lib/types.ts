@@ -78,6 +78,8 @@ export type Package = {
   price: string;
   features: string[];
   isPrimary?: boolean;
+  taskLimit: number;
+  expiryPeriod: string;
 };
 
 export type AdminTask = {

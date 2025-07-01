@@ -176,7 +176,7 @@ export const mockTasks: Task[] = [
       ],
       settings: {
         allow_multi_select: true,
-        allow_comment: true,
+        allow_comment: true
       },
       award_criteria: {
         explanation: "Supports multi-label annotation of complex inputs."
@@ -243,17 +243,23 @@ export const mockPackages: Omit<Package, 'id'>[] = [
     {
         name: 'Starter',
         price: 'Free',
-        features: ['Up to 50 tasks per month', 'Standard rewards', 'Basic leaderboard access'],
+        features: ['Standard rewards', 'Basic leaderboard access'],
+        taskLimit: 50,
+        expiryPeriod: '1 month'
     },
     {
         name: 'Pro',
         price: '$10/mo',
-        features: ['Up to 200 tasks per month', 'Premium rewards', 'Advanced leaderboard stats', 'Priority task access'],
+        features: ['Premium rewards', 'Advanced leaderboard stats', 'Priority task access'],
+        taskLimit: 200,
+        expiryPeriod: '1 month',
         isPrimary: true,
     },
     {
         name: 'Expert',
         price: '$25/mo',
-        features: ['Unlimited tasks', 'Exclusive rewards', 'Expert-level tasks', 'Direct impact reports'],
+        features: ['Exclusive rewards', 'Expert-level tasks', 'Direct impact reports'],
+        taskLimit: 1000,
+        expiryPeriod: '1 month',
     }
 ]
