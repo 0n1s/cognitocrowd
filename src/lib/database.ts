@@ -1,6 +1,7 @@
 
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession } from './types';
@@ -90,10 +91,45 @@ export async function getUserData(userId: string): Promise<User | null> {
     const userDocRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userDocRef);
     if (userDoc.exists()) {
-        return fromDoc<User>(userDoc);
+        const user = fromDoc<any>(userDoc) as any;
+        
+        // Backwards compatibility for users with 'points'
+        if (user.points !== undefined && user.earningsBalance === undefined) {
+            user.earningsBalance = user.points;
+            delete user.points;
+        }
+
+        user.earningsBalance = user.earningsBalance ?? 0;
+        user.depositBalance = user.depositBalance ?? 0;
+        
+        return user as User;
     }
     return null;
 }
+
+export async function getCompletedTaskDetails(taskIds: string[]): Promise<Task[]> {
+    if (!db || taskIds.length === 0) return [];
+    
+    try {
+        const tasks: Task[] = [];
+        // Firestore 'in' query is limited to 30 elements. We might need to batch this.
+        const MAX_IN_CLAUSE_SIZE = 30;
+        for (let i = 0; i < taskIds.length; i += MAX_IN_CLAUSE_SIZE) {
+            const batchIds = taskIds.slice(i, i + MAX_IN_CLAUSE_SIZE);
+            const tasksCol = collection(db, 'tasks');
+            const q = query(tasksCol, where('__name__', 'in', batchIds));
+            const snapshot = await getDocs(q);
+            snapshot.forEach(doc => {
+                tasks.push(fromDoc<Task>(doc));
+            });
+        }
+        return tasks;
+    } catch (error) {
+        console.error("Error fetching completed task details:", error);
+        return [];
+    }
+}
+
 
 export async function getAdminTasks(): Promise<AdminTask[]> {
     if (!db) return Promise.resolve([]);
@@ -158,12 +194,22 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     packagesMap.set("null", "Free Tier"); // Handle null packageId
 
     const users = usersSnapshot.docs.map(doc => {
-        const user = fromDoc<User>(doc);
+        const user = fromDoc<any>(doc) as any;
+
+        // Backwards compatibility for users with 'points'
+        if (user.points !== undefined && user.earningsBalance === undefined) {
+            user.earningsBalance = user.points;
+            delete user.points;
+        }
+
+        user.earningsBalance = user.earningsBalance ?? 0;
+        user.depositBalance = user.depositBalance ?? 0;
+
         const packageName = user.packageId ? packagesMap.get(user.packageId) || 'N/A' : 'Free Tier';
         return { ...user, packageName };
     });
 
-    return users;
+    return users as AdminUser[];
 }
 
 export async function getDashboardStats() {
@@ -234,7 +280,7 @@ export async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
     if (!db) return [];
     
     const usersCol = collection(db, 'users');
-    const q = query(usersCol, orderBy('points', 'desc'), limit(10));
+    const q = query(usersCol, orderBy('earningsBalance', 'desc'), limit(10));
     
     try {
         const snapshot = await getDocs(q);
@@ -245,7 +291,7 @@ export async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
                 user: {
                     name: data.name,
                 },
-                points: data.points || 0,
+                points: data.earningsBalance || 0,
             };
         });
         return leaderboard;

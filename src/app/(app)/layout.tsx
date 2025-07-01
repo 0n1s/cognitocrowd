@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -31,6 +32,7 @@ import {
   ClipboardList,
   Image,
   Video,
+  Wallet,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,7 @@ const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
   { href: "/tasks", icon: ClipboardList, label: "Contributions" },
   { href: "/rewards", icon: Award, label: "Rewards" },
+  { href: "/wallet", icon: Wallet, label: "Wallet" },
   { href: "/leaderboard", icon: Users, label: "Leaderboard" },
   { href: "/redeem", icon: Gift, label: "Redeem" },
   { href: "/packages", icon: Package, label: "Packages" },

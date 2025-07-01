@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -89,52 +90,42 @@ function WithdrawalHistory({ requests }: { requests: WithdrawalRequest[] }) {
 
 export default function RedeemPage() {
   const { user, loading: authLoading } = useAuth();
-  const [userPoints, setUserPoints] = useState(0);
+  const [earningsBalance, setEarningsBalance] = useState(0);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const rewards: Reward[] = mockRewards; 
 
-  useEffect(() => {
-    async function fetchPageData() {
-      if (!user) {
-          setLoading(false);
-          return;
-      };
-      try {
-        const [userData, appSettings, withdrawalRequests] = await Promise.all([
-          getUserData(user.uid),
-          getAppSettings(),
-          getUserWithdrawalRequests(user.uid)
-        ]);
-        
-        if (userData) {
-          setUserPoints(userData.points || 0);
-        }
-        setSettings(appSettings);
-        setRequests(withdrawalRequests);
-
-      } catch (error) {
-        console.error("Failed to fetch redeem page data:", error);
-      } finally {
+  const fetchPageData = async () => {
+    if (!user) {
         setLoading(false);
+        return;
+    };
+    try {
+      const [userData, appSettings, withdrawalRequests] = await Promise.all([
+        getUserData(user.uid),
+        getAppSettings(),
+        getUserWithdrawalRequests(user.uid)
+      ]);
+      
+      if (userData) {
+        setEarningsBalance(userData.earningsBalance || 0);
       }
-    }
+      setSettings(appSettings);
+      setRequests(withdrawalRequests);
 
+    } catch (error) {
+      console.error("Failed to fetch redeem page data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (!authLoading) {
       fetchPageData();
     }
   }, [user, authLoading]);
-
-  const refreshData = async () => {
-    if (!user) return;
-    const [userData, withdrawalRequests] = await Promise.all([
-        getUserData(user.uid),
-        getUserWithdrawalRequests(user.uid)
-    ]);
-    if (userData) setUserPoints(userData.points || 0);
-    setRequests(withdrawalRequests);
-  };
 
   if (loading || authLoading) {
     return <RedeemPageLoadingSkeleton />;
@@ -143,16 +134,16 @@ export default function RedeemPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold font-headline">Redeem & Withdraw</h1>
-      <p className="text-muted-foreground mt-1">Use your points to claim rewards or withdraw your earnings.</p>
-      <div className="mt-4 text-lg">Your Balance: <span className="font-bold text-primary">${userPoints.toFixed(2)}</span></div>
-      <p className="text-xs text-muted-foreground mt-1">(1 point = $1.00 USD)</p>
+      <p className="text-muted-foreground mt-1">Use your earnings to claim rewards or withdraw your balance.</p>
+      <div className="mt-4 text-lg">Your Earnings Balance: <span className="font-bold text-primary">${earningsBalance.toFixed(2)}</span></div>
+      <p className="text-xs text-muted-foreground mt-1">(1 point from contributions = $1.00 USD)</p>
 
         <div className="grid gap-8 mt-8 lg:grid-cols-5">
             <div className="lg:col-span-3 space-y-8">
                 <Card>
                     <CardHeader>
                         <CardTitle>Redeem Gift Cards</CardTitle>
-                        <CardDescription>Instantly claim gift cards with your points.</CardDescription>
+                        <CardDescription>Instantly claim gift cards with your earnings.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6 sm:grid-cols-2">
                         {rewards.map((reward) => (
@@ -174,7 +165,7 @@ export default function RedeemPage() {
                                 </div>
                             </div>
                             <CardFooter className="p-2">
-                            <Button className="w-full" disabled={userPoints < reward.cost}>
+                            <Button className="w-full" disabled={earningsBalance < reward.cost}>
                                 Redeem
                             </Button>
                             </CardFooter>
@@ -188,8 +179,8 @@ export default function RedeemPage() {
                     <WithdrawalForm 
                         user={user} 
                         settings={settings} 
-                        currentPoints={userPoints}
-                        onWithdrawal={refreshData}
+                        currentBalance={earningsBalance}
+                        onWithdrawal={fetchPageData}
                     />
                 )}
                 <WithdrawalHistory requests={requests} />

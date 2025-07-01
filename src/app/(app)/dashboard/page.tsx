@@ -26,7 +26,7 @@ const StatCard = ({ title, value, icon: Icon, description }: { title: string; va
 );
 
 type UserStatsData = {
-    points: number;
+    earningsBalance: number;
     completed: number;
     dailyCount: number;
     dailyLimit: number;
@@ -48,10 +48,10 @@ function UserStats({ stats, loading }: { stats: UserStatsData | null, loading: b
     return (
         <div className="grid gap-4 md:grid-cols-3">
             <StatCard 
-                title="Total Points" 
-                value={stats.points.toLocaleString()} 
+                title="Earnings Balance" 
+                value={`$${stats.earningsBalance.toFixed(2)}`}
                 icon={Award}
-                description="Points earned from all contributions."
+                description="Balance earned from all contributions."
             />
             <StatCard 
                 title="Contributions Completed" 
@@ -163,7 +163,7 @@ export default function DashboardPage() {
             const dailyCount = lastReset < today ? 0 : userData.dailyCompletedCount || 0;
 
             setUserStats({
-                points: userData.points || 0,
+                earningsBalance: userData.earningsBalance || 0,
                 completed: userData.completedTasks?.length || 0,
                 dailyCount: dailyCount,
                 dailyLimit: userPackage?.taskLimit || FREE_TIER_DAILY_LIMIT,

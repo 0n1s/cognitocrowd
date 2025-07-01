@@ -168,12 +168,13 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
             }
 
             // 4. Update user stats and create response document in transaction
-            const newPoints = (userData.points || 0) + points;
+            const currentEarnings = userData.earningsBalance || 0;
+            const newEarnings = currentEarnings + points;
             const newCompletedTasks = [...completedTasks, taskId];
             const newDailyCount = dailyCount + 1;
 
             transaction.update(userRef, {
-                points: newPoints,
+                earningsBalance: newEarnings,
                 completedTasks: newCompletedTasks,
                 dailyCompletedCount: newDailyCount,
                 lastCompletionReset: Timestamp.now()
@@ -217,6 +218,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
         revalidatePath('/dashboard');
         revalidatePath(`/tasks/${taskId}`);
         revalidatePath('/rewards');
+        revalidatePath('/wallet');
         return { success: true, points };
 
     } catch (error) {
@@ -302,7 +304,8 @@ export async function setupNewUser(userId: string, name: string, email: string) 
         await setDoc(userDocRef, {
             name,
             email,
-            points: 0,
+            earningsBalance: 0,
+            depositBalance: 0,
             packageId,
             completedTasks: [],
             role: 'user',
@@ -320,7 +323,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
     }
 }
 
-export async function updateAdminUser(userId: string, data: Partial<Pick<User, 'packageId' | 'role' | 'points'>>) {
+export async function updateAdminUser(userId: string, data: Partial<Pick<User, 'packageId' | 'role' | 'earningsBalance' | 'depositBalance'>>) {
     if (!db) {
         return { success: false, message: 'Database not configured.' };
     }
@@ -383,17 +386,17 @@ export async function requestWithdrawal(
             }
 
             const userData = userDoc.data() as User;
-            const currentPoints = userData.points || 0;
+            const currentBalance = userData.earningsBalance || 0;
 
-            if (currentPoints < amount) {
-                throw new Error("Insufficient points.");
+            if (currentBalance < amount) {
+                throw new Error("Insufficient earnings balance.");
             }
             if (amount <= 0) {
                 throw new Error("Withdrawal amount must be positive.");
             }
 
-            const newPoints = currentPoints - amount;
-            transaction.update(userRef, { points: newPoints });
+            const newBalance = currentBalance - amount;
+            transaction.update(userRef, { earningsBalance: newBalance });
 
             const withdrawalRef = doc(collection(db, "withdrawal_requests"));
             transaction.set(withdrawalRef, {
@@ -409,6 +412,7 @@ export async function requestWithdrawal(
         });
 
         revalidatePath("/redeem");
+        revalidatePath("/wallet");
         revalidatePath("/admin/withdrawals");
         return { success: true, message: "Withdrawal request submitted." };
     } catch (error) {
@@ -443,8 +447,8 @@ export async function updateWithdrawalRequestStatus(
               const userRef = doc(db, "users", requestData.userId);
               const userDoc = await transaction.get(userRef);
               if (userDoc.exists()) {
-                  const newPoints = (userDoc.data().points || 0) + requestData.amount;
-                  transaction.update(userRef, { points: newPoints });
+                  const newBalance = (userDoc.data().earningsBalance || 0) + requestData.amount;
+                  transaction.update(userRef, { earningsBalance: newBalance });
               }
           }
           
@@ -456,6 +460,7 @@ export async function updateWithdrawalRequestStatus(
 
       revalidatePath("/admin/withdrawals");
       revalidatePath("/redeem"); // For user's withdrawal history
+      revalidatePath("/wallet");
       return { success: true, message: `Request status updated to ${newStatus}.` };
   } catch (error) {
       console.error("Error updating withdrawal status:", error);

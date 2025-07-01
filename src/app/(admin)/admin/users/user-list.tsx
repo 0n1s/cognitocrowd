@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -30,14 +31,16 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: E
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [role, setRole] = useState(user.role || 'user');
     const [packageId, setPackageId] = useState(user.packageId || 'null');
-    const [points, setPoints] = useState(user.points);
+    const [earningsBalance, setEarningsBalance] = useState(user.earningsBalance);
+    const [depositBalance, setDepositBalance] = useState(user.depositBalance);
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
         const result = await updateAdminUser(user.id, {
             role,
             packageId: packageId === 'null' ? null : packageId,
-            points
+            earningsBalance,
+            depositBalance,
         });
         
         if (result.success) {
@@ -56,7 +59,7 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: E
         <DialogHeader>
           <DialogTitle className="font-headline">Edit User: {user.name}</DialogTitle>
           <DialogDescription>
-            Update user role, package, and points.
+            Update user role, package, and balances.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -81,8 +84,12 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: E
             </Select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="points" className="text-right">Points</Label>
-            <Input id="points" type="number" value={points} onChange={e => setPoints(Number(e.target.value))} className="col-span-3" />
+            <Label htmlFor="earnings" className="text-right">Earnings</Label>
+            <Input id="earnings" type="number" value={earningsBalance} onChange={e => setEarningsBalance(Number(e.target.value))} className="col-span-3" />
+          </div>
+           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="deposits" className="text-right">Deposits</Label>
+            <Input id="deposits" type="number" value={depositBalance} onChange={e => setDepositBalance(Number(e.target.value))} className="col-span-3" />
           </div>
         </div>
         <DialogFooter>
@@ -151,7 +158,7 @@ const LoadingSkeleton = () => (
               <TableHead>Name</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Package</TableHead>
-              <TableHead>Points</TableHead>
+              <TableHead>Earnings</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -219,7 +226,7 @@ export function UserList() {
                       <TableHead>Name</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Package</TableHead>
-                      <TableHead>Points</TableHead>
+                      <TableHead>Earnings</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -235,7 +242,7 @@ export function UserList() {
                             <Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role || 'user'}</Badge>
                         </TableCell>
                         <TableCell>{user.packageName}</TableCell>
-                        <TableCell>{user.points}</TableCell>
+                        <TableCell>${user.earningsBalance.toFixed(2)}</TableCell>
                         <TableCell>{formatDate(user.createdAt)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end items-center gap-2">

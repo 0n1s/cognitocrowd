@@ -16,11 +16,11 @@ import { requestWithdrawal } from "@/lib/actions";
 type WithdrawalFormProps = {
     user: User;
     settings: AppSettings;
-    currentPoints: number;
+    currentBalance: number;
     onWithdrawal: () => void;
 };
 
-export function WithdrawalForm({ user, settings, currentPoints, onWithdrawal }: WithdrawalFormProps) {
+export function WithdrawalForm({ user, settings, currentBalance, onWithdrawal }: WithdrawalFormProps) {
     const { toast } = useToast();
     const [amount, setAmount] = useState("");
     const [method, setMethod] = useState("");
@@ -44,8 +44,8 @@ export function WithdrawalForm({ user, settings, currentPoints, onWithdrawal }: 
             toast({ title: "Invalid Amount", description: "Please enter a valid amount.", variant: "destructive" });
             return;
         }
-        if (withdrawalAmount > currentPoints) {
-            toast({ title: "Insufficient Balance", description: "You don't have enough points to withdraw that amount.", variant: "destructive" });
+        if (withdrawalAmount > currentBalance) {
+            toast({ title: "Insufficient Balance", description: "You don't have enough funds in your earnings balance to withdraw that amount.", variant: "destructive" });
             return;
         }
         if (!method) {
@@ -89,8 +89,8 @@ export function WithdrawalForm({ user, settings, currentPoints, onWithdrawal }: 
                             type="number"
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
-                            placeholder={`Max $${currentPoints.toFixed(2)}`}
-                            max={currentPoints}
+                            placeholder={`Max $${currentBalance.toFixed(2)}`}
+                            max={currentBalance}
                             min="0.01"
                             step="0.01"
                             disabled={isSubmitting}

@@ -120,7 +120,7 @@ export function TaskForms({ task }: { task: Task }) {
     if (result.success) {
         toast({
             title: "Contribution Submitted!",
-            description: `You've earned ${result.points} points for completing "${task.title}".`,
+            description: `You've earned $${result.points.toFixed(2)} for completing "${task.title}".`,
         });
 
         // Redirect to results page after a short delay

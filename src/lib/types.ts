@@ -49,7 +49,8 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  points: number;
+  earningsBalance: number;
+  depositBalance: number;
   packageId: string | null;
   completedTasks?: string[];
   createdAt: any; // Firestore Timestamp
