@@ -59,23 +59,18 @@ const ChatSkeleton = () => (
 
 
 export function ChatUI({ messages, input, handleInputChange, handleSubmit, isLoading, isLoadingHistory, user }: ChatUIProps) {
-    const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (scrollAreaRef.current) {
-            setTimeout(() => {
-                scrollAreaRef.current?.scrollTo({
-                    top: scrollAreaRef.current.scrollHeight,
-                    behavior: 'smooth',
-                });
-            }, 100);
-        }
-    }, [messages]);
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+    }, [messages, isLoading]);
 
 
     return (
         <div className="flex flex-col h-[calc(100vh-200px)] bg-card rounded-lg border">
-            <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+            <ScrollArea className="flex-1 p-4">
                 {isLoadingHistory ? <ChatSkeleton /> : (
                     <div className="space-y-4">
                         {messages.map((message) => (
@@ -107,6 +102,7 @@ export function ChatUI({ messages, input, handleInputChange, handleSubmit, isLoa
                                 </div>
                             </div>
                         )}
+                        <div ref={messagesEndRef} />
                     </div>
                 )}
             </ScrollArea>
