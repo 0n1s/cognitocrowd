@@ -3,8 +3,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp } from "firebase/firestore";
-import type { Task, TaskType, Package, User } from "@/lib/types";
+import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction } from "firebase/firestore";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 
@@ -323,4 +323,116 @@ export async function deleteAdminUser(userId: string) {
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message: `Failed to delete user: ${errorMessage}` };
     }
+}
+
+export async function updateAppSettings(data: AppSettings) {
+  if (!db) return { success: false, message: "Database not configured." };
+  try {
+    await setDoc(doc(db, "settings", "main"), data, { merge: true });
+    revalidatePath("/admin/settings");
+    revalidatePath("/redeem");
+    return { success: true, message: "Settings updated successfully." };
+  } catch (error) {
+    console.error("Error updating settings:", error);
+    return { success: false, message: "Failed to update settings." };
+  }
+}
+
+export async function requestWithdrawal(
+    userId: string,
+    amount: number,
+    paymentMethod: string,
+    paymentDetails: string
+) {
+    if (!db) return { success: false, message: "Database not configured." };
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, "users", userId);
+            const userDoc = await transaction.get(userRef);
+
+            if (!userDoc.exists()) {
+                throw new Error("User not found.");
+            }
+
+            const userData = userDoc.data() as User;
+            const currentPoints = userData.points || 0;
+
+            if (currentPoints < amount) {
+                throw new Error("Insufficient points.");
+            }
+            if (amount <= 0) {
+                throw new Error("Withdrawal amount must be positive.");
+            }
+
+            const newPoints = currentPoints - amount;
+            transaction.update(userRef, { points: newPoints });
+
+            const withdrawalRef = doc(collection(db, "withdrawal_requests"));
+            transaction.set(withdrawalRef, {
+                userId,
+                userName: userData.name,
+                userEmail: userData.email,
+                amount,
+                paymentMethod,
+                paymentDetails,
+                status: "pending",
+                requestedAt: Timestamp.now(),
+            });
+        });
+
+        revalidatePath("/redeem");
+        revalidatePath("/admin/withdrawals");
+        return { success: true, message: "Withdrawal request submitted." };
+    } catch (error) {
+        console.error("Error requesting withdrawal:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function updateWithdrawalRequestStatus(
+  requestId: string,
+  newStatus: WithdrawalRequest['status']
+) {
+  if (!db) return { success: false, message: "Database not configured." };
+
+  try {
+      await runTransaction(db, async (transaction) => {
+          const requestRef = doc(db, "withdrawal_requests", requestId);
+          const requestDoc = await transaction.get(requestRef);
+
+          if (!requestDoc.exists()) {
+              throw new Error("Withdrawal request not found.");
+          }
+
+          const requestData = requestDoc.data() as WithdrawalRequest;
+          const oldStatus = requestData.status;
+
+          if (oldStatus === newStatus) return; // No change needed
+
+          // Refund points if a request is failed
+          if (newStatus === 'failed' && oldStatus !== 'failed') {
+              const userRef = doc(db, "users", requestData.userId);
+              const userDoc = await transaction.get(userRef);
+              if (userDoc.exists()) {
+                  const newPoints = (userDoc.data().points || 0) + requestData.amount;
+                  transaction.update(userRef, { points: newPoints });
+              }
+          }
+          
+          transaction.update(requestRef, { 
+              status: newStatus,
+              processedAt: Timestamp.now()
+          });
+      });
+
+      revalidatePath("/admin/withdrawals");
+      revalidatePath("/redeem"); // For user's withdrawal history
+      return { success: true, message: `Request status updated to ${newStatus}.` };
+  } catch (error) {
+      console.error("Error updating withdrawal status:", error);
+      const message = error instanceof Error ? error.message : "An unknown error occurred.";
+      return { success: false, message };
+  }
 }

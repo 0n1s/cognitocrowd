@@ -108,3 +108,27 @@ export type TaskResponse = {
   rank?: number;
   rankExplanation?: string;
 };
+
+export type PaymentMethod = {
+  id: string;
+  name: string;
+};
+
+export type AppSettings = {
+  id?: 'main';
+  paymentMethods: PaymentMethod[];
+  withdrawalScheduleInfo: string;
+};
+
+export type WithdrawalRequest = {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  amount: number; // in points
+  paymentMethod: string;
+  paymentDetails: string;
+  status: 'pending' | 'completed' | 'failed';
+  requestedAt: any; // Firestore Timestamp
+  processedAt?: any; // Firestore Timestamp
+};

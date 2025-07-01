@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, Users, BarChart, CheckCircle2, Users2 } from 'lucide-react';
+import { ClipboardList, Users, BarChart, CheckCircle2, Users2, Banknote } from 'lucide-react';
 import { getDashboardStats } from '@/lib/database';
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description: string }) => (
@@ -24,7 +24,7 @@ export default async function AdminDashboardPage() {
             <h1 className="text-3xl font-bold font-headline">Admin Dashboard</h1>
             <p className="text-muted-foreground mt-1">Overview and management tools.</p>
             
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-8">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-8">
                 <StatCard 
                     title="Total Users" 
                     value={stats.totalUsers} 
@@ -36,6 +36,12 @@ export default async function AdminDashboardPage() {
                     value={stats.totalTasksCompleted.toLocaleString()} 
                     icon={CheckCircle2}
                     description="Total responses submitted by all users."
+                />
+                 <StatCard 
+                    title="Pending Withdrawals" 
+                    value={stats.pendingWithdrawals} 
+                    icon={Banknote}
+                    description="User withdrawal requests needing review."
                 />
                 <StatCard 
                     title="Active Tasks" 

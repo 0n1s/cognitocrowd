@@ -24,6 +24,8 @@ import {
   Loader2,
   Package,
   Users,
+  Settings,
+  Banknote,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -44,6 +46,8 @@ const navItems = [
   { href: "/admin/tasks", icon: ClipboardList, label: "Tasks" },
   { href: "/admin/packages", icon: Package, label: "Packages" },
   { href: "/admin/users", icon: Users, label: "Users" },
+  { href: "/admin/withdrawals", icon: Banknote, label: "Withdrawals" },
+  { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
 const AdminHeader = () => {

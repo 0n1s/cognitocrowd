@@ -1,7 +1,8 @@
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User, TaskResponse, AdminUser } from './types';
+import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy } from 'firebase/firestore';
+import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest } from './types';
 import { mockTasks, mockPackages } from './data';
+import { v4 as uuidv4 } from 'uuid';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     const data = doc.data();
@@ -138,26 +139,64 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
 }
 
 export async function getDashboardStats() {
-    if (!db) return { totalUsers: 0, totalTasksCompleted: 0, activeTasks: 0 };
+    if (!db) return { totalUsers: 0, totalTasksCompleted: 0, activeTasks: 0, pendingWithdrawals: 0 };
 
     const usersCol = collection(db, 'users');
     const tasksCol = collection(db, 'tasks');
     const responsesCol = collection(db, 'task_responses');
+    const withdrawalsCol = collection(db, 'withdrawal_requests');
 
     try {
-        const [usersSnapshot, tasksSnapshot, responsesSnapshot] = await Promise.all([
+        const [usersSnapshot, tasksSnapshot, responsesSnapshot, withdrawalsSnapshot] = await Promise.all([
             getDocs(usersCol),
             getDocs(query(tasksCol, where('status', '==', 'Active'))),
             getDocs(responsesCol),
+            getDocs(query(withdrawalsCol, where('status', '==', 'pending')))
         ]);
 
         return {
             totalUsers: usersSnapshot.size,
             activeTasks: tasksSnapshot.size,
             totalTasksCompleted: responsesSnapshot.size,
+            pendingWithdrawals: withdrawalsSnapshot.size
         };
     } catch (error) {
         console.error("Failed to fetch dashboard stats:", error);
-        return { totalUsers: 0, totalTasksCompleted: 0, activeTasks: 0 };
+        return { totalUsers: 0, totalTasksCompleted: 0, activeTasks: 0, pendingWithdrawals: 0 };
     }
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+    const defaultSettings: AppSettings = {
+        paymentMethods: [{ id: uuidv4(), name: 'PayPal' }],
+        withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.'
+    };
+
+    if (!db) return defaultSettings;
+
+    const settingsDocRef = doc(db, 'settings', 'main');
+    const docSnap = await getDoc(settingsDocRef);
+
+    if (docSnap.exists()) {
+        return docSnap.data() as AppSettings;
+    } else {
+        await setDoc(settingsDocRef, defaultSettings);
+        return defaultSettings;
+    }
+}
+
+export async function getWithdrawalRequests(): Promise<WithdrawalRequest[]> {
+    if (!db) return [];
+    const requestsCol = collection(db, 'withdrawal_requests');
+    const q = query(requestsCol, orderBy('requestedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => fromDoc<WithdrawalRequest>(d));
+}
+
+export async function getUserWithdrawalRequests(userId: string): Promise<WithdrawalRequest[]> {
+    if (!db) return [];
+    const requestsCol = collection(db, 'withdrawal_requests');
+    const q = query(requestsCol, where('userId', '==', userId), orderBy('requestedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => fromDoc<WithdrawalRequest>(d));
 }
