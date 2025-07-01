@@ -83,6 +83,10 @@ export function WithdrawalList() {
     };
 
     const formatDate = (timestamp: any) => {
+        if (!timestamp) return 'N/A';
+        if (typeof timestamp === 'string') {
+            return new Date(timestamp).toLocaleString();
+        }
         if (timestamp && typeof timestamp.toDate === 'function') {
             return timestamp.toDate().toLocaleString();
         }

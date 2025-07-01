@@ -156,7 +156,7 @@ export default function DashboardPage() {
                 userPackage = await getPackage(userData.packageId);
             }
             
-            const lastReset = userData.lastCompletionReset?.toDate() || new Date(0);
+            const lastReset = userData.lastCompletionReset ? new Date(userData.lastCompletionReset) : new Date(0);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 

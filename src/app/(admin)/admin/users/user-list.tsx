@@ -206,6 +206,10 @@ export function UserList() {
     }, []);
 
     const formatDate = (timestamp: any) => {
+        if (!timestamp) return 'N/A';
+        if (typeof timestamp === 'string') {
+            return new Date(timestamp).toLocaleDateString();
+        }
         if (timestamp && typeof timestamp.toDate === 'function') {
             return timestamp.toDate().toLocaleDateString();
         }
