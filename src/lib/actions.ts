@@ -50,18 +50,21 @@ export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
 
         generatedData.tasks.forEach(task => {
             const docRef = doc(tasksCol); // Create new doc with auto-ID
-            const taskToAdd: Omit<Task, 'id'> = {
+            
+            const taskToAdd: any = {
                 title: task.prompt,
                 description: task.description,
                 points: 100, // Default points
                 type: task.taskType,
-                options: task.options || [],
-                scale: task.scale,
-                settings: task.settings,
-                award_criteria: task.award_criteria,
                 status: 'Active',
                 difficulty: 'Medium', // Default difficulty
             };
+
+            if (task.options) taskToAdd.options = task.options;
+            if (task.scale) taskToAdd.scale = task.scale;
+            if (task.settings) taskToAdd.settings = task.settings;
+            if (task.award_criteria) taskToAdd.award_criteria = task.award_criteria;
+
             batch.set(docRef, taskToAdd);
         });
 
