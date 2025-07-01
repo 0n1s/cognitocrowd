@@ -1,13 +1,31 @@
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry } from './types';
+import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     const data = doc.data();
-    return { ...data, id: doc.id } as T;
+    // Convert Firestore Timestamps to serializable format if they exist
+    for (const key in data) {
+        if (data[key] instanceof Object && 'toDate' in data[key]) {
+            data[key] = data[key].toDate().toISOString();
+        }
+    }
+    const result = { ...data, id: doc.id } as T;
+
+    // A bit of a hack to handle nested timestamps in chat messages
+    if ('messages' in result && Array.isArray((result as any).messages)) {
+        (result as any).messages = (result as any).messages.map((m: any) => {
+            if(m.createdAt && typeof m.createdAt === 'object') {
+                m.createdAt = new Date(m.createdAt.seconds * 1000).toISOString();
+            }
+            return m;
+        })
+    }
+    return result;
 }
 
 export async function getTasks(userId?: string): Promise<Task[]> {
@@ -232,5 +250,30 @@ export async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
     } catch (error) {
         console.error("Failed to fetch leaderboard data:", error);
         return [];
+    }
+}
+
+export async function getMostRecentChat(userId: string): Promise<ChatSession | null> {
+    if (!db) return null;
+    try {
+        const chatsCol = collection(db, 'chats');
+        const q = query(
+            chatsCol,
+            where('userId', '==', userId),
+            orderBy('updatedAt', 'desc'),
+            limit(1)
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+            return null;
+        }
+        // Firestore Timestamps are not directly serializable for client components.
+        // Convert them to a serializable format (e.g., ISO string)
+        const chatData = fromDoc<ChatSession>(snapshot.docs[0]);
+        return chatData;
+
+    } catch (error) {
+        console.error("Failed to fetch most recent chat:", error);
+        return null;
     }
 }

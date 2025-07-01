@@ -4,10 +4,12 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
-import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage } from "@/lib/types";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { v4 as uuidv4 } from "uuid";
+import { getMostRecentChat } from './database';
+
 
 export type CreateTaskInput = {
     title: string;
@@ -515,5 +517,19 @@ export async function logChatInteraction(
         console.error("Error logging chat interaction:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, newChatId: chatId || '', message };
+    }
+}
+
+
+export async function getInitialChatHistory(userId: string): Promise<ChatSession | null> {
+    if (!db) return null;
+    if (!userId) return null;
+    
+    try {
+        const chatSession = await getMostRecentChat(userId);
+        return chatSession;
+    } catch (error) {
+        console.error("Error fetching initial chat history:", error);
+        return null;
     }
 }
