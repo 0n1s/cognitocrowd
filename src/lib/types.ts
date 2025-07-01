@@ -1,4 +1,5 @@
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -121,6 +122,7 @@ export type PaymentMethod = {
 export type AppSettings = {
   id?: 'main';
   paymentMethods: PaymentMethod[];
+  depositMethods: PaymentMethod[];
   withdrawalScheduleInfo: string;
   withdrawalDays?: string[];
 };
@@ -142,14 +144,14 @@ export type ChatMessage = {
   id: string;
   text: string;
   sender: 'user' | 'ai';
-  createdAt: any; // Firestore Timestamp
+  createdAt: any; // Firestore Timestamp or ISO String
 };
 
 export type ChatSession = {
   id: string;
   userId: string;
   title: string;
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
+  createdAt: any; // Firestore Timestamp or ISO String
+  updatedAt: any; // Firestore Timestamp or ISO String
   messages: ChatMessage[];
 };

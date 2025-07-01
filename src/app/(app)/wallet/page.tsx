@@ -5,10 +5,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { getUserData } from '@/lib/database';
-import { ArrowRight, DollarSign, Download, Upload } from 'lucide-react';
+import { getUserData, getAppSettings } from '@/lib/database';
+import { ArrowRight, Download, Upload } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
+import { AppSettings } from '@/lib/types';
+import { DepositDialog } from './deposit-dialog';
 
 function WalletPageLoadingSkeleton() {
     return (
@@ -25,8 +27,10 @@ function WalletPageLoadingSkeleton() {
 
 export default function WalletPage() {
   const [balances, setBalances] = useState<{ earnings: number; deposits: number } | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const { user, loading: authLoading } = useAuth();
+  const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
 
   useEffect(() => {
     async function fetchWalletData() {
@@ -36,13 +40,17 @@ export default function WalletPage() {
       };
       
       try {
-        const userData = await getUserData(user.uid);
+        const [userData, appSettings] = await Promise.all([
+            getUserData(user.uid),
+            getAppSettings()
+        ]);
         if (userData) {
           setBalances({
             earnings: userData.earningsBalance || 0,
             deposits: userData.depositBalance || 0,
           });
         }
+        setSettings(appSettings);
       } catch (error) {
         console.error("Failed to fetch wallet data:", error);
       } finally {
@@ -59,7 +67,7 @@ export default function WalletPage() {
       return <WalletPageLoadingSkeleton />;
   }
   
-  if (!balances) {
+  if (!balances || !settings) {
       return <p>Could not load wallet information.</p>
   }
 
@@ -107,12 +115,17 @@ export default function WalletPage() {
             <p className="text-muted-foreground">This is the balance you've deposited into your account. Use these funds to purchase premium packages or features.</p>
           </CardContent>
           <CardFooter>
-            <Button variant="secondary">
+            <Button variant="secondary" onClick={() => setIsDepositDialogOpen(true)}>
               Make a Deposit
             </Button>
           </CardFooter>
         </Card>
       </div>
+      <DepositDialog
+        open={isDepositDialogOpen}
+        onOpenChange={setIsDepositDialogOpen}
+        settings={settings}
+      />
     </div>
   );
 }

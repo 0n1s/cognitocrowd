@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { AppSettings, PaymentMethod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,14 +15,11 @@ import { updateAppSettings } from "@/lib/actions";
 import { getAppSettings } from "@/lib/database";
 import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 
 const LoadingSkeleton = () => (
     <Card>
-        <CardHeader>
-            <Skeleton className="h-7 w-48" />
-            <Skeleton className="h-4 w-64 mt-2" />
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="pt-6 space-y-6">
             <div>
                 <Skeleton className="h-5 w-32 mb-2" />
                 <Skeleton className="h-10 w-full" />
@@ -58,31 +55,54 @@ export function SettingsForm() {
         fetchSettings();
     }, [toast]);
 
-    const handleAddMethod = () => {
+    const handleAddMethod = (type: 'withdrawal' | 'deposit') => {
         if (!settings) return;
         const newMethod = { id: uuidv4(), name: "" };
-        setSettings({
-            ...settings,
-            paymentMethods: [...settings.paymentMethods, newMethod],
-        });
+        if (type === 'withdrawal') {
+            setSettings({
+                ...settings,
+                paymentMethods: [...settings.paymentMethods, newMethod],
+            });
+        } else {
+            setSettings({
+                ...settings,
+                depositMethods: [...(settings.depositMethods || []), newMethod],
+            });
+        }
     };
 
-    const handleRemoveMethod = (id: string) => {
+    const handleRemoveMethod = (id: string, type: 'withdrawal' | 'deposit') => {
         if (!settings) return;
-        setSettings({
-            ...settings,
-            paymentMethods: settings.paymentMethods.filter((m) => m.id !== id),
-        });
+        if (type === 'withdrawal') {
+            setSettings({
+                ...settings,
+                paymentMethods: settings.paymentMethods.filter((m) => m.id !== id),
+            });
+        } else {
+            setSettings({
+                ...settings,
+                depositMethods: (settings.depositMethods || []).filter((m) => m.id !== id),
+            });
+        }
     };
 
-    const handleMethodNameChange = (id: string, name: string) => {
+    const handleMethodNameChange = (id: string, name: string, type: 'withdrawal' | 'deposit') => {
         if (!settings) return;
-        setSettings({
-            ...settings,
-            paymentMethods: settings.paymentMethods.map((m) =>
-                m.id === id ? { ...m, name } : m
-            ),
-        });
+        if (type === 'withdrawal') {
+            setSettings({
+                ...settings,
+                paymentMethods: settings.paymentMethods.map((m) =>
+                    m.id === id ? { ...m, name } : m
+                ),
+            });
+        } else {
+             setSettings({
+                ...settings,
+                depositMethods: (settings.depositMethods || []).map((m) =>
+                    m.id === id ? { ...m, name } : m
+                ),
+            });
+        }
     };
 
     const handleScheduleChange = (info: string) => {
@@ -104,7 +124,8 @@ export function SettingsForm() {
         setIsSubmitting(true);
         const result = await updateAppSettings({
             ...settings,
-            paymentMethods: settings.paymentMethods.filter(m => m.name.trim() !== '')
+            paymentMethods: settings.paymentMethods.filter(m => m.name.trim() !== ''),
+            depositMethods: (settings.depositMethods || []).filter(m => m.name.trim() !== '')
         });
         if (result.success) {
             toast({ title: "Success", description: result.message });
@@ -119,30 +140,55 @@ export function SettingsForm() {
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Withdrawal Settings</CardTitle>
-                <CardDescription>
-                    Manage payment methods and the withdrawal schedule for users.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
+            <CardContent className="pt-6 space-y-8">
+                <div>
+                    <h3 className="text-lg font-semibold">Deposit Settings</h3>
+                    <p className="text-sm text-muted-foreground">Manage accepted deposit methods.</p>
+                </div>
                 <div className="space-y-4">
-                    <Label className="text-base font-semibold">Payment Methods</Label>
+                    <Label className="text-base font-semibold">Deposit Methods</Label>
                     <div className="space-y-2">
-                        {settings.paymentMethods.map((method) => (
+                        {(settings.depositMethods || []).map((method) => (
                             <div key={method.id} className="flex items-center gap-2">
                                 <Input
                                     value={method.name}
-                                    onChange={(e) => handleMethodNameChange(method.id, e.target.value)}
-                                    placeholder="e.g., PayPal"
+                                    onChange={(e) => handleMethodNameChange(method.id, e.target.value, 'deposit')}
+                                    placeholder="e.g., Plisio (Crypto)"
                                 />
-                                <Button variant="ghost" size="icon" onClick={() => handleRemoveMethod(method.id)}>
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveMethod(method.id, 'deposit')}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                             </div>
                         ))}
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleAddMethod}>
+                    <Button variant="outline" size="sm" onClick={() => handleAddMethod('deposit')}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Method
+                    </Button>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                    <h3 className="text-lg font-semibold">Withdrawal Settings</h3>
+                    <p className="text-sm text-muted-foreground">Manage payment methods and the withdrawal schedule for users.</p>
+                </div>
+                <div className="space-y-4">
+                    <Label className="text-base font-semibold">Withdrawal Payment Methods</Label>
+                    <div className="space-y-2">
+                        {settings.paymentMethods.map((method) => (
+                            <div key={method.id} className="flex items-center gap-2">
+                                <Input
+                                    value={method.name}
+                                    onChange={(e) => handleMethodNameChange(method.id, e.target.value, 'withdrawal')}
+                                    placeholder="e.g., PayPal"
+                                />
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveMethod(method.id, 'withdrawal')}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleAddMethod('withdrawal')}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Add Method
                     </Button>
                 </div>
@@ -180,14 +226,13 @@ export function SettingsForm() {
                         This text is shown to users in addition to any weekly schedule. Use for non-weekday schedules.
                     </p>
                 </div>
-
-                <div>
-                     <Button onClick={handleSubmit} disabled={isSubmitting}>
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save Settings
-                    </Button>
-                </div>
             </CardContent>
+            <CardFooter>
+                 <Button onClick={handleSubmit} disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Settings
+                </Button>
+            </CardFooter>
         </Card>
     );
 }

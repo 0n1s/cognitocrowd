@@ -3,26 +3,28 @@
 
 
 
+
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
+import { getMostRecentChat } from './database';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     const data = doc.data();
     
-    // Serialize top-level timestamps
+    // Convert all top-level Firestore Timestamps to serializable ISO strings
     for (const key in data) {
-        if (data[key] && typeof data[key].toDate === 'function') {
+        if (data[key] instanceof Timestamp) {
             data[key] = data[key].toDate().toISOString();
         }
     }
 
-    // Specifically serialize timestamps within the 'messages' array
+    // Special handling for nested timestamps in chat messages
     if (data.messages && Array.isArray(data.messages)) {
         data.messages = data.messages.map((message: any) => {
-            if (message.createdAt && typeof message.createdAt.toDate === 'function') {
+            if (message.createdAt instanceof Timestamp) {
                 return { ...message, createdAt: message.createdAt.toDate().toISOString() };
             }
             return message;
@@ -31,6 +33,7 @@ function fromDoc<T extends { id: string }>(doc: DocumentData): T {
 
     return { ...data, id: doc.id } as T;
 }
+
 
 export async function getTasks(userId?: string): Promise<Task[]> {
     if (!db) return Promise.resolve([]);
@@ -244,6 +247,7 @@ export async function getDashboardStats() {
 export async function getAppSettings(): Promise<AppSettings> {
     const defaultSettings: AppSettings = {
         paymentMethods: [{ id: uuidv4(), name: 'PayPal' }],
+        depositMethods: [{ id: uuidv4(), name: 'Plisio (Crypto)' }],
         withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.',
         withdrawalDays: []
     };
@@ -254,7 +258,12 @@ export async function getAppSettings(): Promise<AppSettings> {
     const docSnap = await getDoc(settingsDocRef);
 
     if (docSnap.exists()) {
-        return { ...defaultSettings, ...docSnap.data() };
+        const data = fromDoc<AppSettings>(docSnap);
+        // Ensure depositMethods exists for backward compatibility
+        if (!data.depositMethods) {
+            data.depositMethods = defaultSettings.depositMethods;
+        }
+        return { ...defaultSettings, ...data };
     } else {
         await setDoc(settingsDocRef, defaultSettings);
         return defaultSettings;
