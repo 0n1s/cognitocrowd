@@ -1,8 +1,8 @@
-import { Task, LeaderboardEntry, Reward, CompletedTask, Package } from './types';
+import { Task, LeaderboardEntry, Reward, CompletedTask, Package, TaskType } from './types';
 
 export const mockTasks: Task[] = [
   {
-    id: '1',
+    id: 'q001',
     type: 'multiple_choice_preference',
     title: 'Which response feels more professional?',
     description: "User: I need my invoice right now.",
@@ -15,11 +15,14 @@ export const mockTasks: Task[] = [
         allow_comment: true,
         allow_confidence: true
     },
+    award_criteria: {
+        explanation: "Preferences are aggregated to train tone perception."
+    },
     points: 75,
     difficulty: 'Easy',
   },
   {
-    id: '2',
+    id: 'q002',
     type: 'ranking',
     title: 'Rank the following responses from most to least helpful.',
     description: "User: I can't log into my account.",
@@ -31,11 +34,14 @@ export const mockTasks: Task[] = [
     settings: {
       allow_comment: true
     },
+    award_criteria: {
+        explanation: "Captures user judgment on response quality."
+    },
     points: 200,
     difficulty: 'Medium',
   },
   {
-    id: '3',
+    id: 'q003',
     type: 'likert_scale',
     title: 'Rate the clarity of this instruction.',
     description: "Click your avatar, then choose 'Edit Profile'.",
@@ -51,9 +57,125 @@ export const mockTasks: Task[] = [
       allow_comment: true,
       allow_confidence: true
     },
+    award_criteria: {
+        explanation: "Used to learn clarity and usability perception."
+    },
     points: 100,
     difficulty: 'Easy'
   },
+  {
+      id: "q004",
+      type: "classification",
+      title: "What tone does this sentence convey?",
+      description: "Well, maybe read the manual next time.",
+      options: [
+        "Helpful",
+        "Sarcastic",
+        "Polite",
+        "Neutral"
+      ],
+      settings: {
+        allow_comment: true
+      },
+      award_criteria: {
+        explanation: "Gathers tone recognition from users."
+      },
+      points: 150,
+      difficulty: 'Medium',
+  },
+  {
+      id: "q005",
+      type: "sentiment",
+      title: "What sentiment is expressed here?",
+      description: "Nothing works on this site and I’ve wasted an hour!",
+      options: [
+        "Positive",
+        "Neutral",
+        "Negative"
+      ],
+      settings: {
+        allow_comment: false
+      },
+      award_criteria: {
+        explanation: "Used to train emotion recognition models."
+      },
+      points: 250,
+      difficulty: 'Hard'
+  },
+  {
+      id: "q006",
+      type: "topic_classification",
+      title: "What is the topic of this statement?",
+      description: "Unemployment dropped by 2% in Q2 2025.",
+      options: [
+        "Health",
+        "Finance",
+        "Education"
+      ],
+      settings: {
+        allow_comment: false
+      },
+      award_criteria: {
+        explanation: "Used to train topic classifiers."
+      },
+      points: 75,
+      difficulty: 'Easy'
+  },
+  {
+      id: "q007",
+      type: "open_text_feedback",
+      title: "How would you improve this assistant response?",
+      description: "I already told you what to do.",
+      settings: {
+        min_chars: 10,
+        max_chars: 300
+      },
+      award_criteria: {
+        explanation: "Freeform feedback helps improve assistant behavior."
+      },
+      points: 200,
+      difficulty: 'Medium'
+  },
+  {
+      id: "q008",
+      type: "compare_pairwise",
+      title: "Which response is better?",
+      description: "User: My order arrived broken.",
+      options: [
+        { "label": "Response A", "text": "Sorry to hear that! I’ll help you right away." },
+        { "label": "Response B", "text": "Not my problem. Contact the courier." }
+      ],
+      settings: {
+        allow_comment: true,
+        allow_confidence: true
+      },
+      award_criteria: {
+        explanation: "Used for pairwise preference ranking in RLHF."
+      },
+      points: 100,
+      difficulty: 'Easy'
+  },
+  {
+      id: "q009",
+      type: "label_multiple",
+      title: "Which of the following labels apply to this sentence?",
+      description: "I can’t believe they hired someone like her.",
+      options: [
+        "Biased",
+        "Offensive",
+        "Neutral",
+        "Needs context"
+      ],
+      settings: {
+        allow_multi_select: true,
+        "allow_comment": true
+      },
+      award_criteria: {
+        explanation: "Supports multi-label annotation of complex inputs."
+      },
+      points: 250,
+      difficulty: 'Hard'
+  }
 ];
 
 export const mockLeaderboard: LeaderboardEntry[] = [
