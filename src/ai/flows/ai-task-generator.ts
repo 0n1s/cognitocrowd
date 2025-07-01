@@ -18,7 +18,7 @@ const GenerateTaskInputSchema = z.object({
 });
 export type GenerateTaskInput = z.infer<typeof GenerateTaskInputSchema>;
 
-const GenerateTaskOutputSchema = z.object({
+export const GenerateTaskOutputSchema = z.object({
   prompt: z.string().describe('The generated task prompt.'),
   description: z.string().describe('The generated task description.'),
   options: z.array(z.string()).optional().describe('The generated task options, if applicable (e.g., for multiple choice tasks).'),
