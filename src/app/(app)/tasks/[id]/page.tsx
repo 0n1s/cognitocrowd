@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { getTask } from "@/lib/database";
-import { notFound } from "next/navigation";
+import { notFound, useParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TaskForms } from "./task-forms";
-import { Task } from '@/lib/types';
+import type { Task } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
 function LoadingSkeleton() {
@@ -35,12 +35,14 @@ function LoadingSkeleton() {
     )
 }
 
-export default function TaskPage({ params }: { params: { id: string } }) {
+export default function TaskPage() {
+  const params = useParams<{ id: string }>();
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchTask() {
+      if (!params.id) return;
       try {
         const fetchedTask = await getTask(params.id);
         if (!fetchedTask) {
