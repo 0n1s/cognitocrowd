@@ -1,0 +1,18 @@
+import { TaskList } from "./task-list";
+import { mockAdminTasks } from "@/lib/data";
+
+export default function AdminTasksPage() {
+    return (
+        <div>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold font-headline">Task Management</h1>
+                    <p className="text-muted-foreground mt-1">Create, view, and manage all tasks on the platform.</p>
+                </div>
+            </div>
+            <div className="mt-8">
+                <TaskList initialTasks={mockAdminTasks} />
+            </div>
+        </div>
+    );
+}

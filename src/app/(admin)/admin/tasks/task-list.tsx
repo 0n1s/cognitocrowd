@@ -1,0 +1,244 @@
+"use client";
+
+import { useState } from "react";
+import { AdminTask, Task } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { PlusCircle, Loader2, Wand2 } from "lucide-react";
+import { generateTask } from "@/ai/flows/ai-task-generator";
+
+type AddTaskDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTaskAdd: (task: AdminTask) => void;
+};
+
+function AddTaskDialog({ open, onOpenChange, onTaskAdd }: AddTaskDialogProps) {
+  const [taskType, setTaskType] = useState<Task["type"]>("open_text_feedback");
+  const [options, setOptions] = useState<string[]>([""]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [points, setPoints] = useState(100);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleOptionChange = (index: number, value: string) => {
+    const newOptions = [...options];
+    newOptions[index] = value;
+    setOptions(newOptions);
+  };
+
+  const addOption = () => setOptions([...options, ""]);
+  const removeOption = (index: number) => {
+    if (options.length > 1) {
+      setOptions(options.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!title) return;
+    setIsGenerating(true);
+    try {
+        const result = await generateTask({ topic: title, taskType });
+        setDescription(result.description);
+        if(result.options && result.options.length > 0) {
+            setOptions(result.options);
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    const newTask: AdminTask = {
+      id: Date.now().toString(),
+      title,
+      type: taskType,
+      points,
+      status: "Active",
+    };
+    onTaskAdd(newTask);
+    onOpenChange(false);
+    // Reset form
+    setTitle("");
+    setDescription("");
+    setPoints(100);
+    setTaskType("open_text_feedback");
+    setOptions([""]);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="font-headline">Add New Task</DialogTitle>
+          <DialogDescription>
+            Configure the details for the new task.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="title" className="text-right">
+              Title
+            </Label>
+            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., 'Describe a sunset'" />
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="description" className="text-right pt-2">
+              Description
+            </Label>
+            <div className="col-span-3 space-y-2">
+                <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder="A detailed prompt for the user." />
+                 <Button onClick={handleGenerate} disabled={isGenerating || !title} variant="outline" size="sm">
+                    {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    Generate with AI
+                </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="points" className="text-right">
+              Points
+            </Label>
+            <Input id="points" type="number" value={points} onChange={e => setPoints(Number(e.target.value))} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="task-type" className="text-right">
+              Task Type
+            </Label>
+            <Select
+              value={taskType}
+              onValueChange={(value) => setTaskType(value as Task["type"])}
+            >
+              <SelectTrigger id="task-type" className="col-span-3">
+                <SelectValue placeholder="Select a type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open_text_feedback">Open Text Feedback</SelectItem>
+                <SelectItem value="multiple_choice_preference">Multiple Choice</SelectItem>
+                <SelectItem value="ranking">Ranking</SelectItem>
+                <SelectItem value="classification">Classification</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification") && (
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">Options</Label>
+              <div className="col-span-3 space-y-2">
+                {options.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      placeholder={`Option ${index + 1}`}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeOption(index)}
+                      disabled={options.length <= 1}
+                    >
+                      &times;
+                    </Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addOption}>
+                  Add Option
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleSubmit}>Create Task</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+export function TaskList({ initialTasks }: { initialTasks: AdminTask[] }) {
+    const [tasks, setTasks] = useState<AdminTask[]>(initialTasks);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const handleAddTask = (task: AdminTask) => {
+        setTasks(prev => [task, ...prev]);
+    }
+  return (
+    <Card>
+      <CardHeader className="flex flex-row justify-between items-center">
+        <CardTitle>All Tasks</CardTitle>
+        <Button onClick={() => setIsDialogOpen(true)}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Task
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Points</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tasks.map((task) => (
+              <TableRow key={task.id}>
+                <TableCell className="font-medium">{task.title}</TableCell>
+                <TableCell>{task.type}</TableCell>
+                <TableCell>{task.points}</TableCell>
+                <TableCell>
+                  <Badge variant={task.status === "Active" ? "secondary" : "outline"}>
+                    {task.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {/* Action buttons can go here */}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+       <AddTaskDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} onTaskAdd={handleAddTask} />
+    </Card>
+  );
+}
