@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest } from './types';
+import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit } from 'firebase/firestore';
+import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -208,4 +208,29 @@ export async function getUserWithdrawalRequests(userId: string): Promise<Withdra
     const q = query(requestsCol, where('userId', '==', userId), orderBy('requestedAt', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => fromDoc<WithdrawalRequest>(d));
+}
+
+export async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
+    if (!db) return [];
+    
+    const usersCol = collection(db, 'users');
+    const q = query(usersCol, orderBy('points', 'desc'), limit(10));
+    
+    try {
+        const snapshot = await getDocs(q);
+        const leaderboard: LeaderboardEntry[] = snapshot.docs.map((doc, index) => {
+            const data = doc.data() as User;
+            return {
+                rank: index + 1,
+                user: {
+                    name: data.name,
+                },
+                points: data.points || 0,
+            };
+        });
+        return leaderboard;
+    } catch (error) {
+        console.error("Failed to fetch leaderboard data:", error);
+        return [];
+    }
 }
