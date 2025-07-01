@@ -12,7 +12,7 @@ import { z } from 'genkit';
 import { getTask, getTaskResponses } from '@/lib/database';
 import { Task, TaskResponse } from '@/lib/types';
 
-export const RankResponseInputSchema = z.object({
+const RankResponseInputSchema = z.object({
   taskId: z.string().describe('The ID of the task being responded to.'),
   response: z.object({
     userId: z.string(),
@@ -21,7 +21,7 @@ export const RankResponseInputSchema = z.object({
 });
 export type RankResponseInput = z.infer<typeof RankResponseInputSchema>;
 
-export const RankResponseOutputSchema = z.object({
+const RankResponseOutputSchema = z.object({
   rank: z.number().min(1).max(10).describe('A quality score from 1 (poor) to 10 (excellent).'),
   explanation: z.string().describe('A brief explanation for the assigned rank.'),
 });
