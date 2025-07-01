@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch } from 'firebase/firestore';
-import type { Task, AdminTask } from './types';
-import { mockTasks } from './data';
+import type { Task, AdminTask, Package } from './types';
+import { mockTasks, mockPackages } from './data';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     const data = doc.data();
@@ -53,4 +53,25 @@ export async function getAdminTasks(): Promise<AdminTask[]> {
             status: data.status || 'Active',
         } as AdminTask;
     });
+}
+
+export async function getPackages(): Promise<Package[]> {
+    if (!db) return Promise.resolve([]);
+    const packagesCol = collection(db, 'packages');
+    const snapshot = await getDocs(packagesCol);
+
+    if (snapshot.empty && mockPackages.length > 0) {
+        console.log('No packages found. Seeding database with mock data...');
+        const batch = writeBatch(db);
+        mockPackages.forEach((pkg) => {
+            const docRef = doc(collection(db, 'packages'));
+            batch.set(docRef, pkg);
+        });
+        await batch.commit();
+        console.log('Packages database seeded.');
+        const seededSnapshot = await getDocs(packagesCol);
+        return seededSnapshot.docs.map(d => fromDoc<Package>(d));
+    }
+
+    return snapshot.docs.map(doc => fromDoc<Package>(doc));
 }

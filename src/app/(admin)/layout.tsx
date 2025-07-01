@@ -22,6 +22,7 @@ import {
   LogOut,
   ArrowLeft,
   Loader2,
+  Package,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import { signOut } from "firebase/auth";
 const navItems = [
   { href: "/admin/dashboard", icon: LayoutGrid, label: "Dashboard" },
   { href: "/admin/tasks", icon: ClipboardList, label: "Tasks" },
+  { href: "/admin/packages", icon: Package, label: "Packages" },
 ];
 
 const AdminHeader = () => {

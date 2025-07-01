@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch } from "firebase/firestore";
-import type { Task, TaskType } from "@/lib/types";
+import type { Task, TaskType, Package } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 
 export type CreateTaskInput = {
@@ -101,5 +101,24 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
     } catch (error) {
         console.error(error);
         return { success: false, message: 'Failed to submit response.' };
+    }
+}
+
+export type CreatePackageInput = Omit<Package, 'id'>;
+
+export async function createAdminPackage(data: CreatePackageInput) {
+    if (!db) {
+        return { success: false, message: 'Database not configured. Please check your environment variables.' };
+    }
+    try {
+        await addDoc(collection(db, "packages"), data);
+
+        revalidatePath("/admin/packages");
+        revalidatePath("/packages");
+        return { success: true, message: 'Package created successfully.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to create package: ${errorMessage}` };
     }
 }

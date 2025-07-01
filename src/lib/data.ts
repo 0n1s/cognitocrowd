@@ -20,6 +20,7 @@ export const mockTasks: Task[] = [
     },
     points: 75,
     difficulty: 'Easy',
+    status: 'Active',
   },
   {
     id: 'q002',
@@ -39,6 +40,7 @@ export const mockTasks: Task[] = [
     },
     points: 200,
     difficulty: 'Medium',
+    status: 'Active',
   },
   {
     id: 'q003',
@@ -61,7 +63,8 @@ export const mockTasks: Task[] = [
         explanation: "Used to learn clarity and usability perception."
     },
     points: 100,
-    difficulty: 'Easy'
+    difficulty: 'Easy',
+    status: 'Active',
   },
   {
       id: "q004",
@@ -82,6 +85,7 @@ export const mockTasks: Task[] = [
       },
       points: 150,
       difficulty: 'Medium',
+      status: 'Active',
   },
   {
       id: "q005",
@@ -100,7 +104,8 @@ export const mockTasks: Task[] = [
         explanation: "Used to train emotion recognition models."
       },
       points: 250,
-      difficulty: 'Hard'
+      difficulty: 'Hard',
+      status: 'Active',
   },
   {
       id: "q006",
@@ -119,7 +124,8 @@ export const mockTasks: Task[] = [
         explanation: "Used to train topic classifiers."
       },
       points: 75,
-      difficulty: 'Easy'
+      difficulty: 'Easy',
+      status: 'Active',
   },
   {
       id: "q007",
@@ -134,7 +140,8 @@ export const mockTasks: Task[] = [
         explanation: "Freeform feedback helps improve assistant behavior."
       },
       points: 200,
-      difficulty: 'Medium'
+      difficulty: 'Medium',
+      status: 'Active',
   },
   {
       id: "q008",
@@ -153,7 +160,8 @@ export const mockTasks: Task[] = [
         explanation: "Used for pairwise preference ranking in RLHF."
       },
       points: 100,
-      difficulty: 'Easy'
+      difficulty: 'Easy',
+      status: 'Active',
   },
   {
       id: "q009",
@@ -168,13 +176,14 @@ export const mockTasks: Task[] = [
       ],
       settings: {
         allow_multi_select: true,
-        "allow_comment": true
+        allow_comment: true,
       },
       award_criteria: {
         explanation: "Supports multi-label annotation of complex inputs."
       },
       points: 250,
-      difficulty: 'Hard'
+      difficulty: 'Hard',
+      status: 'Active',
   }
 ];
 
@@ -230,7 +239,7 @@ export const mockCompletedTasks: CompletedTask[] = [
   { id: '5', title: 'Describe this Image', completedAt: '2024-05-16', points: 150 },
 ];
 
-export const mockPackages: Package[] = [
+export const mockPackages: Omit<Package, 'id'>[] = [
     {
         name: 'Starter',
         price: 'Free',

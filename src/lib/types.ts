@@ -73,6 +73,7 @@ export type CompletedTask = {
 };
 
 export type Package = {
+  id: string;
   name: string;
   price: string;
   features: string[];
