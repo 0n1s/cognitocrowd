@@ -123,9 +123,9 @@ export function TaskForms({ task }: { task: Task }) {
             description: `You've earned ${result.points} points for completing "${task.title}".`,
         });
 
-        // Redirect to dashboard after a short delay to allow toast to be seen
+        // Redirect to results page after a short delay
         setTimeout(() => {
-            router.push('/dashboard');
+            router.push(`/tasks/${task.id}/results`);
         }, 1500);
     } else {
         toast({
