@@ -170,7 +170,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarSeparator className="my-2" />
           <div className="px-2">
             <div className="px-2 py-1 text-xs font-semibold text-sidebar-foreground/70">
-                AI Tools
+                Our AI Tools
             </div>
           </div>
           <SidebarMenu>
