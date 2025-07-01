@@ -50,6 +50,8 @@ export type User = {
   email: string;
   points: number;
   packageId: string | null;
+  completedTasks?: string[];
+  createdAt: Date;
 };
 
 export type Reward = {
@@ -67,7 +69,7 @@ export type LeaderboardEntry = {
 };
 
 export type CompletedTask = {
-  id: string;
+  id:string;
   title: string;
   completedAt: string;
   points: number;

@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { getTask } from "@/lib/database";
-import { notFound, useParams } from "next/navigation";
+import { getTask, getUserData } from "@/lib/database";
+import { notFound, useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TaskForms } from "./task-forms";
 import type { Task } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 
 function LoadingSkeleton() {
     return (
@@ -39,11 +41,22 @@ export default function TaskPage() {
   const params = useParams<{ id: string }>();
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
-    async function fetchTask() {
-      if (!params.id) return;
+    async function fetchTaskAndCheckCompletion() {
+      if (!params.id || !user) return;
+      
       try {
+        const userData = await getUserData(user.uid);
+        if (userData?.completedTasks?.includes(params.id)) {
+            toast({ title: "Task unavailable", description: "You have already completed this task." });
+            router.push('/dashboard');
+            return;
+        }
+
         const fetchedTask = await getTask(params.id);
         if (!fetchedTask) {
           notFound();
@@ -57,10 +70,13 @@ export default function TaskPage() {
         setLoading(false);
       }
     }
-    fetchTask();
-  }, [params.id]);
+    
+    if (!authLoading) {
+        fetchTaskAndCheckCompletion();
+    }
+  }, [params.id, user, authLoading, router, toast]);
 
-  if (loading) {
+  if (loading || authLoading) {
       return <LoadingSkeleton />;
   }
   

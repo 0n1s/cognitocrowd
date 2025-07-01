@@ -1,6 +1,6 @@
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch } from 'firebase/firestore';
-import type { Task, AdminTask, Package } from './types';
+import type { Task, AdminTask, Package, User } from './types';
 import { mockTasks, mockPackages } from './data';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
@@ -8,12 +8,22 @@ function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     return { ...data, id: doc.id } as T;
 }
 
-export async function getTasks(): Promise<Task[]> {
+export async function getTasks(userId?: string): Promise<Task[]> {
     if (!db) return Promise.resolve([]);
+
+    let completedTaskIds: string[] = [];
+    if (userId) {
+        const userDoc = await getUserData(userId);
+        if (userDoc?.completedTasks) {
+            completedTaskIds = userDoc.completedTasks;
+        }
+    }
+
     const tasksCol = collection(db, 'tasks');
     const q = query(tasksCol, where('status', '==', 'Active'));
     const snapshot = await getDocs(q);
 
+    let allTasks: Task[] = [];
     if (snapshot.empty && mockTasks.length > 0) {
         console.log('No tasks found. Seeding database with mock data...');
         const batch = writeBatch(db);
@@ -25,10 +35,16 @@ export async function getTasks(): Promise<Task[]> {
         await batch.commit();
         console.log('Database seeded.');
         const seededSnapshot = await getDocs(q);
-        return seededSnapshot.docs.map(d => fromDoc<Task>(d));
+        allTasks = seededSnapshot.docs.map(d => fromDoc<Task>(d));
+    } else {
+        allTasks = snapshot.docs.map(doc => fromDoc<Task>(doc));
     }
 
-    return snapshot.docs.map(doc => fromDoc<Task>(doc));
+    if (completedTaskIds.length > 0) {
+        return allTasks.filter(task => !completedTaskIds.includes(task.id));
+    }
+
+    return allTasks;
 }
 
 export async function getTask(id: string): Promise<Task | null> {
@@ -36,6 +52,16 @@ export async function getTask(id: string): Promise<Task | null> {
     const docRef = doc(db, 'tasks', id);
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? fromDoc<Task>(docSnap) : null;
+}
+
+export async function getUserData(userId: string): Promise<User | null> {
+    if (!db) return null;
+    const userDocRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+        return fromDoc<User>(userDoc);
+    }
+    return null;
 }
 
 export async function getAdminTasks(): Promise<AdminTask[]> {

@@ -3,8 +3,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit } from "firebase/firestore";
-import type { Task, TaskType, Package } from "@/lib/types";
+import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp } from "firebase/firestore";
+import type { Task, TaskType, Package, User } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 
 export type CreateTaskInput = {
@@ -87,20 +87,74 @@ export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
 }
 
 
-export async function submitTaskResponse(taskId: string, points: number, formData: FormData) {
-     try {
-        // In a real app, we'd save the response to a 'responses' collection
-        // and update the user's points.
-        console.log("Submitted for task:", taskId);
-        console.log("Points earned:", points);
-        console.log("Form data:", Object.fromEntries(formData.entries()));
+export async function submitTaskResponse(taskId: string, points: number, formData: FormData, userId: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    if (!userId) {
+        return { success: false, message: 'User not authenticated.' };
+    }
 
-        // For now, just revalidate and return success
+    const userDocRef = doc(db, 'users', userId);
+    const taskResponseColRef = collection(db, 'task_responses');
+
+    try {
+        const userDoc = await getDoc(userDocRef);
+        if (!userDoc.exists()) {
+            return { success: false, message: 'User not found.' };
+        }
+
+        const userData = userDoc.data() as User;
+        const completedTasks = userData.completedTasks || [];
+
+        if (completedTasks.includes(taskId)) {
+            return { success: false, message: 'You have already completed this task.' };
+        }
+
+        if (userData.packageId) {
+            const packageDocRef = doc(db, 'packages', userData.packageId);
+            const packageDoc = await getDoc(packageDocRef);
+
+            if (packageDoc.exists()) {
+                const packageData = packageDoc.data() as Package;
+                if (completedTasks.length >= packageData.taskLimit) {
+                    return { success: false, message: 'You have reached your task limit for this period. Please upgrade your package to continue.' };
+                }
+            }
+        } else {
+             const FREE_TIER_LIMIT = 50; 
+             if (completedTasks.length >= FREE_TIER_LIMIT) {
+                 return { success: false, message: 'You have reached your task limit for this period.' };
+             }
+        }
+
+        const batch = writeBatch(db);
+
+        const responseData = Object.fromEntries(formData.entries());
+        const newResponseRef = doc(taskResponseColRef);
+        batch.set(newResponseRef, {
+            userId,
+            taskId,
+            pointsEarned: points,
+            submittedAt: Timestamp.now(),
+            responseData,
+        });
+
+        const newPoints = (userData.points || 0) + points;
+        const newCompletedTasks = [...completedTasks, taskId];
+        batch.update(userDocRef, {
+            points: newPoints,
+            completedTasks: newCompletedTasks
+        });
+        
+        await batch.commit();
+
         revalidatePath('/dashboard');
         revalidatePath(`/tasks/${taskId}`);
-        return { success: true };
+        revalidatePath('/rewards');
+        return { success: true, points };
     } catch (error) {
-        console.error(error);
+        console.error("Error submitting task response:", error);
         return { success: false, message: 'Failed to submit response.' };
     }
 }
@@ -183,6 +237,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             email,
             points: 0,
             packageId,
+            completedTasks: [],
             createdAt: new Date(),
         });
         

@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { submitTaskResponse } from "@/lib/actions";
+import { useAuth } from "@/hooks/use-auth";
 
 const AdditionalFeedback = ({ settings }: { settings?: TaskSettings }) => {
     if (!settings || (!settings.allow_comment && !settings.allow_confidence)) {
@@ -49,18 +50,26 @@ export function TaskForms({ task }: { task: Task }) {
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
+    
+    if (!user) {
+        toast({ title: "Authentication Error", description: "You must be logged in to submit a task.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+    }
+
     const formData = new FormData(event.currentTarget);
     
-    const result = await submitTaskResponse(task.id, task.points, formData);
+    const result = await submitTaskResponse(task.id, task.points, formData, user.uid);
 
     if (result.success) {
         toast({
             title: "Task Submitted!",
-            description: `You've earned ${task.points} points for completing "${task.title}".`,
+            description: `You've earned ${result.points} points for completing "${task.title}".`,
         });
 
         // Redirect to dashboard after a short delay to allow toast to be seen

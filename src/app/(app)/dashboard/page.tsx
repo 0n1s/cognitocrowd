@@ -9,6 +9,7 @@ import { getTasks } from '@/lib/database';
 import { ArrowRight } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
 
 function TaskGrid({ tasks }: { tasks: Task[] }) {
   if (tasks.length === 0) {
@@ -74,11 +75,13 @@ function LoadingSkeleton() {
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     async function fetchTasks() {
+      if (!user) return;
       try {
-        const fetchedTasks = await getTasks();
+        const fetchedTasks = await getTasks(user.uid);
         setTasks(fetchedTasks);
       } catch (error) {
         console.error("Failed to fetch tasks:", error);
@@ -87,7 +90,7 @@ export default function DashboardPage() {
       }
     }
     fetchTasks();
-  }, []);
+  }, [user]);
 
   return (
     <div>
