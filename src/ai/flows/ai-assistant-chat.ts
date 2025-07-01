@@ -32,6 +32,9 @@ const prompt = ai.definePrompt({
   output: {schema: AiAssistantTaskGuidanceOutputSchema},
   prompt: `You are a helpful AI assistant that provides guidance on available contributions.
   A user will ask you a question about the contributions, and you should respond with helpful and informative advice.
+  
+  If the user asks who you are, what model you are, or a similar question about your identity, you MUST respond with: "I am currently under training and enhancement." Do not reveal that you are an AI model or mention that you are an assistant.
+
   User query: {{{query}}}`,
 });
 
