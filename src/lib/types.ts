@@ -91,4 +91,15 @@ export type AdminTask = {
     type: string;
     points: number;
     status: 'Active' | 'Archived';
-}
+};
+
+export type TaskResponse = {
+  id: string;
+  userId: string;
+  taskId: string;
+  pointsEarned: number;
+  submittedAt: any; // Firestore Timestamp
+  responseData: Record<string, any>;
+  rank?: number;
+  rankExplanation?: string;
+};

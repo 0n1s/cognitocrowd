@@ -1,6 +1,6 @@
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User } from './types';
+import type { Task, AdminTask, Package, User, TaskResponse } from './types';
 import { mockTasks, mockPackages } from './data';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
@@ -53,6 +53,15 @@ export async function getTask(id: string): Promise<Task | null> {
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? fromDoc<Task>(docSnap) : null;
 }
+
+export async function getTaskResponses(taskId: string): Promise<TaskResponse[]> {
+    if (!db) return [];
+    const responsesCol = collection(db, 'task_responses');
+    const q = query(responsesCol, where('taskId', '==', taskId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => fromDoc<TaskResponse>(d));
+}
+
 
 export async function getUserData(userId: string): Promise<User | null> {
     if (!db) return null;

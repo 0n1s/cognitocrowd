@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp } from "firebase/firestore";
 import type { Task, TaskType, Package, User } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
+import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 
 export type CreateTaskInput = {
     title: string;
@@ -97,6 +98,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
 
     const userDocRef = doc(db, 'users', userId);
     const taskResponseColRef = collection(db, 'task_responses');
+    let newResponseRef; // Define here to be accessible in the whole function scope
 
     try {
         const userDoc = await getDoc(userDocRef);
@@ -133,36 +135,27 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
         const responseData: Record<string, any> = {};
 
         if (taskType === 'ranking') {
-            // All other fields
             formData.forEach((value, key) => {
-                if (key !== 'ranking') {
-                    responseData[key] = value;
-                }
+                if (key !== 'ranking') responseData[key] = value;
             });
-            // Ranking array
             responseData.ranking = formData.getAll('ranking');
-
         } else if (taskType === 'label_multiple') {
             const labels: string[] = [];
-            // All other fields
             formData.forEach((value, key) => {
                 if (key.startsWith('label-')) {
-                    if (value === 'on') { // Checkboxes send 'on' when checked
-                        labels.push(key.replace('label-', ''));
-                    }
+                    if (value === 'on') labels.push(key.replace('label-', ''));
                 } else {
                     responseData[key] = value;
                 }
             });
             responseData.labels = labels;
         } else {
-            // Default for other types
             formData.forEach((value, key) => {
                 responseData[key] = value;
             });
         }
         
-        const newResponseRef = doc(taskResponseColRef);
+        newResponseRef = doc(taskResponseColRef);
         batch.set(newResponseRef, {
             userId,
             taskId,
@@ -179,6 +172,24 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
         });
         
         await batch.commit();
+
+        // After committing, trigger the AI ranking flow.
+        try {
+            const rankOutput = await rankTaskResponse({
+                taskId,
+                response: { userId, responseData }
+            });
+
+            if (rankOutput) {
+                await updateDoc(newResponseRef, {
+                    rank: rankOutput.rank,
+                    rankExplanation: rankOutput.explanation
+                });
+            }
+        } catch (error) {
+            console.error("Failed to rank task response:", error);
+            // Don't block user return if ranking fails. It can be a background process.
+        }
 
         revalidatePath('/dashboard');
         revalidatePath(`/tasks/${taskId}`);
