@@ -1,3 +1,4 @@
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest } from './types';
@@ -169,7 +170,8 @@ export async function getDashboardStats() {
 export async function getAppSettings(): Promise<AppSettings> {
     const defaultSettings: AppSettings = {
         paymentMethods: [{ id: uuidv4(), name: 'PayPal' }],
-        withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.'
+        withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.',
+        withdrawalDays: []
     };
 
     if (!db) return defaultSettings;
@@ -178,7 +180,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     const docSnap = await getDoc(settingsDocRef);
 
     if (docSnap.exists()) {
-        return docSnap.data() as AppSettings;
+        return { ...defaultSettings, ...docSnap.data() };
     } else {
         await setDoc(settingsDocRef, defaultSettings);
         return defaultSettings;

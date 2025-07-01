@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { updateAppSettings } from "@/lib/actions";
 import { getAppSettings } from "@/lib/database";
 import { v4 as uuidv4 } from "uuid";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const LoadingSkeleton = () => (
     <Card>
@@ -38,6 +40,8 @@ export function SettingsForm() {
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -84,6 +88,15 @@ export function SettingsForm() {
     const handleScheduleChange = (info: string) => {
         if (!settings) return;
         setSettings({ ...settings, withdrawalScheduleInfo: info });
+    };
+
+    const handleDayChange = (day: string, checked: boolean) => {
+        if (!settings) return;
+        const currentDays = settings.withdrawalDays || [];
+        const newDays = checked
+            ? [...currentDays, day]
+            : currentDays.filter((d) => d !== day);
+        setSettings({ ...settings, withdrawalDays: newDays });
     };
 
     const handleSubmit = async () => {
@@ -133,20 +146,41 @@ export function SettingsForm() {
                         <PlusCircle className="mr-2 h-4 w-4" /> Add Method
                     </Button>
                 </div>
+                
+                <div className="space-y-4">
+                    <Label className="text-base font-semibold">Weekly Withdrawal Days</Label>
+                    <p className="text-sm text-muted-foreground">
+                        Select specific days of the week for processing withdrawals. This will be shown to users.
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-2">
+                        {weekdays.map((day) => (
+                            <div key={day} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`day-${day}`}
+                                    checked={settings.withdrawalDays?.includes(day)}
+                                    onCheckedChange={(checked) => handleDayChange(day, checked as boolean)}
+                                />
+                                <Label htmlFor={`day-${day}`} className="font-normal">{day}</Label>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="space-y-2">
                     <Label htmlFor="schedule" className="text-base font-semibold">
-                        Withdrawal Schedule Information
+                        Custom Schedule Information
                     </Label>
                     <Textarea
                         id="schedule"
                         value={settings.withdrawalScheduleInfo}
                         onChange={(e) => handleScheduleChange(e.target.value)}
-                        placeholder="e.g., Withdrawals are processed on the 1st and 15th of each month."
+                        placeholder="e.g., Withdrawals are also processed on the 1st and 15th of each month."
                     />
                     <p className="text-xs text-muted-foreground">
-                        This text will be shown to users when they request a withdrawal.
+                        This text is shown to users in addition to any weekly schedule. Use for non-weekday schedules.
                     </p>
                 </div>
+
                 <div>
                      <Button onClick={handleSubmit} disabled={isSubmitting}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

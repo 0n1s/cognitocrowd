@@ -1,3 +1,4 @@
+
 export type TaskOption =
   | string
   | { text: string }
@@ -118,6 +119,7 @@ export type AppSettings = {
   id?: 'main';
   paymentMethods: PaymentMethod[];
   withdrawalScheduleInfo: string;
+  withdrawalDays?: string[];
 };
 
 export type WithdrawalRequest = {

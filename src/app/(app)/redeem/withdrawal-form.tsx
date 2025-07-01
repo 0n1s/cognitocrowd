@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -25,6 +26,15 @@ export function WithdrawalForm({ user, settings, currentPoints, onWithdrawal }: 
     const [method, setMethod] = useState("");
     const [details, setDetails] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const scheduleParts = [];
+    if (settings.withdrawalDays && settings.withdrawalDays.length > 0) {
+        scheduleParts.push(`Weekly processing is available on ${settings.withdrawalDays.join(', ')}.`);
+    }
+    if (settings.withdrawalScheduleInfo) {
+        scheduleParts.push(settings.withdrawalScheduleInfo);
+    }
+    const scheduleDescription = scheduleParts.join(' ') || "Withdrawal processing times are configured by the admin.";
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -67,7 +77,7 @@ export function WithdrawalForm({ user, settings, currentPoints, onWithdrawal }: 
             <CardHeader>
                 <CardTitle>Request Withdrawal</CardTitle>
                 <CardDescription>
-                    {settings.withdrawalScheduleInfo}
+                    {scheduleDescription}
                 </CardDescription>
             </CardHeader>
             <CardContent>
