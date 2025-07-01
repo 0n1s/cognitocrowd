@@ -51,7 +51,12 @@ export type User = {
   points: number;
   packageId: string | null;
   completedTasks?: string[];
-  createdAt: Date;
+  createdAt: any; // Firestore Timestamp
+  role?: 'user' | 'admin';
+};
+
+export type AdminUser = User & {
+  packageName: string;
 };
 
 export type Reward = {

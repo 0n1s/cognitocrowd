@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   Loader2,
   Package,
+  Users,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ const navItems = [
   { href: "/admin/dashboard", icon: LayoutGrid, label: "Dashboard" },
   { href: "/admin/tasks", icon: ClipboardList, label: "Tasks" },
   { href: "/admin/packages", icon: Package, label: "Packages" },
+  { href: "/admin/users", icon: Users, label: "Users" },
 ];
 
 const AdminHeader = () => {

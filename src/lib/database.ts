@@ -1,6 +1,6 @@
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User, TaskResponse } from './types';
+import type { Task, AdminTask, Package, User, TaskResponse, AdminUser } from './types';
 import { mockTasks, mockPackages } from './data';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
@@ -109,4 +109,30 @@ export async function getPackages(): Promise<Package[]> {
     }
 
     return snapshot.docs.map(doc => fromDoc<Package>(doc));
+}
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+    if (!db) return [];
+
+    const usersCol = collection(db, 'users');
+    const packagesCol = collection(db, 'packages');
+
+    const [usersSnapshot, packagesSnapshot] = await Promise.all([
+        getDocs(usersCol),
+        getDocs(packagesCol)
+    ]);
+    
+    const packagesMap = new Map<string, string>();
+    packagesSnapshot.docs.forEach(doc => {
+        packagesMap.set(doc.id, doc.data().name);
+    });
+    packagesMap.set("null", "Free Tier"); // Handle null packageId
+
+    const users = usersSnapshot.docs.map(doc => {
+        const user = fromDoc<User>(doc);
+        const packageName = user.packageId ? packagesMap.get(user.packageId) || 'N/A' : 'Free Tier';
+        return { ...user, packageName };
+    });
+
+    return users;
 }

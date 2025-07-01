@@ -31,8 +31,8 @@ export default function AdminDashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-muted-foreground">View and manage user accounts and roles.</p>
-                        <Link href="#" className="text-primary font-semibold mt-4 inline-block text-muted-foreground pointer-events-none">
-                            Coming Soon
+                        <Link href="/admin/users" className="text-primary font-semibold mt-4 inline-block">
+                            Go to Users &rarr;
                         </Link>
                     </CardContent>
                 </Card>

@@ -280,6 +280,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             points: 0,
             packageId,
             completedTasks: [],
+            role: 'user',
             createdAt: new Date(),
         });
         
@@ -289,5 +290,37 @@ export async function setupNewUser(userId: string, name: string, email: string) 
         console.error("Error setting up new user:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message: `Failed to set up new user: ${errorMessage}` };
+    }
+}
+
+export async function updateAdminUser(userId: string, data: Partial<Pick<User, 'packageId' | 'role' | 'points'>>) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const userDoc = doc(db, 'users', userId);
+        await updateDoc(userDoc, data);
+        revalidatePath("/admin/users");
+        return { success: true, message: 'User updated successfully.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to update user: ${errorMessage}` };
+    }
+}
+
+export async function deleteAdminUser(userId: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const userDoc = doc(db, 'users', userId);
+        await deleteDoc(userDoc);
+        revalidatePath("/admin/users");
+        return { success: true, message: 'User deleted successfully. Note: This does not remove the user from Firebase Authentication.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to delete user: ${errorMessage}` };
     }
 }
