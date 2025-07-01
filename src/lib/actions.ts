@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, doc, writeBatch } from "firebase/firestore";
 import type { Task, TaskType } from "@/lib/types";
+import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 
 export type CreateTaskInput = {
     title: string;
@@ -35,6 +36,43 @@ export async function createAdminTask(data: CreateTaskInput) {
         return { success: false, message: `Failed to create task: ${errorMessage}` };
     }
 }
+
+export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
+    try {
+        const generatedData = await bulkGenerateTasks(data);
+
+        if (!generatedData || !generatedData.tasks || generatedData.tasks.length === 0) {
+            return { success: false, message: 'AI failed to generate tasks.' };
+        }
+
+        const batch = writeBatch(db);
+        const tasksCol = collection(db, "tasks");
+
+        generatedData.tasks.forEach(task => {
+            const docRef = doc(tasksCol); // Create new doc with auto-ID
+            const taskToAdd: Omit<Task, 'id'> = {
+                title: task.prompt,
+                description: task.description,
+                points: 100, // Default points for now
+                type: task.taskType,
+                options: task.options || [],
+                status: 'Active',
+                difficulty: 'Medium', // Default difficulty
+            };
+            batch.set(docRef, taskToAdd);
+        });
+
+        await batch.commit();
+
+        revalidatePath("/admin/tasks");
+        return { success: true, message: `${generatedData.tasks.length} tasks created successfully.` };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to create tasks: ${errorMessage}` };
+    }
+}
+
 
 export async function submitTaskResponse(taskId: string, points: number, formData: FormData) {
      try {
