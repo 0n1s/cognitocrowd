@@ -32,8 +32,8 @@ export default function AuthLayout({
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <div className="absolute top-4 left-4">
             <Link href="/" className="flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-                <span className="font-bold font-headline text-lg">CognitoCrowd</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                <span className="font-bold font-headline text-lg">Trainly</span>
             </Link>
         </div>
         {!loading && !user && children}

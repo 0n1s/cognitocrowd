@@ -73,7 +73,7 @@ const AppHeader = () => {
     <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
       {isMobile && <SidebarTrigger />}
       <div className="flex-1">
-        <h1 className="font-headline text-lg font-semibold">CognitoCrowd</h1>
+        <h1 className="font-headline text-lg font-semibold">Trainly</h1>
       </div>
       <div className="flex items-center gap-4">
         <div className="text-right">
@@ -135,9 +135,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader>
           <Link href="/dashboard" className="flex items-center gap-2">
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
             <span className="font-headline font-semibold text-lg text-sidebar-foreground">
-              CognitoCrowd
+              Trainly
             </span>
           </Link>
         </SidebarHeader>

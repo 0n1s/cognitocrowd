@@ -125,9 +125,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Sidebar>
         <SidebarHeader>
           <Link href="/admin/dashboard" className="flex items-center gap-2">
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
             <span className="font-headline font-semibold text-lg text-sidebar-foreground">
-              CognitoCrowd
+              Trainly
             </span>
           </Link>
         </SidebarHeader>

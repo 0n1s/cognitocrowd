@@ -8,8 +8,8 @@ const LandingHeader = () => (
   <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div className="container flex h-14 items-center">
       <Link href="/" className="mr-6 flex items-center space-x-2">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-        <span className="font-bold font-headline">CognitoCrowd</span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        <span className="font-bold font-headline">Trainly</span>
       </Link>
       <nav className="flex flex-1 items-center space-x-4">
         {/* Future nav links can go here */}
@@ -29,7 +29,7 @@ const LandingHeader = () => (
 const LandingFooter = () => (
   <footer className="border-t">
     <div className="container py-8 flex items-center justify-between">
-      <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} CognitoCrowd. All rights reserved.</p>
+      <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} Trainly. All rights reserved.</p>
       <div className="flex items-center gap-4">
         <Link href="#" className="text-sm text-muted-foreground hover:text-foreground">Privacy Policy</Link>
         <Link href="#" className="text-sm text-muted-foreground hover:text-foreground">Terms of Service</Link>
@@ -48,7 +48,7 @@ export default function Home() {
             Shape the Future of AI
           </h1>
           <p className="mx-auto max-w-[700px] text-lg text-muted-foreground md:text-xl mt-4">
-            Join CognitoCrowd and help train intelligent models by completing simple, gamified contributions. Earn points, climb the leaderboard, and get real rewards for your contributions.
+            Join Trainly and help train intelligent models by completing simple, gamified contributions. Earn points, climb the leaderboard, and get real rewards for your contributions.
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Button size="lg" asChild>
@@ -108,7 +108,7 @@ export default function Home() {
            <div className="grid md:grid-cols-2 gap-12 items-center">
                 <div>
                     <h2 className="font-headline text-3xl font-bold tracking-tight">How It Works</h2>
-                    <p className="mt-4 text-lg text-muted-foreground">Joining CognitoCrowd is easy. Start contributing and earning in just a few simple steps.</p>
+                    <p className="mt-4 text-lg text-muted-foreground">Joining Trainly is easy. Start contributing and earning in just a few simple steps.</p>
                     <ul className="mt-8 space-y-6">
                         <li className="flex items-start">
                             <div className="flex-shrink-0"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">1</div></div>
