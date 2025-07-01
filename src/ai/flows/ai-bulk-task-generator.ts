@@ -9,7 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {GenerateTaskOutputSchema} from './ai-task-generator';
+import {GenerateTaskOutputSchema} from '@/ai/schemas';
 
 const TASK_TYPES = [
   'open_text_feedback',

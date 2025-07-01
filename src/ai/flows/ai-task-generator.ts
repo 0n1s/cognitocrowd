@@ -11,6 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { GenerateTaskOutputSchema } from '@/ai/schemas';
 
 const GenerateTaskInputSchema = z.object({
   topic: z.string().describe('The topic or subject of the task.'),
@@ -18,11 +19,6 @@ const GenerateTaskInputSchema = z.object({
 });
 export type GenerateTaskInput = z.infer<typeof GenerateTaskInputSchema>;
 
-export const GenerateTaskOutputSchema = z.object({
-  prompt: z.string().describe('The generated task prompt.'),
-  description: z.string().describe('The generated task description.'),
-  options: z.array(z.string()).optional().describe('The generated task options, if applicable (e.g., for multiple choice tasks).'),
-});
 export type GenerateTaskOutput = z.infer<typeof GenerateTaskOutputSchema>;
 
 export async function generateTask(input: GenerateTaskInput): Promise<GenerateTaskOutput> {
