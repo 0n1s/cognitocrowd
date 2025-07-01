@@ -8,7 +8,7 @@ import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, Cha
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { v4 as uuidv4 } from "uuid";
-import { getMostRecentChat } from './database';
+import { getMostRecentChat, getAppSettings } from './database';
 
 
 export type CreateTaskInput = {
@@ -377,6 +377,14 @@ export async function requestWithdrawal(
     if (!db) return { success: false, message: "Database not configured." };
 
     try {
+        const settings = await getAppSettings();
+        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const today = weekdays[new Date().getDay()];
+
+        if (settings.withdrawalDays && settings.withdrawalDays.length > 0 && !settings.withdrawalDays.includes(today)) {
+            return { success: false, message: `Withdrawals are only processed on ${settings.withdrawalDays.join(', ')}.` };
+        }
+
         await runTransaction(db, async (transaction) => {
             const userRef = doc(db, "users", userId);
             const userDoc = await transaction.get(userRef);

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { User, AppSettings } from "@/lib/types";
+import type { User, AppSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
