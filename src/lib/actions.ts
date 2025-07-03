@@ -35,7 +35,7 @@ export async function createAdminTask(data: CreateTaskInput) {
             options: data.options,
             status: 'Active',
             difficulty: 'Medium', // Assign a default difficulty
-            expertise: data.expertise || undefined,
+            expertise: data.expertise === 'general' ? undefined : data.expertise,
         };
 
         await addDoc(collection(db, "tasks"), taskToAdd);
@@ -84,7 +84,7 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
             type: task.taskType,
             status: 'Active',
             difficulty: 'Medium', // Default difficulty
-            expertise: task.expertise,
+            expertise: task.expertise === 'General' ? undefined : task.expertise,
         };
 
         if (task.options) taskToAdd.options = task.options;
