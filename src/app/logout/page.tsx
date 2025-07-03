@@ -24,6 +24,12 @@ function LogoutLogic() {
           case 'user_data_not_found':
               message = 'Your user data could not be found. For your security, you will be logged out.';
               break;
+          case 'user_data_setup_failed':
+              message = 'There was a problem setting up your account profile. For security, you are being logged out.';
+              break;
+          case 'invalid_onboarding_status':
+              message = 'Your account has an invalid status. For security, you are being logged out.';
+              break;
           default:
               message = 'You are being logged out.';
               break;

@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { getUserData } from "@/lib/database";
+import { setupNewUser } from "@/lib/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
@@ -135,12 +136,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     // If there is a user, check their status in the database.
     async function checkUserStatus() {
-        const userData = await getUserData(user!.uid);
+        let userData = await getUserData(user!.uid);
 
-        // This handles cases where user exists in Auth but not in DB (e.g., failed signup step).
+        // If the user exists in Auth but not in our database, create the user record.
         if (!userData) {
-            router.push('/logout?reason=user_data_not_found');
-            return;
+            console.log("User data not found, attempting to create it...");
+            await setupNewUser(user!.uid, user!.displayName || "New User", user!.email!);
+            // Re-fetch the data after creation
+            userData = await getUserData(user!.uid);
+            
+            // If it still fails, then there's a problem with setup. Log out.
+            if (!userData) {
+                router.push('/logout?reason=user_data_setup_failed');
+                return;
+            }
         }
 
         switch (userData.onboardingStatus) {
@@ -158,7 +167,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 break;
             default:
                 // Fallback for any other state is to log out to prevent loops.
-                router.push('/logout?reason=user_data_not_found');
+                router.push('/logout?reason=invalid_onboarding_status');
                 break;
         }
     }
