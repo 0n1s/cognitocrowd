@@ -39,8 +39,7 @@ export default function OnboardingProfilePage() {
         
         if (result.success) {
             toast({ title: "Profile Updated", description: "Let's move to the next step." });
-            // router.push('/onboarding/expertise'); // This will be the next step
-            toast({ title: "Next Step: Expertise", description: "This part of the flow is not yet implemented.", variant: "default"});
+            router.push('/onboarding/expertise');
         } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
         }

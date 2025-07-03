@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -734,6 +735,26 @@ export async function updateUserOnboardingProfile(userId: string, data: { countr
         return { success: true, message: 'Profile information saved.' };
     } catch (error) {
         console.error("Error updating onboarding profile:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function updateUserExpertise(userId: string, data: { expertise: string[] }) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, {
+            expertise: data.expertise,
+        });
+
+        revalidatePath(`/onboarding/expertise`);
+        // In a future step, we might update the onboarding status here.
+        return { success: true, message: 'Expertise information saved.' };
+    } catch (error) {
+        console.error("Error updating user expertise:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }
