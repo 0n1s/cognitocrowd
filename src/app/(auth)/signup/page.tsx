@@ -35,7 +35,10 @@ export default function SignupPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
-        await updateProfile(userCredential.user, { displayName: name });
+        await updateProfile(userCredential.user, { 
+            displayName: name,
+            photoURL: `https://placehold.co/128x128.png?text=${name.charAt(0)}`
+        });
         await setupNewUser(userCredential.user.uid, name, email);
       }
       toast({

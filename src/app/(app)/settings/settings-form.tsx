@@ -1,22 +1,24 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { updateUserNameInDB } from "@/lib/actions";
-import { auth } from "@/lib/firebase";
+import { updateUserNameInDB, updateUserPhotoURL } from "@/lib/actions";
+import { auth, storage } from "@/lib/firebase";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -30,6 +32,116 @@ const passwordFormSchema = z.object({
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
+
+
+function ProfilePictureForm() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreview(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setPreview(objectUrl);
+    
+    // free memory when ever this component is unmounted
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedFile]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setSelectedFile(event.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!user || !auth?.currentUser || !storage) {
+      toast({ title: "Error", description: "You must be logged in to upload.", variant: "destructive" });
+      return;
+    }
+    if (!selectedFile) {
+      toast({ title: "No file selected", description: "Please select an image to upload.", variant: "destructive" });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `profile-pictures/${user.uid}`);
+      await uploadBytes(storageRef, selectedFile);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      await updateProfile(auth.currentUser, { photoURL: downloadURL });
+      const result = await updateUserPhotoURL(user.uid, downloadURL);
+      
+      if (result.success) {
+        toast({ title: "Success", description: "Profile picture updated!" });
+        setSelectedFile(null);
+        setPreview(null);
+        router.refresh();
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Upload Failed", description: "There was an error uploading your image.", variant: "destructive" });
+      console.error(error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "U";
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Profile Picture</CardTitle>
+        <CardDescription>Update your avatar. This will be visible to other users.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col sm:flex-row items-center gap-6">
+        <Avatar className="h-24 w-24">
+          <AvatarImage src={preview || user?.photoURL || ''} alt={user?.displayName || "user"} />
+          <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
+        </Avatar>
+        <div className="flex-grow w-full">
+            <Input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleFileChange}
+              accept="image/png, image/jpeg, image/gif"
+              disabled={isUploading}
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Choose Image
+            </Button>
+            {selectedFile && <p className="text-sm text-muted-foreground mt-2">Selected: {selectedFile.name}</p>}
+        </div>
+      </CardContent>
+      <CardFooter className="border-t px-6 py-4">
+        <Button onClick={handleUpload} disabled={!selectedFile || isUploading}>
+          {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save Picture
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
 
 export function SettingsForm() {
     const { user, loading } = useAuth();
@@ -118,6 +230,21 @@ export function SettingsForm() {
             <div className="space-y-8 max-w-2xl">
                 <Card>
                     <CardHeader>
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-4 w-64 mt-2" />
+                    </CardHeader>
+                    <CardContent className="flex items-center gap-6">
+                        <Skeleton className="h-24 w-24 rounded-full" />
+                        <div className="flex-grow">
+                            <Skeleton className="h-10 w-40" />
+                        </div>
+                    </CardContent>
+                    <CardFooter className="border-t px-6 py-4">
+                        <Skeleton className="h-10 w-36" />
+                    </CardFooter>
+                </Card>
+                <Card>
+                    <CardHeader>
                         <Skeleton className="h-6 w-24" />
                         <Skeleton className="h-4 w-48 mt-2" />
                     </CardHeader>
@@ -136,6 +263,7 @@ export function SettingsForm() {
                     <CardContent className="space-y-4">
                         <Skeleton className="h-10 w-full" />
                         <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
                     </CardContent>
                     <CardFooter className="border-t px-6 py-4">
                         <Skeleton className="h-10 w-40" />
@@ -147,6 +275,7 @@ export function SettingsForm() {
 
     return (
         <div className="space-y-8 max-w-2xl">
+            <ProfilePictureForm />
             <Card>
                 <CardHeader>
                     <CardTitle>Profile</CardTitle>

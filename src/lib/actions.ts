@@ -305,6 +305,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
         await setDoc(userDocRef, {
             name,
             email,
+            photoURL: null,
             earningsBalance: 0,
             depositBalance: 0,
             packageId,
@@ -604,10 +605,30 @@ export async function updateUserNameInDB(userId: string, name: string) {
         const userDocRef = doc(db, 'users', userId);
         await updateDoc(userDocRef, { name });
 
+        revalidatePath('/settings');
         revalidatePath(`/admin/users/${userId}`); // Also revalidate admin view
         return { success: true, message: 'Your profile has been updated.' };
     } catch (error) {
         console.error("Error updating user name in DB:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function updateUserPhotoURL(userId: string, photoURL: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    
+    try {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, { photoURL });
+
+        revalidatePath(`/settings`); 
+        revalidatePath(`/admin/users/${userId}`);
+        return { success: true, message: 'Your profile picture has been updated.' };
+    } catch (error) {
+        console.error("Error updating user photo URL in DB:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }

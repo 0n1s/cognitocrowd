@@ -1,6 +1,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -51,6 +52,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
+  photoURL?: string;
   earningsBalance: number;
   depositBalance: number;
   packageId: string | null;
