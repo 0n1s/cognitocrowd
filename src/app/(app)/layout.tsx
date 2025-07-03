@@ -151,6 +151,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 return;
             }
         }
+        
+        // If the user is an admin, grant immediate access.
+        if (userData.role === 'admin') {
+            setIsAuthorized(true);
+            return;
+        }
 
         switch (userData.onboardingStatus) {
             case 'approved':
@@ -167,7 +173,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 break;
             default:
                 // Fallback for any other state is to log out to prevent loops.
-                router.push('/logout?reason=invalid_onboarding_status');
+                router.push('/logout?reason=user_data_not_found');
                 break;
         }
     }
