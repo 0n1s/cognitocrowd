@@ -89,9 +89,14 @@ export default async function Home() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative w-full h-[80vh] flex items-center justify-center text-center overflow-hidden">
-            <div className="absolute inset-0 z-0 bg-background">
+            <div className="absolute inset-0 z-0 bg-background overflow-hidden">
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
+               {/* Animated Robots */}
+              <Bot className="absolute h-12 w-12 text-primary/10 animate-[robot-float-1] [animation-delay:-10s]" />
+              <Bot className="absolute h-20 w-20 text-accent/10 animate-[robot-float-2]" />
+              <Bot className="absolute h-8 w-8 text-primary/5 animate-[robot-float-3] [animation-delay:-5s]" />
+              <Bot className="absolute h-16 w-16 text-accent/5 animate-[robot-float-4] [animation-delay:-2s]" />
             </div>
             <div className="container relative z-10">
                 <h1 className="font-headline text-5xl font-extrabold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-muted-foreground">
