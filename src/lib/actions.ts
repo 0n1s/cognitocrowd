@@ -59,50 +59,46 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
     if (!db) {
         return { success: false, message: 'Database not configured. Please check your environment variables.' };
     }
-    try {
-        const generatedData = await bulkGenerateTasks({ 
-            count: data.count, 
-            expertise: data.expertise,
-            taskTypes: data.taskTypes,
-        });
+    
+    // Let errors from the AI flow be thrown and caught by the client
+    const generatedData = await bulkGenerateTasks({
+        count: data.count,
+        expertise: data.expertise,
+        taskTypes: data.taskTypes,
+    });
 
-        if (!generatedData || !generatedData.tasks || generatedData.tasks.length === 0) {
-            return { success: false, message: 'AI failed to generate contributions.' };
-        }
-
-        const batch = writeBatch(db);
-        const tasksCol = collection(db, "tasks");
-
-        generatedData.tasks.forEach(task => {
-            const docRef = doc(tasksCol); // Create new doc with auto-ID
-            
-            const taskToAdd: any = {
-                title: task.prompt,
-                description: task.description,
-                points: 100, // Default points
-                type: task.taskType,
-                status: 'Active',
-                difficulty: 'Medium', // Default difficulty
-                expertise: task.expertise,
-            };
-
-            if (task.options) taskToAdd.options = task.options;
-            if (task.scale) taskToAdd.scale = task.scale;
-            if (task.settings) taskToAdd.settings = task.settings;
-            if (task.award_criteria) taskToAdd.award_criteria = task.award_criteria;
-
-            batch.set(docRef, taskToAdd);
-        });
-
-        await batch.commit();
-
-        revalidatePath("/admin/tasks");
-        return { success: true, message: `${generatedData.tasks.length} contributions created successfully across selected expertises.` };
-    } catch (error) {
-        console.error(error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message: `Failed to create contributions: ${errorMessage}` };
+    if (!generatedData || !generatedData.tasks || generatedData.tasks.length === 0) {
+        return { success: false, message: 'AI failed to generate contributions. Please try again.' };
     }
+
+    const batch = writeBatch(db);
+    const tasksCol = collection(db, "tasks");
+
+    generatedData.tasks.forEach(task => {
+        const docRef = doc(tasksCol); // Create new doc with auto-ID
+        
+        const taskToAdd: any = {
+            title: task.prompt,
+            description: task.description,
+            points: 100, // Default points
+            type: task.taskType,
+            status: 'Active',
+            difficulty: 'Medium', // Default difficulty
+            expertise: task.expertise,
+        };
+
+        if (task.options) taskToAdd.options = task.options;
+        if (task.scale) taskToAdd.scale = task.scale;
+        if (task.settings) taskToAdd.settings = task.settings;
+        if (task.award_criteria) taskToAdd.award_criteria = task.award_criteria;
+
+        batch.set(docRef, taskToAdd);
+    });
+
+    await batch.commit();
+
+    revalidatePath("/admin/tasks");
+    return { success: true, message: `${generatedData.tasks.length} contributions created successfully across selected expertises.` };
 }
 
 
