@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -11,25 +12,45 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, ArrowRight } from "lucide-react";
 import { updateUserExpertise } from "@/lib/actions";
+import { getEnabledExpertiseAreas } from "@/lib/database";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const EXPERTISE_OPTIONS = [
-  "General Knowledge",
-  "Mathematics",
-  "Science (Physics, Chemistry, Biology)",
-  "Software Development & Code",
-  "History & Humanities",
-  "Creative Writing & Literature",
-  "Art & Design",
-  "Business & Finance",
-  "Health & Medicine",
-];
+const ExpertiseLoadingSkeleton = () => (
+    <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[...Array(8)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-5 w-48" />
+                </div>
+            ))}
+        </div>
+    </div>
+);
 
 export default function OnboardingExpertisePage() {
     const { user } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
+    const [expertiseOptions, setExpertiseOptions] = useState<string[]>([]);
     const [selectedExpertise, setSelectedExpertise] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+
+    useEffect(() => {
+        async function fetchExpertise() {
+            setIsLoadingOptions(true);
+            try {
+                const enabledAreas = await getEnabledExpertiseAreas();
+                setExpertiseOptions(enabledAreas);
+            } catch (error) {
+                toast({ title: "Error", description: "Could not load expertise options.", variant: "destructive" });
+            } finally {
+                setIsLoadingOptions(false);
+            }
+        }
+        fetchExpertise();
+    }, [toast]);
 
     const handleCheckboxChange = (expertise: string) => {
         setSelectedExpertise(prev => 
@@ -72,21 +93,31 @@ export default function OnboardingExpertisePage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <Label>Areas of Expertise (select all that apply)</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {EXPERTISE_OPTIONS.map(option => (
-                            <div key={option} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={option}
-                                    onCheckedChange={() => handleCheckboxChange(option)}
-                                    checked={selectedExpertise.includes(option)}
-                                />
-                                <Label htmlFor={option} className="font-normal">{option}</Label>
-                            </div>
-                        ))}
-                    </div>
+                    {isLoadingOptions ? <ExpertiseLoadingSkeleton /> : (
+                        <>
+                            {expertiseOptions.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {expertiseOptions.map(option => (
+                                        <div key={option} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={option}
+                                                onCheckedChange={() => handleCheckboxChange(option)}
+                                                checked={selectedExpertise.includes(option)}
+                                            />
+                                            <Label htmlFor={option} className="font-normal">{option}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center text-muted-foreground p-8 border rounded-md">
+                                    No qualification tests are available at this moment. Please check back later.
+                                </div>
+                            )}
+                        </>
+                    )}
                 </CardContent>
                 <CardFooter>
-                    <Button type="submit" disabled={isLoading}>
+                    <Button type="submit" disabled={isLoading || isLoadingOptions || selectedExpertise.length === 0}>
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Continue to Qualification Test <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>

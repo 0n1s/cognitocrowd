@@ -6,6 +6,7 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -858,7 +859,8 @@ export async function generateAndSaveQualificationTest(expertise: string) {
             const testData: Omit<QualificationTest, 'id'> = {
                 expertise,
                 questions: newQuestionsData.questions,
-                createdAt: Timestamp.now()
+                createdAt: Timestamp.now(),
+                isEnabled: true,
             };
             await setDoc(testDocRef, testData);
             message = `Test for ${expertise} generated successfully.`;
@@ -868,6 +870,34 @@ export async function generateAndSaveQualificationTest(expertise: string) {
         return { success: true, message };
     } catch (error) {
         console.error("Error generating and saving qualification test:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function toggleQualificationTestStatus(expertise: string, isEnabled: boolean) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const testDocRef = doc(db, 'qualification_tests', expertise);
+        const docSnap = await getDoc(testDocRef);
+
+        if (docSnap.exists()) {
+            await updateDoc(testDocRef, { isEnabled });
+        } else {
+            // If the test doesn't exist, create a document for it so its state can be tracked.
+            await setDoc(testDocRef, {
+                expertise,
+                isEnabled,
+                questions: [],
+                createdAt: Timestamp.now(),
+            });
+        }
+        revalidatePath('/admin/qualifications');
+        return { success: true, message: `"${expertise}" status updated.` };
+    } catch (error) {
+        console.error("Error toggling test status:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }

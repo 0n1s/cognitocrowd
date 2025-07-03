@@ -2,6 +2,11 @@
 
 
 
+
+
+
+
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
@@ -369,15 +374,18 @@ export async function getAdminUserDetail(userId: string) {
 }
 
 
-export async function getQualificationTestsSummary(): Promise<Record<string, { questionCount: number }>> {
+export async function getQualificationTestsSummary(): Promise<Record<string, { questionCount: number; isEnabled: boolean; }>> {
     if (!db) return {};
     try {
         const testsCol = collection(db, 'qualification_tests');
         const snapshot = await getDocs(testsCol);
-        const summaries: Record<string, { questionCount: number }> = {};
+        const summaries: Record<string, { questionCount: number; isEnabled: boolean; }> = {};
         snapshot.docs.forEach(doc => {
             const data = doc.data() as QualificationTest;
-            summaries[doc.id] = { questionCount: data.questions?.length || 0 };
+            summaries[doc.id] = { 
+                questionCount: data.questions?.length || 0,
+                isEnabled: data.isEnabled === true,
+            };
         });
         return summaries;
     } catch (error) {
@@ -398,5 +406,26 @@ export async function getQualificationTest(expertise: string): Promise<Qualifica
     } catch (error) {
         console.error(`Error fetching test for ${expertise}:`, error);
         return null;
+    }
+}
+
+export async function getEnabledExpertiseAreas(): Promise<string[]> {
+    if (!db) return [];
+    try {
+        const testsCol = collection(db, 'qualification_tests');
+        const q = query(testsCol, where('isEnabled', '==', true));
+        const snapshot = await getDocs(q);
+        
+        const enabledAreas = snapshot.docs
+            .filter(doc => {
+                const testData = doc.data() as QualificationTest;
+                return testData.questions && testData.questions.length > 0;
+            })
+            .map(doc => (doc.data() as QualificationTest).expertise);
+
+        return enabledAreas;
+    } catch (error) {
+        console.error("Error fetching enabled expertise areas:", error);
+        return [];
     }
 }

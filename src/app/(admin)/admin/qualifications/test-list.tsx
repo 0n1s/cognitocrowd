@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,9 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { getQualificationTestsSummary } from "@/lib/database";
-import { generateAndSaveQualificationTest } from "@/lib/actions";
+import { generateAndSaveQualificationTest, toggleQualificationTestStatus } from "@/lib/actions";
 import { Wand2, Loader2, CheckCircle, XCircle } from "lucide-react";
 
 const EXPERTISE_AREAS = [
@@ -24,6 +26,8 @@ const EXPERTISE_AREAS = [
   "Health & Medicine",
 ];
 
+type Summary = { questionCount: number; isEnabled: boolean };
+
 const LoadingSkeleton = () => (
     <Table>
         <TableHeader>
@@ -31,6 +35,7 @@ const LoadingSkeleton = () => (
               <TableHead>Expertise Area</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Question Count</TableHead>
+              <TableHead>Enabled</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
         </TableHeader>
@@ -40,6 +45,7 @@ const LoadingSkeleton = () => (
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-12" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-10 w-40" /></TableCell>
                 </TableRow>
             ))}
@@ -50,9 +56,10 @@ const LoadingSkeleton = () => (
 
 export function TestList() {
     const { toast } = useToast();
-    const [summaries, setSummaries] = useState<Record<string, { questionCount: number }>>({});
+    const [summaries, setSummaries] = useState<Record<string, Summary>>({});
     const [loading, setLoading] = useState(true);
     const [generatingExpertise, setGeneratingExpertise] = useState<string | null>(null);
+    const [togglingExpertise, setTogglingExpertise] = useState<string | null>(null);
 
     const fetchSummaries = async () => {
         setLoading(true);
@@ -88,12 +95,34 @@ export function TestList() {
         }
     };
 
+    const handleToggle = async (expertise: string, isEnabled: boolean) => {
+        setTogglingExpertise(expertise);
+        try {
+            const result = await toggleQualificationTestStatus(expertise, isEnabled);
+            if (result.success) {
+                toast({ title: "Success", description: result.message });
+                // Optimistic update before refetching
+                setSummaries(prev => ({
+                    ...prev,
+                    [expertise]: { ...(prev[expertise] || { questionCount: 0 }), isEnabled: isEnabled }
+                }));
+            } else {
+                toast({ title: "Error", description: result.message, variant: "destructive" });
+            }
+        } catch (error) {
+             toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+        } finally {
+            setTogglingExpertise(null);
+            fetchSummaries();
+        }
+    };
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Test Bank Status</CardTitle>
                 <CardDescription>
-                    Generate and manage the question banks for each expertise area. Users cannot take a test until a bank is generated.
+                    Generate and manage the question banks for each expertise area. Users cannot take a test until a bank is generated and enabled.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -104,19 +133,21 @@ export function TestList() {
                                 <TableHead>Expertise Area</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Question Count</TableHead>
+                                <TableHead>Enabled</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {EXPERTISE_AREAS.map(expertise => {
                                 const summary = summaries[expertise];
-                                const hasTest = !!summary;
+                                const hasQuestions = !!summary && summary.questionCount > 0;
+                                const isEnabled = summary?.isEnabled ?? false;
                                 
                                 return (
                                 <TableRow key={expertise}>
                                     <TableCell className="font-medium">{expertise}</TableCell>
                                     <TableCell>
-                                        {hasTest ? (
+                                        {hasQuestions ? (
                                             <Badge variant="secondary" className="text-green-600 border-green-200 bg-green-50">
                                                 <CheckCircle className="mr-1 h-3 w-3" /> Generated
                                             </Badge>
@@ -127,19 +158,27 @@ export function TestList() {
                                         )}
                                     </TableCell>
                                     <TableCell className="font-medium">{summary?.questionCount || 0}</TableCell>
+                                    <TableCell>
+                                        <Switch
+                                            checked={isEnabled}
+                                            onCheckedChange={(checked) => handleToggle(expertise, checked)}
+                                            disabled={togglingExpertise === expertise || generatingExpertise === expertise}
+                                            aria-label={`Enable ${expertise} test`}
+                                        />
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         <Button 
                                             variant="outline"
                                             size="sm"
                                             onClick={() => handleGenerate(expertise)}
-                                            disabled={!!generatingExpertise}
+                                            disabled={!!generatingExpertise || !!togglingExpertise}
                                         >
                                             {generatingExpertise === expertise ? (
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                             ) : (
                                                 <Wand2 className="mr-2 h-4 w-4" />
                                             )}
-                                            {hasTest ? 'Add 10 Questions' : 'Generate Test'}
+                                            {hasQuestions ? 'Add 10 Questions' : 'Generate Test'}
                                         </Button>
                                     </TableCell>
                                 </TableRow>
