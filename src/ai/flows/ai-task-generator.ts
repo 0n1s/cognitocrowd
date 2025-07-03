@@ -1,3 +1,4 @@
+
 // src/ai/flows/ai-task-generator.ts
 'use server';
 
@@ -35,7 +36,7 @@ const taskGeneratorPrompt = ai.definePrompt({
 
   Given the topic: "{{topic}}", the expertise area: "{{expertise}}", and the task type: "{{taskType}}", generate a suitable contribution prompt and description.
 
-  If the task type is 'multiple_choice_preference', also generate an array of options.
+  If the task type is 'multiple_choice_preference', 'ranking', or 'classification', also generate an array of options.
   Otherwise, the options field should be omitted from the output.
 
   Ensure the prompt is clear and concise, and the description provides sufficient context for users to complete the contribution effectively.

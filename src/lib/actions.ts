@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
-import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest } from "@/lib/types";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest, OnboardingStep } from "@/lib/types";
 import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
@@ -379,7 +379,9 @@ export async function deleteAdminUser(userId: string) {
 export async function updateAppSettings(data: AppSettings) {
   if (!db) return { success: false, message: "Database not configured." };
   try {
-    await setDoc(doc(db, "settings", "main"), data, { merge: true });
+    const validSteps = (data.onboardingCourseSteps || []).filter(step => step.title && step.content);
+    const dataToSave = {...data, onboardingCourseSteps: validSteps};
+    await setDoc(doc(db, "settings", "main"), dataToSave, { merge: true });
     revalidatePath("/admin/settings");
     revalidatePath("/redeem");
     return { success: true, message: "Settings updated successfully." };
