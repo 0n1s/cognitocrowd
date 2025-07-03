@@ -54,7 +54,7 @@ export default async function AdminDashboardPage() {
             <div className="grid gap-6 mt-8 sm:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
                             <ClipboardList className="h-5 w-5" />
                             Contribution Management
                         </CardTitle>
@@ -68,7 +68,7 @@ export default async function AdminDashboardPage() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
                             <Users className="h-5 w-5" />
                             User Management
                         </CardTitle>
@@ -82,7 +82,7 @@ export default async function AdminDashboardPage() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
                             <BarChart className="h-5 w-5" />
                             Analytics
                         </CardTitle>
