@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -8,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { updateUserNameInDB } from "@/lib/actions";
 import { auth } from "@/lib/firebase";
-import { updateProfile, updatePassword } from "firebase/auth";
+import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ const profileFormSchema = z.object({
 });
 
 const passwordFormSchema = z.object({
+  currentPassword: z.string().min(1, { message: "Current password is required." }),
   newPassword: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string(),
 }).refine(data => data.newPassword === data.confirmPassword, {
@@ -43,7 +45,7 @@ export function SettingsForm() {
 
     const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
         resolver: zodResolver(passwordFormSchema),
-        defaultValues: { newPassword: "", confirmPassword: "" },
+        defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
     });
 
     // Update form default value when user loads
@@ -79,19 +81,25 @@ export function SettingsForm() {
     };
 
     const onPasswordSubmit = async (values: z.infer<typeof passwordFormSchema>) => {
-        if (!user || !auth?.currentUser) {
-             toast({ title: "Error", description: "You are not logged in.", variant: "destructive" });
+        if (!user || !auth?.currentUser || !user.email) {
+             toast({ title: "Error", description: "You are not logged in or user email is not available.", variant: "destructive" });
              return;
         }
         setIsPasswordSubmitting(true);
         try {
+            const credential = EmailAuthProvider.credential(user.email, values.currentPassword);
+            await reauthenticateWithCredential(auth.currentUser, credential);
+
             await updatePassword(auth.currentUser, values.newPassword);
             toast({ title: "Success", description: "Your password has been updated successfully." });
-            passwordForm.reset();
+            passwordForm.reset({ currentPassword: "", newPassword: "", confirmPassword: "" });
         } catch (error: any) {
-             console.error("Error updating password:", error);
+            console.error("Error updating password:", error);
             let message = "An unknown error occurred.";
-            if (error.code === 'auth/requires-recent-login') {
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+                message = "The current password you entered is incorrect. Please try again.";
+                passwordForm.setError("currentPassword", { type: 'manual', message: "Incorrect password." });
+            } else if (error.code === 'auth/requires-recent-login') {
                 message = "This action is sensitive and requires recent authentication. Please log out and log back in to update your password.";
             } else if (error.code) {
                  message = error.code.replace('auth/', '').replace(/-/g, ' ');
@@ -177,6 +185,19 @@ export function SettingsForm() {
                  <Form {...passwordForm}>
                     <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
                         <CardContent className="space-y-4">
+                            <FormField
+                                control={passwordForm.control}
+                                name="currentPassword"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Current Password</FormLabel>
+                                        <FormControl>
+                                            <Input type="password" {...field} disabled={isPasswordSubmitting} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                             <FormField
                                 control={passwordForm.control}
                                 name="newPassword"
