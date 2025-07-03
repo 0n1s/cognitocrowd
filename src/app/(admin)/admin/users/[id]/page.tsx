@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Award, CheckCircle, Package, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Task, WithdrawalRequest, Deposit, AdminUser } from '@/lib/types';
+import { WithdrawalRequest, Deposit, AdminUser } from '@/lib/types';
 import { UserPageHeader } from './user-details';
+import { CompletedTasksTable } from './completed-tasks-table';
 
 
 const StatCard = ({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) => (
@@ -25,38 +26,6 @@ const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
 };
-
-const CompletedTasksTable = ({ tasks }: { tasks: Task[] }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle>Completed Contributions</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead className="text-right">Points</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {tasks.length > 0 ? tasks.map((task) => (
-                        <TableRow key={task.id}>
-                            <TableCell>{task.title}</TableCell>
-                            <TableCell>{task.type}</TableCell>
-                            <TableCell className="text-right">{task.points}</TableCell>
-                        </TableRow>
-                    )) : (
-                        <TableRow>
-                            <TableCell colSpan={3} className="text-center">No contributions completed yet.</TableCell>
-                        </TableRow>
-                    )}
-                </TableBody>
-            </Table>
-        </CardContent>
-    </Card>
-);
 
 const WithdrawalHistoryTable = ({ requests }: { requests: WithdrawalRequest[] }) => {
     const statusColors: Record<WithdrawalRequest['status'], string> = {
@@ -191,9 +160,9 @@ export default async function UserDetailPage({ params }: { params: { id: string 
             </div>
 
             <div className="space-y-8">
-                <CompletedTasksTable tasks={completedTasks} />
                 <WithdrawalHistoryTable requests={withdrawalRequests} />
                 <DepositHistoryTable deposits={depositHistory} />
+                <CompletedTasksTable tasks={completedTasks} />
             </div>
         </div>
     );
