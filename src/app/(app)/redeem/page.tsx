@@ -26,11 +26,11 @@ function RedeemPageLoadingSkeleton() {
             <div className="mt-4">
                 <Skeleton className="h-7 w-48" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
-                <div className="md:col-span-1">
+            <div className="space-y-8 mt-8">
+                <div className="max-w-md mx-auto">
                     <Skeleton className="h-96 w-full" />
                 </div>
-                <div className="md:col-span-2">
+                <div>
                      <Skeleton className="h-96 w-full" />
                 </div>
              </div>
@@ -145,8 +145,8 @@ export default function RedeemPage() {
       <div className="mt-4 text-lg">Your Earnings Balance: <span className="font-bold text-primary">${earningsBalance.toFixed(2)}</span></div>
       <p className="text-xs text-muted-foreground mt-1">(1 point from contributions = $1.00 USD)</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
-            <div className="md:col-span-1">
+        <div className="space-y-8 mt-8">
+            <div className="max-w-md mx-auto">
                 {user && settings && (
                     <WithdrawalForm 
                         user={user} 
@@ -156,7 +156,7 @@ export default function RedeemPage() {
                     />
                 )}
             </div>
-            <div className="md:col-span-2">
+            <div>
                 <WithdrawalHistory requests={requests} />
             </div>
         </div>
