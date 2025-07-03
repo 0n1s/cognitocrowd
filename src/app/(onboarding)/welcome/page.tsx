@@ -24,7 +24,7 @@ export default function WelcomePage() {
             </CardContent>
             <CardFooter>
                 <Button asChild size="lg">
-                    <Link href="#">Get Started <ArrowRight className="ml-2 h-5 w-5" /></Link>
+                    <Link href="/onboarding/profile">Get Started <ArrowRight className="ml-2 h-5 w-5" /></Link>
                 </Button>
             </CardFooter>
         </Card>

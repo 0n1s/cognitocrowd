@@ -718,3 +718,23 @@ export async function purchasePackage(userId: string, packageId: string) {
         return { success: false, message };
     }
 }
+
+export async function updateUserOnboardingProfile(userId: string, data: { country: string; languages: string[] }) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, {
+            country: data.country,
+            languages: data.languages,
+        });
+
+        revalidatePath(`/onboarding/profile`);
+        return { success: true, message: 'Profile information saved.' };
+    } catch (error) {
+        console.error("Error updating onboarding profile:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
