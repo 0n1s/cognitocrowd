@@ -604,25 +604,6 @@ export async function initiateDeposit(
   }
 }
 
-export async function updateUserNameInDB(userId: string, name: string) {
-    if (!db) {
-        return { success: false, message: 'Database not configured.' };
-    }
-    
-    try {
-        const userDocRef = doc(db, 'users', userId);
-        await updateDoc(userDocRef, { name });
-
-        revalidatePath('/settings');
-        revalidatePath(`/admin/users/${userId}`); // Also revalidate admin view
-        return { success: true, message: 'Your profile has been updated.' };
-    } catch (error) {
-        console.error("Error updating user name in DB:", error);
-        const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
-    }
-}
-
 export async function updateUserPhotoURL(userId: string, photoURL: string) {
     if (!db) {
         return { success: false, message: 'Database not configured.' };
@@ -755,6 +736,52 @@ export async function updateUserExpertise(userId: string, data: { expertise: str
         return { success: true, message: 'Expertise information saved.' };
     } catch (error) {
         console.error("Error updating user expertise:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function submitQualificationTest(userId: string, formData: FormData) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const userDocRef = doc(db, 'users', userId);
+        
+        const submission: Record<string, any> = {};
+        formData.forEach((value, key) => {
+            submission[key] = value;
+        });
+
+        await updateDoc(userDocRef, {
+            qualificationSubmission: submission,
+            qualificationTestSubmittedAt: Timestamp.now(),
+        });
+
+        // The user's onboardingStatus remains 'pending' until an admin reviews it.
+        revalidatePath(`/onboarding/test`);
+        return { success: true, message: 'Your test has been submitted for review.' };
+    } catch (error) {
+        console.error("Error submitting qualification test:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function updateUserNameInDB(userId: string, name: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    
+    try {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, { name });
+
+        revalidatePath('/settings');
+        revalidatePath(`/admin/users/${userId}`); // Also revalidate admin view
+        return { success: true, message: 'Your profile has been updated.' };
+    } catch (error) {
+        console.error("Error updating user name in DB:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }

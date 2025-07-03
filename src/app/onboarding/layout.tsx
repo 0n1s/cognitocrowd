@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserData } from "@/lib/database";
 import { Loader2 } from "lucide-react";
@@ -15,34 +15,40 @@ export default function OnboardingLayout({
 }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    // Wait for the authentication state to be determined.
     if (authLoading) {
       return;
     }
 
-    // If there is no user, they must log in.
     if (!user) {
       router.push('/login');
       return;
     }
 
-    // If there is a user, check their application status.
     getUserData(user.uid).then(userData => {
-      // If the user has already been approved, they don't need to be here.
-      // Redirect them to the main application dashboard.
-      if (userData?.onboardingStatus === 'approved') {
-        router.push('/dashboard');
+      if (!userData) {
+          // This case should be handled by the main app layout which creates the user doc.
+          // If we are here, something is wrong. Log out to be safe.
+          router.push('/logout?reason=user_data_not_found');
+          return;
       }
-      // Otherwise, if their status is 'pending', 'rejected', or undefined,
-      // we allow them to stay on the onboarding pages to complete the process.
+      
+      if (userData.onboardingStatus === 'approved') {
+        router.push('/dashboard');
+        return;
+      }
+
+      // If the user has submitted their test, they should only be on the pending page.
+      if (pathname !== '/onboarding/pending' && userData.qualificationTestSubmittedAt) {
+          router.push('/onboarding/pending');
+          return;
+      }
     });
 
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, pathname]);
 
-  // While authentication is loading or we're waiting for the redirect to happen,
-  // show a loading spinner.
   if (authLoading || !user) {
      return (
       <div className="flex min-h-screen items-center justify-center">
@@ -51,7 +57,6 @@ export default function OnboardingLayout({
     );
   }
 
-  // Once we've confirmed the user is logged in and not yet approved, show the onboarding content.
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <div className="absolute top-4 left-4">

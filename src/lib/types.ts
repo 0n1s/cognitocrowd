@@ -64,6 +64,8 @@ export type User = {
   country?: string;
   languages?: string[];
   expertise?: string[];
+  qualificationTestSubmittedAt?: any;
+  qualificationSubmission?: Record<string, any>;
 };
 
 export type AdminUser = User & {

@@ -54,14 +54,11 @@ export default function OnboardingExpertisePage() {
         const result = await updateUserExpertise(user.uid, { expertise: selectedExpertise });
         
         if (result.success) {
-            toast({ title: "Expertise Saved!", description: "Next, you'll take a short qualification test." });
-            // In the future, this will redirect to the test. For now, we show a toast.
-            toast({ title: "Next Step: Qualification Test", description: "This part of the flow is not yet implemented.", variant: "default"});
-            // router.push('/onboarding/test');
+            router.push('/onboarding/test');
         } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     return (
