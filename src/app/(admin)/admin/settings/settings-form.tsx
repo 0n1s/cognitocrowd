@@ -188,11 +188,11 @@ export function SettingsForm() {
                             <div className="space-y-4 pl-4 border-l-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="course-title">Course Title</Label>
-                                    <Input id="course-title" value={settings.onboardingCourseTitle} onChange={(e) => handleFieldChange('onboardingCourseTitle', e.target.value)} />
+                                    <Input id="course-title" value={settings.onboardingCourseTitle || ''} onChange={(e) => handleFieldChange('onboardingCourseTitle', e.target.value)} />
                                 </div>
                                  <div className="space-y-2">
                                     <Label htmlFor="course-desc">Course Description</Label>
-                                    <Textarea id="course-desc" value={settings.onboardingCourseDescription} onChange={(e) => handleFieldChange('onboardingCourseDescription', e.target.value)} />
+                                    <Textarea id="course-desc" value={settings.onboardingCourseDescription || ''} onChange={(e) => handleFieldChange('onboardingCourseDescription', e.target.value)} />
                                 </div>
                                 <div>
                                     <Label className="text-base font-semibold">Course Steps</Label>

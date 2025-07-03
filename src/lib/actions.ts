@@ -5,6 +5,7 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -301,6 +302,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
         return { success: false, message: 'Database not configured.' };
     }
     try {
+        const appSettings = await getAppSettings();
         const packagesCol = collection(db, 'packages');
         const q = query(packagesCol, where('price', '==', 'Free'), limit(1));
         const packageSnapshot = await getDocs(q);
@@ -328,7 +330,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             dailyCompletedCount: 0,
             lastCompletionReset: now,
             accountExpiresAt: expiryTimestamp,
-            onboardingStatus: 'pending',
+            onboardingStatus: appSettings.onboardingCourseEnabled ? 'pending' : 'approved',
         });
         
         return { success: true };
