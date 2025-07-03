@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   SidebarProvider,
   Sidebar,
@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getUserData } from "@/lib/database";
 
 const navItems = [
   { href: "/admin/dashboard", icon: LayoutGrid, label: "Dashboard" },
@@ -95,22 +96,39 @@ const AdminHeader = () => {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
+    if (authLoading) {
+      return;
     }
-  }, [user, loading, router]);
+    if (!user) {
+      router.push('/login');
+      return;
+    }
 
-  if (loading || !user) {
+    // User is logged in, check their role from Firestore
+    getUserData(user.uid).then(userData => {
+      if (userData?.role === 'admin') {
+        setIsAuthorized(true);
+      } else {
+        // Not an admin, redirect to user dashboard
+        router.push('/dashboard');
+      }
+    });
+
+  }, [user, authLoading, router]);
+
+  if (authLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
-    )
+    );
   }
+
 
   return (
     <SidebarProvider>
