@@ -594,3 +594,21 @@ export async function initiateDeposit(
     return { success: false, message };
   }
 }
+
+export async function updateUserNameInDB(userId: string, name: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    
+    try {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, { name });
+
+        revalidatePath(`/admin/users/${userId}`); // Also revalidate admin view
+        return { success: true, message: 'Your profile has been updated.' };
+    } catch (error) {
+        console.error("Error updating user name in DB:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
