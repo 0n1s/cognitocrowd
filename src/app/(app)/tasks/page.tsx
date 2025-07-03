@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getTasks } from '@/lib/database';
@@ -35,7 +36,6 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
                 {task.difficulty}
               </Badge>
             </div>
-            <CardDescription>{task.description}</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow">
             <div className="text-2xl font-bold text-primary">{task.points} Points</div>
@@ -58,7 +58,6 @@ function LoadingTaskGridSkeleton() {
                 <Card key={i}>
                     <CardHeader>
                         <Skeleton className="h-6 w-3/4" />
-                        <Skeleton className="h-4 w-full mt-2" />
                     </CardHeader>
                     <CardContent>
                         <Skeleton className="h-8 w-1/2" />
