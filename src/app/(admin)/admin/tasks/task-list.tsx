@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -40,6 +41,25 @@ import { useToast } from "@/hooks/use-toast";
 import { createAdminTask, bulkCreateAdminTasks } from "@/lib/actions";
 import { getAdminTasks } from "@/lib/database";
 
+const EXPERTISE_AREAS = [
+  "General Knowledge",
+  "Mathematics",
+  "Science (Physics, Chemistry, Biology)",
+  "Software Development & Code",
+  "History & Humanities",
+  "Creative Writing & Literature",
+  "Art & Design",
+  "Business & Finance",
+  "Health & Medicine",
+];
+
+const TASK_TYPE_OPTIONS: { id: TaskType; label: string }[] = [
+  { id: "open_text_feedback", label: "Open Text Feedback" },
+  { id: "multiple_choice_preference", label: "Multiple Choice" },
+  { id: "ranking", label: "Ranking" },
+  { id: "classification", label: "Classification" },
+];
+
 type AddTaskDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -49,6 +69,7 @@ type AddTaskDialogProps = {
 function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps) {
   const { toast } = useToast();
   const [taskType, setTaskType] = useState<TaskType>("open_text_feedback");
+  const [expertise, setExpertise] = useState<string>("");
   const [options, setOptions] = useState<string[]>([""]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -70,10 +91,13 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
   };
 
   const handleGenerate = async () => {
-    if (!title) return;
+    if (!title || !expertise) {
+        toast({ title: "Missing Info", description: "Please provide a topic and select an expertise to generate with AI.", variant: "destructive" });
+        return;
+    }
     setIsGenerating(true);
     try {
-        const result = await generateTask({ topic: title, taskType });
+        const result = await generateTask({ topic: title, taskType, expertise });
         setTitle(result.prompt);
         setDescription(result.description);
         if(result.options && result.options.length > 0) {
@@ -98,6 +122,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
     setDescription("");
     setPoints(100);
     setTaskType("open_text_feedback");
+    setExpertise("");
     setOptions([""]);
   };
 
@@ -108,7 +133,8 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
         description,
         points,
         type: taskType,
-        options: taskType.includes('choice') || taskType.includes('ranking') || taskType.includes('label') ? options : [],
+        options: taskType.includes('choice') || taskType.includes('ranking') || taskType.includes('classification') ? options.filter(o => o.trim() !== '') : [],
+        expertise,
     });
     
     if (result.success) {
@@ -128,7 +154,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
         <DialogHeader>
           <DialogTitle className="font-headline">Add New Contribution</DialogTitle>
           <DialogDescription>
-            Configure the details for the new contribution. Use the title field to provide a topic for AI generation.
+            Configure the details for the new contribution. Use the title/topic and expertise to generate with AI.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -136,7 +162,23 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
             <Label htmlFor="title" className="text-right">
               Title/Topic
             </Label>
-            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., 'Describe a sunset'" />
+            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., 'The ethics of AI in art'" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="expertise-add" className="text-right">
+              Expertise
+            </Label>
+            <Select value={expertise} onValueChange={setExpertise}>
+              <SelectTrigger id="expertise-add" className="col-span-3">
+                <SelectValue placeholder="Select an expertise" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">General (for all users)</SelectItem>
+                {EXPERTISE_AREAS.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="description" className="text-right pt-2">
@@ -144,7 +186,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
             </Label>
             <div className="col-span-3 space-y-2">
                 <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder="A detailed prompt for the user." />
-                 <Button onClick={handleGenerate} disabled={isGenerating || !title} variant="outline" size="sm">
+                 <Button onClick={handleGenerate} disabled={isGenerating || !title || !expertise} variant="outline" size="sm">
                     {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                     Generate with AI
                 </Button>
@@ -168,20 +210,14 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
                 <SelectValue placeholder="Select a type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="open_text_feedback">Open Text Feedback</SelectItem>
-                <SelectItem value="multiple_choice_preference">Multiple Choice</SelectItem>
-                <SelectItem value="ranking">Ranking</SelectItem>
-                <SelectItem value="classification">Classification</SelectItem>
-                <SelectItem value="sentiment">Sentiment Analysis</SelectItem>
-                <SelectItem value="topic_classification">Topic Classification</SelectItem>
-                <SelectItem value="likert_scale">Likert Scale</SelectItem>
-                <SelectItem value="compare_pairwise">Pairwise Comparison</SelectItem>
-                <SelectItem value="label_multiple">Multi-label</SelectItem>
+                {TASK_TYPE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification" || taskType === "sentiment" || taskType === "topic_classification" || taskType === "compare_pairwise" || taskType === "label_multiple") && (
+          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification") && (
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">Options</Label>
               <div className="col-span-3 space-y-2">
@@ -223,18 +259,6 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
   );
 }
 
-const TASK_TYPE_OPTIONS: { id: TaskType; label: string }[] = [
-  { id: "open_text_feedback", label: "Open Text Feedback" },
-  { id: "multiple_choice_preference", label: "Multiple Choice" },
-  { id: "ranking", label: "Ranking" },
-  { id: "classification", label: "Classification" },
-  { id: "sentiment", label: "Sentiment Analysis" },
-  { id: "topic_classification", label: "Topic Classification" },
-  { id: "likert_scale", label: "Likert Scale" },
-  { id: "compare_pairwise", label: "Pairwise Comparison" },
-  { id: "label_multiple", label: "Multi-label" },
-];
-
 type AutoGenerateDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -245,10 +269,11 @@ type AutoGenerateDialogProps = {
 function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenerateDialogProps) {
   const { toast } = useToast();
   const [count, setCount] = useState(5);
+  const [expertise, setExpertise] = useState<string>("");
   const [selectedTypes, setSelectedTypes] = useState<TaskType[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleTypeChange = (type: TaskType) => {
+   const handleTypeChange = (type: TaskType) => {
     setSelectedTypes((prev) =>
       prev.includes(type)
         ? prev.filter((t) => t !== type)
@@ -265,10 +290,10 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenera
   }
 
   const handleGenerate = async () => {
-    if (count <= 0 || selectedTypes.length === 0) {
+    if (count <= 0 || !expertise || selectedTypes.length === 0) {
       toast({
         title: "Invalid Input",
-        description: "Please enter a valid count and select at least one contribution type.",
+        description: "Please provide a count, select an expertise, and choose at least one contribution type.",
         variant: "destructive",
       });
       return;
@@ -276,11 +301,13 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenera
     setIsGenerating(true);
     const result = await bulkCreateAdminTasks({
       count,
+      expertise,
       taskTypes: selectedTypes,
     });
     if (result.success) {
       toast({ title: "Success", description: result.message });
       onOpenChange(false);
+      setExpertise("");
       setSelectedTypes([]);
       onTasksGenerated();
     } else {
@@ -295,7 +322,7 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenera
         <DialogHeader>
           <DialogTitle className="font-headline">Bulk Generate Contributions with AI</DialogTitle>
           <DialogDescription>
-            Select the number of contributions and the types you want to generate.
+            Select the number of contributions, their types, and the expertise area for generation.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4">
@@ -312,8 +339,21 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenera
             />
           </div>
           <div>
+            <Label htmlFor="expertise-bulk">Expertise Area</Label>
+            <Select value={expertise} onValueChange={setExpertise}>
+              <SelectTrigger id="expertise-bulk" className="mt-2">
+                <SelectValue placeholder="Select an expertise" />
+              </SelectTrigger>
+              <SelectContent>
+                {EXPERTISE_AREAS.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+           <div>
             <Label>Contribution Types</Label>
-            <div className="mt-2 space-y-2 p-3 border rounded-md max-h-60 overflow-y-auto">
+            <div className="mt-2 space-y-2 p-3 border rounded-md max-h-40 overflow-y-auto">
               <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="select-all" 
@@ -329,7 +369,7 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenera
                     checked={selectedTypes.includes(type.id)}
                     onCheckedChange={() => handleTypeChange(type.id)}
                   />
-                  <Label htmlFor={type.id}>{type.label}</Label>
+                  <Label htmlFor={type.id} className="font-normal">{type.label}</Label>
                 </div>
               ))}
             </div>
@@ -339,7 +379,7 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenera
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleGenerate} disabled={isGenerating || count <= 0 || selectedTypes.length === 0}>
+          <Button onClick={handleGenerate} disabled={isGenerating || count <= 0 || !expertise || selectedTypes.length === 0}>
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
             Generate
           </Button>
@@ -355,6 +395,7 @@ const LoadingSkeleton = () => (
             <TableRow>
               <TableHead>Title</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Expertise</TableHead>
               <TableHead>Points</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>
@@ -367,6 +408,7 @@ const LoadingSkeleton = () => (
                 <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-28 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                     <TableCell></TableCell>
@@ -420,6 +462,7 @@ export function TaskList() {
                     <TableRow>
                     <TableHead>Title</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Expertise</TableHead>
                     <TableHead>Points</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>
@@ -432,6 +475,9 @@ export function TaskList() {
                     <TableRow key={task.id}>
                         <TableCell className="font-medium">{task.title}</TableCell>
                         <TableCell>{task.type}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline">{task.expertise || 'General'}</Badge>
+                        </TableCell>
                         <TableCell>{task.points}</TableCell>
                         <TableCell>
                         <Badge variant={task.status === "Active" ? "secondary" : "outline"}>

@@ -23,6 +23,7 @@ const TASK_TYPES = [
 const BulkGenerateTasksInputSchema = z.object({
   count: z.number().int().min(1).max(10).describe('The number of contributions to generate.'),
   expertise: z.string().describe('The expertise area for which to generate contributions.'),
+  taskTypes: z.array(z.enum(TASK_TYPES)).describe("The types of contributions to generate.")
 });
 export type BulkGenerateTasksInput = z.infer<typeof BulkGenerateTasksInputSchema>;
 
@@ -76,10 +77,7 @@ const bulkGenerateTasksFlow = ai.defineFlow(
   async (input) => {
     const settings = await getAppSettings();
     const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
-    const {output} = await prompt(
-        {...input, taskTypes: TASK_TYPES as any}, 
-        { model }
-    );
+    const {output} = await prompt(input, { model });
     return output!;
   }
 );

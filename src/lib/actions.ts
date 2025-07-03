@@ -52,6 +52,7 @@ export async function createAdminTask(data: CreateTaskInput) {
 export type BulkCreateTasksInput = {
     count: number;
     expertise: string;
+    taskTypes: TaskType[];
 };
 
 export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
@@ -59,7 +60,11 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
         return { success: false, message: 'Database not configured. Please check your environment variables.' };
     }
     try {
-        const generatedData = await bulkGenerateTasks({ count: data.count, expertise: data.expertise });
+        const generatedData = await bulkGenerateTasks({ 
+            count: data.count, 
+            expertise: data.expertise,
+            taskTypes: data.taskTypes,
+        });
 
         if (!generatedData || !generatedData.tasks || generatedData.tasks.length === 0) {
             return { success: false, message: 'AI failed to generate contributions.' };
