@@ -1,4 +1,5 @@
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -42,8 +43,9 @@ export interface Task {
   award_criteria?: {
     explanation: string;
   };
-  status?: 'Active' | 'Archived';
+  status?: 'Active' | 'Paused';
   expertise?: string;
+  createdAt?: any; // Firestore Timestamp
 };
 
 export type QualificationQuestion = {
@@ -114,15 +116,6 @@ export type Package = {
   isPrimary?: boolean;
   taskLimit: number;
   expiryPeriod: string;
-};
-
-export type AdminTask = {
-    id: string;
-    title: string;
-    type: string;
-    points: number;
-    status: 'Active' | 'Archived';
-    expertise?: string;
 };
 
 export type TaskResponse = {

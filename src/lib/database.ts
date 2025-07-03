@@ -8,9 +8,10 @@
 
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
+import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -84,7 +85,7 @@ export async function getTasks(userId?: string): Promise<Task[]> {
         mockTasks.forEach((task) => {
             const { id, ...taskData } = task; // Firestore will generate its own ID
             const docRef = doc(collection(db, 'tasks'));
-            batch.set(docRef, {...taskData, status: 'Active'});
+            batch.set(docRef, {...taskData, status: 'Active', createdAt: Timestamp.now()});
         });
         await batch.commit();
         console.log('Database seeded.');
@@ -162,22 +163,25 @@ export async function getCompletedTaskDetails(taskIds: string[]): Promise<Task[]
 }
 
 
-export async function getAdminTasks(): Promise<AdminTask[]> {
+export async function getAdminTasks(): Promise<Task[]> {
     if (!db) return Promise.resolve([]);
-    const tasksCol = collection(db, 'tasks');
-    const snapshot = await getDocs(tasksCol);
-    
-    return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            title: data.title,
-            type: data.type,
-            points: data.points,
-            status: data.status || 'Active',
-            expertise: data.expertise
-        } as AdminTask;
-    });
+    try {
+        const tasksCol = collection(db, 'tasks');
+        const q = query(tasksCol, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromDoc<Task>(doc));
+    } catch (error) {
+        // This can happen if the `createdAt` index doesn't exist yet.
+        // Fallback to fetching without ordering.
+        if (error instanceof Error && error.message.includes('firestore/failed-precondition')) {
+            console.warn('Firestore index for ordering contributions not found. Fetching without ordering. Please create the index in your Firebase console.');
+            const tasksCol = collection(db, 'tasks');
+            const snapshot = await getDocs(tasksCol);
+            return snapshot.docs.map(doc => fromDoc<Task>(doc));
+        }
+        console.error("Error fetching admin tasks:", error);
+        return [];
+    }
 }
 
 export async function getPackages(): Promise<Package[]> {

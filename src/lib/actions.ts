@@ -36,6 +36,7 @@ export async function createAdminTask(data: CreateTaskInput) {
             status: 'Active',
             difficulty: 'Medium', // Assign a default difficulty
             expertise: data.expertise === 'general' ? undefined : data.expertise,
+            createdAt: Timestamp.now(),
         };
 
         await addDoc(collection(db, "tasks"), taskToAdd);
@@ -83,6 +84,7 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
             type: task.taskType,
             status: 'Active',
             difficulty: 'Medium',
+            createdAt: Timestamp.now(),
         };
 
         if (task.expertise && task.expertise !== 'General') {
@@ -101,6 +103,36 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
 
     revalidatePath("/admin/tasks");
     return { success: true, message: `${generatedData.tasks.length} contributions created successfully across selected expertises.` };
+}
+
+export async function deleteAdminTask(taskId: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        await deleteDoc(doc(db, "tasks", taskId));
+        revalidatePath("/admin/tasks");
+        return { success: true, message: 'Contribution deleted successfully.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to delete contribution: ${errorMessage}` };
+    }
+}
+
+export async function updateAdminTaskStatus(taskId: string, status: 'Active' | 'Paused') {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        await updateDoc(doc(db, "tasks", taskId), { status });
+        revalidatePath("/admin/tasks");
+        return { success: true, message: 'Contribution status updated.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to update status: ${errorMessage}` };
+    }
 }
 
 
