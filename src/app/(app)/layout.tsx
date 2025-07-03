@@ -138,9 +138,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const userData = await getUserData(user!.uid);
 
         // This handles cases where user exists in Auth but not in DB (e.g., failed signup step).
-        // Redirecting to logout is the safest way to clear the bad state.
         if (!userData) {
-            router.push('/logout');
+            router.push('/logout?reason=user_data_not_found');
             return;
         }
 
@@ -154,13 +153,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 router.push('/onboarding/welcome');
                 break;
             case 'rejected':
-                // In a real app, you might have a page explaining the rejection.
-                // For now, logging out prevents them from being stuck.
-                router.push('/logout');
+                // User is rejected, log them out with a reason.
+                router.push('/logout?reason=account_rejected');
                 break;
             default:
                 // Fallback for any other state is to log out to prevent loops.
-                router.push('/logout');
+                router.push('/logout?reason=invalid_account_status');
                 break;
         }
     }
