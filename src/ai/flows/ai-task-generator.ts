@@ -15,9 +15,21 @@ import {z} from 'genkit';
 import { GenerateTaskOutputSchema } from '@/ai/schemas';
 import { getAppSettings } from '@/lib/database';
 
+const TASK_TYPES = [
+  'multiple_choice_preference',
+  'ranking',
+  'likert_scale',
+  'classification',
+  'sentiment',
+  'topic_classification',
+  'open_text_feedback',
+  'compare_pairwise',
+  'label_multiple',
+] as const;
+
 const GenerateTaskInputSchema = z.object({
   topic: z.string().describe('The topic or subject of the contribution.'),
-  taskType: z.enum(['open_text_feedback', 'multiple_choice_preference', 'ranking', 'classification']).describe('The type of contribution to generate.'),
+  taskType: z.enum(TASK_TYPES).describe('The type of contribution to generate.'),
   expertise: z.string().optional().describe('The expertise area for the contribution.'),
 });
 export type GenerateTaskInput = z.infer<typeof GenerateTaskInputSchema>;

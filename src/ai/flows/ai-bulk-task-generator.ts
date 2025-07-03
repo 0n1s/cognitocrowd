@@ -14,10 +14,15 @@ import {GenerateTaskOutputSchema} from '@/ai/schemas';
 import { getAppSettings } from '@/lib/database';
 
 const TASK_TYPES = [
-  'open_text_feedback',
   'multiple_choice_preference',
   'ranking',
+  'likert_scale',
   'classification',
+  'sentiment',
+  'topic_classification',
+  'open_text_feedback',
+  'compare_pairwise',
+  'label_multiple',
 ] as const;
 
 const BulkGenerateTasksInputSchema = z.object({

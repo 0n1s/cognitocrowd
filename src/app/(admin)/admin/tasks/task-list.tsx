@@ -58,6 +58,11 @@ const TASK_TYPE_OPTIONS: { id: TaskType; label: string }[] = [
   { id: "multiple_choice_preference", label: "Multiple Choice" },
   { id: "ranking", label: "Ranking" },
   { id: "classification", label: "Classification" },
+  { id: "likert_scale", label: "Likert Scale" },
+  { id: "sentiment", label: "Sentiment Analysis" },
+  { id: "topic_classification", label: "Topic Classification" },
+  { id: "compare_pairwise", label: "Pairwise Comparison" },
+  { id: "label_multiple", label: "Multi-Labeling" },
 ];
 
 type AddTaskDialogProps = {
