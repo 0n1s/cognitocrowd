@@ -40,6 +40,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
   { href: "/admin/dashboard", icon: LayoutGrid, label: "Dashboard" },
@@ -73,6 +74,7 @@ const AdminHeader = () => {
         <h1 className="font-headline text-lg font-semibold">Admin Panel</h1>
       </div>
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">

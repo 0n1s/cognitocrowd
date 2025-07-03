@@ -47,6 +47,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
@@ -88,6 +89,7 @@ const AppHeader = () => {
         <h1 className="font-headline text-lg font-semibold">Trainly</h1>
       </div>
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <div className="text-right">
           <p className="font-semibold text-sm">{user?.displayName || "User"}</p>
           <p className="text-xs text-muted-foreground">{user?.email}</p>

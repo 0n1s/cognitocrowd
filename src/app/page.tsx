@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Zap, Award } from 'lucide-react';
 import Image from 'next/image';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const LandingHeader = () => (
   <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -15,6 +16,7 @@ const LandingHeader = () => (
         {/* Future nav links can go here */}
       </nav>
       <div className="flex items-center space-x-2">
+        <ThemeToggle />
         <Button variant="ghost" asChild>
           <Link href="/login">Login</Link>
         </Button>
@@ -60,7 +62,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="bg-white py-20">
+        <section className="bg-muted/40 py-20 dark:bg-card">
           <div className="container grid gap-8 md:grid-cols-3">
             <Card className="text-center">
               <CardHeader>
