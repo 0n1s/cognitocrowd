@@ -61,7 +61,7 @@ export function WithdrawalForm({ user, settings, currentBalance, onWithdrawal }:
         const result = await requestWithdrawal(user.id, withdrawalAmount, method, details);
 
         if (result.success) {
-            toast({ title: "Success", description: "Your withdrawal request has been submitted." });
+            toast({ title: "Success", description: "Your redemption request has been submitted." });
             setAmount("");
             setMethod("");
             setDetails("");
@@ -75,7 +75,7 @@ export function WithdrawalForm({ user, settings, currentBalance, onWithdrawal }:
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Request Withdrawal</CardTitle>
+                <CardTitle>New Redemption Request</CardTitle>
                 <CardDescription>
                     {scheduleDescription}
                 </CardDescription>
@@ -124,7 +124,7 @@ export function WithdrawalForm({ user, settings, currentBalance, onWithdrawal }:
                     </div>
                     <Button type="submit" className="w-full" disabled={isSubmitting}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Request Withdrawal
+                        Submit Request
                     </Button>
                 </form>
             </CardContent>

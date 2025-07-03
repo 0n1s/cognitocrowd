@@ -94,7 +94,7 @@ export default function WalletPage() {
           </CardContent>
           <CardFooter>
             <Button asChild>
-              <Link href="/redeem">Withdraw or Redeem <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link href="/redeem">Redeem Earnings <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </CardFooter>
         </Card>

@@ -140,10 +140,9 @@ export default function RedeemPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold font-headline">Withdraw Earnings</h1>
-      <p className="text-muted-foreground mt-1">Request a withdrawal of your available earnings balance.</p>
-      <div className="mt-4 text-lg">Your Earnings Balance: <span className="font-bold text-primary">${earningsBalance.toFixed(2)}</span></div>
-      <p className="text-xs text-muted-foreground mt-1">(1 point from contributions = $1.00 USD)</p>
+      <h1 className="text-3xl font-bold font-headline">Redeem Your Earnings for Cash</h1>
+      <p className="text-muted-foreground mt-1">Request to convert your available balance into cash.</p>
+      <div className="mt-4 text-lg">Available to Redeem: <span className="font-bold text-primary">${earningsBalance.toFixed(2)}</span></div>
 
         <div className="space-y-8 mt-8">
             <div className="max-w-md mx-auto">
