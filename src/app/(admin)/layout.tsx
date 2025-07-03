@@ -28,6 +28,7 @@ import {
   Settings,
   Banknote,
   FileQuestion,
+  UserCheck,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ const navItems = [
   { href: "/admin/users", icon: Users, label: "Users" },
   { href: "/admin/withdrawals", icon: Banknote, label: "Withdrawals" },
   { href: "/admin/qualifications", icon: FileQuestion, label: "Qualifications" },
+  { href: "/admin/approvals", icon: UserCheck, label: "Approvals" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 

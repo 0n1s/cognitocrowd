@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -956,5 +957,21 @@ export async function updateUserNameInDB(userId: string, name: string) {
         console.error("Error updating user name in DB:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
+    }
+}
+
+export async function updateUserApprovalStatus(userId: string, status: 'approved' | 'rejected') {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const userDoc = doc(db, 'users', userId);
+        await updateDoc(userDoc, { onboardingStatus: status });
+        revalidatePath("/admin/approvals");
+        return { success: true, message: `User status updated to ${status}.` };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to update user status: ${errorMessage}` };
     }
 }

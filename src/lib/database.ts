@@ -9,6 +9,7 @@
 
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
@@ -456,6 +457,37 @@ export async function getEnabledExpertiseAreas(): Promise<string[]> {
         return enabledAreas;
     } catch (error) {
         console.error("Error fetching enabled expertise areas:", error);
+        return [];
+    }
+}
+
+export async function getPendingApprovals(): Promise<User[]> {
+    if (!db) return [];
+    try {
+        const usersCol = collection(db, 'users');
+        const q = query(
+            usersCol, 
+            where('onboardingStatus', '==', 'pending'),
+            orderBy('qualificationTestSubmittedAt', 'asc') // Show oldest first
+        );
+        const snapshot = await getDocs(q);
+
+        // We filter again in code because `qualificationTestSubmittedAt` might not be present on all pending users
+        return snapshot.docs
+            .filter(doc => doc.data().qualificationTestSubmittedAt) 
+            .map(doc => fromDoc<User>(doc));
+
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('firestore/failed-precondition')) {
+            console.warn('Firestore index for approvals not found. Fetching without ordering.');
+            const usersCol = collection(db, 'users');
+            const q = query(usersCol, where('onboardingStatus', '==', 'pending'));
+            const snapshot = await getDocs(q);
+             return snapshot.docs
+                .filter(doc => doc.data().qualificationTestSubmittedAt)
+                .map(doc => fromDoc<User>(doc));
+        }
+        console.error("Error fetching pending approvals:", error);
         return [];
     }
 }
