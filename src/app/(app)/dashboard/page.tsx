@@ -87,7 +87,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
         <Card key={task.id} className="flex flex-col">
           <CardHeader className="flex-grow">
             <div className="flex justify-between items-start">
-              <CardTitle className="text-lg">{task.title}</CardTitle>
+              <CardTitle className="text-lg truncate">{task.title}</CardTitle>
               <Badge variant={task.difficulty === 'Easy' ? 'secondary' : task.difficulty === 'Medium' ? 'outline' : 'default'}
                 className={task.difficulty === 'Hard' ? `bg-destructive/80 text-destructive-foreground` : ''}
               >
