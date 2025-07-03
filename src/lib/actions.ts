@@ -80,7 +80,7 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
         const taskToAdd: any = {
             title: task.prompt,
             description: task.description,
-            points: 100, // Default points
+            points: task.points || 100, // Default points
             type: task.taskType,
             status: 'Active',
             difficulty: 'Medium', // Default difficulty

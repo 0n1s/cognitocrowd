@@ -69,6 +69,7 @@ Here are the requirements for each field:
 - "taskType": (Required) The type of the generated contribution, from the list provided.
 - "prompt": (Required) The main question for the user. This will be the contribution title.
 - "description": (Required) The context or detailed instruction for the contribution.
+- "points": (Required) A number between 10 and 500, based on the perceived complexity and effort required for the contribution.
 - "options": (Required for 'multiple_choice_preference', 'ranking', 'classification') Provide an array of string options.
 - "settings": (Optional) An object to configure the contribution. You can include:
     - "allow_comment": boolean

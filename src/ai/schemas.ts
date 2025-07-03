@@ -26,6 +26,7 @@ const TaskSettingsSchema = z.object({
 export const GenerateTaskOutputSchema = z.object({
   prompt: z.string().describe("The main question or prompt for the contribution. This will be the contribution title."),
   description: z.string().describe("The context or additional description for the contribution."),
+  points: z.number().int().min(10).max(500).optional().describe("An appropriate point value for the contribution based on its complexity, between 10 and 500."),
   options: z.array(TaskOptionSchema).optional().describe("The generated contribution options, if applicable (e.g., for multiple choice, ranking, etc)."),
   scale: LikertScaleSchema.optional().describe("The scale for a Likert scale contribution. Should only be present for 'likert_scale' type."),
   settings: TaskSettingsSchema.optional().describe("Additional settings for the contribution."),

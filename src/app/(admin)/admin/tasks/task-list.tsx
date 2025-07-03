@@ -105,6 +105,9 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
         const result = await generateTask({ topic: title, taskType, expertise });
         setTitle(result.prompt);
         setDescription(result.description);
+        if (result.points) {
+            setPoints(result.points);
+        }
         if(result.options && result.options.length > 0) {
             const stringOptions = result.options.map(opt => {
                 if (typeof opt === 'string') return opt;
