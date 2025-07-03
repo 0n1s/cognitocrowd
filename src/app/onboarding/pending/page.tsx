@@ -73,7 +73,7 @@ function PendingReviewContent() {
                     )}
                 </div>
 
-                <p className="text-muted-foreground">You will be notified via email once your application has been approved. This usually takes 1-2 business days. In the meantime, you can log out.</p>
+                <p className="text-muted-foreground">We'll notify you via email once your application has been approved, which usually takes 1-2 business days. Thank you for your patience.</p>
                 <Button asChild variant="outline">
                     <Link href="/logout"><LogOut className="mr-2 h-4 w-4" /> Log Out</Link>
                 </Button>
