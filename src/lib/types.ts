@@ -129,6 +129,7 @@ export type AppSettings = {
   onboardingCourseTitle?: string;
   onboardingCourseDescription?: string;
   onboardingCourseSteps?: OnboardingStep[];
+  defaultGenAiModel?: string;
 };
 
 export type WithdrawalRequest = {

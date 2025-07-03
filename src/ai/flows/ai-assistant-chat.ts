@@ -11,6 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { getAppSettings } from '@/lib/database';
 
 const AiAssistantTaskGuidanceInputSchema = z.object({
   query: z.string().describe('The user query for contribution guidance.'),
@@ -45,7 +46,9 @@ const aiAssistantTaskGuidanceFlow = ai.defineFlow(
     outputSchema: AiAssistantTaskGuidanceOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const settings = await getAppSettings();
+    const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
+    const {output} = await prompt(input, { model });
     return output!;
   }
 );

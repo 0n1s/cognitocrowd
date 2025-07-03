@@ -9,7 +9,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getTask, getTaskResponses } from '@/lib/database';
+import { getTask, getTaskResponses, getAppSettings } from '@/lib/database';
 import { Task, TaskResponse } from '@/lib/types';
 
 const RankResponseInputSchema = z.object({
@@ -81,13 +81,17 @@ const rankResponseFlow = ai.defineFlow(
     const existingResponses = (await getTaskResponses(input.taskId))
         .filter(r => r.userId !== input.response.userId)
         .slice(0, 10);
+    
+    // 2. Get the configured AI model
+    const settings = await getAppSettings();
+    const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
 
-    // 2. Call the prompt with all the necessary data
+    // 3. Call the prompt with all the necessary data
     const { output } = await prompt({
         ...input,
         task,
         existingResponses
-    });
+    }, { model });
 
     return output!;
   }

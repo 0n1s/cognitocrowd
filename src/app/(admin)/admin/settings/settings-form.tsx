@@ -17,6 +17,9 @@ import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { AVAILABLE_MODELS } from "@/ai/genkit";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 const LoadingSkeleton = () => (
     <Card>
@@ -213,6 +216,35 @@ export function SettingsForm() {
                             </div>
                         )}
                     </div>
+                </div>
+
+                <Separator />
+                
+                <div>
+                    <h3 className="text-lg font-semibold">AI Model Settings</h3>
+                    <p className="text-sm text-muted-foreground">Configure the default generative model for AI features.</p>
+                </div>
+                <div className="space-y-4">
+                    <Label className="text-base font-semibold">Default Generative AI Model</Label>
+                    <p className="text-sm text-muted-foreground">
+                        Select the default model to use for features like the AI Assistant and contribution generation.
+                        Note: For Groq, add `GROQ_API_KEY` to your .env file. For Ollama, ensure it's running locally.
+                    </p>
+                    <Select
+                        value={settings.defaultGenAiModel}
+                        onValueChange={(value) => handleFieldChange('defaultGenAiModel', value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {AVAILABLE_MODELS.map((model) => (
+                                <SelectItem key={model.id} value={model.id}>
+                                    {model.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <Separator />

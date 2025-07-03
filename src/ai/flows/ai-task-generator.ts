@@ -12,6 +12,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { GenerateTaskOutputSchema } from '@/ai/schemas';
+import { getAppSettings } from '@/lib/database';
 
 const GenerateTaskInputSchema = z.object({
   topic: z.string().describe('The topic or subject of the contribution.'),
@@ -49,7 +50,9 @@ const generateTaskFlow = ai.defineFlow(
     outputSchema: GenerateTaskOutputSchema,
   },
   async input => {
-    const {output} = await taskGeneratorPrompt(input);
+    const settings = await getAppSettings();
+    const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
+    const {output} = await taskGeneratorPrompt(input, { model });
     return output!;
   }
 );

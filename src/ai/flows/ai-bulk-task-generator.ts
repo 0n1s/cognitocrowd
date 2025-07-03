@@ -10,6 +10,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import {GenerateTaskOutputSchema} from '@/ai/schemas';
+import { getAppSettings } from '@/lib/database';
 
 const TASK_TYPES = [
   'open_text_feedback',
@@ -83,7 +84,9 @@ const bulkGenerateTasksFlow = ai.defineFlow(
     outputSchema: BulkGenerateTasksOutputSchema,
   },
   async (input) => {
-    const {output} = await prompt(input);
+    const settings = await getAppSettings();
+    const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
+    const {output} = await prompt(input, { model });
     return output!;
   }
 );
