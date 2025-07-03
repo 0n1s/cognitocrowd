@@ -32,7 +32,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Loader2, Wand2 } from "lucide-react";
@@ -126,7 +125,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
         description,
         points,
         type: taskType,
-        options: taskType.includes('choice') || taskType.includes('ranking') || taskType.includes('label') ? options : [],
+        options: taskType.includes('choice') || taskType.includes('ranking') || taskType.includes('label') ? options.filter(o => o.trim() !== '') : [],
         expertise,
     });
     
@@ -147,7 +146,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
         <DialogHeader>
           <DialogTitle className="font-headline">Add New Contribution</DialogTitle>
           <DialogDescription>
-            Configure the details for the new contribution. Use the title field to provide a topic for AI generation.
+            Configure the details for the new contribution. Use the title/topic and expertise to generate with AI.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -155,7 +154,23 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
             <Label htmlFor="title" className="text-right">
               Title/Topic
             </Label>
-            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., 'Describe a sunset'" />
+            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., 'The ethics of AI in art'" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="expertise-add" className="text-right">
+              Expertise
+            </Label>
+            <Select value={expertise} onValueChange={setExpertise}>
+              <SelectTrigger id="expertise-add" className="col-span-3">
+                <SelectValue placeholder="Select an expertise" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">General (for all users)</SelectItem>
+                {EXPERTISE_AREAS.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="description" className="text-right pt-2">
@@ -168,22 +183,6 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
                     Generate with AI
                 </Button>
             </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="expertise" className="text-right">
-              Expertise
-            </Label>
-            <Select value={expertise} onValueChange={setExpertise}>
-              <SelectTrigger id="expertise" className="col-span-3">
-                <SelectValue placeholder="Select an expertise (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">General (for all users)</SelectItem>
-                {EXPERTISE_AREAS.map(area => (
-                    <SelectItem key={area} value={area}>{area}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="points" className="text-right">
@@ -207,16 +206,11 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
                 <SelectItem value="multiple_choice_preference">Multiple Choice</SelectItem>
                 <SelectItem value="ranking">Ranking</SelectItem>
                 <SelectItem value="classification">Classification</SelectItem>
-                <SelectItem value="sentiment">Sentiment Analysis</SelectItem>
-                <SelectItem value="topic_classification">Topic Classification</SelectItem>
-                <SelectItem value="likert_scale">Likert Scale</SelectItem>
-                <SelectItem value="compare_pairwise">Pairwise Comparison</SelectItem>
-                <SelectItem value="label_multiple">Multi-label</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification" || taskType === "sentiment" || taskType === "topic_classification" || taskType === "compare_pairwise" || taskType === "label_multiple") && (
+          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification") && (
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">Options</Label>
               <div className="col-span-3 space-y-2">
