@@ -2,20 +2,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AppSettings, PaymentMethod } from "@/lib/types";
+import { AppSettings, PaymentMethod, OnboardingStep } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Trash2, Loader2 } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, GripVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateAppSettings } from "@/lib/actions";
 import { getAppSettings } from "@/lib/database";
 import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 
 const LoadingSkeleton = () => (
     <Card>
@@ -28,6 +29,10 @@ const LoadingSkeleton = () => (
                 <Skeleton className="h-5 w-40 mb-2" />
                 <Skeleton className="h-20 w-full" />
             </div>
+             <div>
+                <Skeleton className="h-5 w-32 mb-2" />
+                <Skeleton className="h-10 w-full" />
+            </div>
         </CardContent>
     </Card>
 )
@@ -39,12 +44,14 @@ export function SettingsForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-
     useEffect(() => {
         const fetchSettings = async () => {
             setLoading(true);
             try {
                 const fetchedSettings = await getAppSettings();
+                if (fetchedSettings.onboardingCourseSteps && !fetchedSettings.onboardingCourseSteps.every(s => s.id)) {
+                    fetchedSettings.onboardingCourseSteps = fetchedSettings.onboardingCourseSteps.map(s => ({...s, id: uuidv4()}));
+                }
                 setSettings(fetchedSettings);
             } catch (error) {
                 toast({ title: "Error", description: "Failed to load settings.", variant: "destructive" });
@@ -54,6 +61,11 @@ export function SettingsForm() {
         };
         fetchSettings();
     }, [toast]);
+    
+    const handleFieldChange = (field: keyof AppSettings, value: any) => {
+        if (!settings) return;
+        setSettings({ ...settings, [field]: value });
+    };
 
     const handleAddMethod = (type: 'withdrawal' | 'deposit') => {
         if (!settings) return;
@@ -104,29 +116,47 @@ export function SettingsForm() {
             });
         }
     };
-
-    const handleScheduleChange = (info: string) => {
-        if (!settings) return;
-        setSettings({ ...settings, withdrawalScheduleInfo: info });
-    };
-
-    const handleDayChange = (day: string, checked: boolean) => {
+    
+     const handleDayChange = (day: string, checked: boolean) => {
         if (!settings) return;
         const currentDays = settings.withdrawalDays || [];
         const newDays = checked
             ? [...currentDays, day]
             : currentDays.filter((d) => d !== day);
-        setSettings({ ...settings, withdrawalDays: newDays });
+        handleFieldChange('withdrawalDays', newDays);
+    };
+    
+    const handleAddCourseStep = () => {
+        if (!settings) return;
+        const newSteps = [...(settings.onboardingCourseSteps || []), { id: uuidv4(), title: '', content: '' }];
+        handleFieldChange('onboardingCourseSteps', newSteps);
+    };
+
+    const handleRemoveCourseStep = (id: string) => {
+        if (!settings) return;
+        const newSteps = (settings.onboardingCourseSteps || []).filter(step => step.id !== id);
+        handleFieldChange('onboardingCourseSteps', newSteps);
+    };
+
+    const handleCourseStepChange = (id: string, field: 'title' | 'content', value: string) => {
+        if (!settings) return;
+        const newSteps = (settings.onboardingCourseSteps || []).map(step =>
+            step.id === id ? { ...step, [field]: value } : step
+        );
+        handleFieldChange('onboardingCourseSteps', newSteps);
     };
 
     const handleSubmit = async () => {
         if (!settings) return;
         setIsSubmitting(true);
-        const result = await updateAppSettings({
+        const settingsToSave = {
             ...settings,
             paymentMethods: settings.paymentMethods.filter(m => m.name.trim() !== ''),
-            depositMethods: (settings.depositMethods || []).filter(m => m.name.trim() !== '')
-        });
+            depositMethods: (settings.depositMethods || []).filter(m => m.name.trim() !== ''),
+            onboardingCourseSteps: (settings.onboardingCourseSteps || []).filter(s => s.title.trim() !== '' && s.content.trim() !== ''),
+        };
+
+        const result = await updateAppSettings(settingsToSave);
         if (result.success) {
             toast({ title: "Success", description: result.message });
         } else {
@@ -140,7 +170,53 @@ export function SettingsForm() {
 
     return (
         <Card>
-            <CardContent className="pt-6 space-y-8">
+            <CardContent className="pt-6 space-y-12">
+                
+                 <div>
+                    <h3 className="text-lg font-semibold">Onboarding Course Settings</h3>
+                    <p className="text-sm text-muted-foreground">Configure the optional course for new users.</p>
+                    <div className="mt-6 space-y-6">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="onboarding-enabled" checked={settings.onboardingCourseEnabled} onCheckedChange={(checked) => handleFieldChange('onboardingCourseEnabled', checked)} />
+                            <Label htmlFor="onboarding-enabled">Enable Onboarding Course</Label>
+                        </div>
+                        
+                        {settings.onboardingCourseEnabled && (
+                            <div className="space-y-4 pl-4 border-l-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="course-title">Course Title</Label>
+                                    <Input id="course-title" value={settings.onboardingCourseTitle} onChange={(e) => handleFieldChange('onboardingCourseTitle', e.target.value)} />
+                                </div>
+                                 <div className="space-y-2">
+                                    <Label htmlFor="course-desc">Course Description</Label>
+                                    <Textarea id="course-desc" value={settings.onboardingCourseDescription} onChange={(e) => handleFieldChange('onboardingCourseDescription', e.target.value)} />
+                                </div>
+                                <div>
+                                    <Label className="text-base font-semibold">Course Steps</Label>
+                                    <div className="space-y-4 mt-2">
+                                        {(settings.onboardingCourseSteps || []).map((step, index) => (
+                                            <div key={step.id} className="p-4 border rounded-lg space-y-2 bg-muted/50 relative">
+                                                <Label htmlFor={`step-title-${index}`}>Step {index + 1} Title</Label>
+                                                <Input id={`step-title-${index}`} value={step.title} onChange={(e) => handleCourseStepChange(step.id, 'title', e.target.value)} />
+                                                <Label htmlFor={`step-content-${index}`}>Step Content</Label>
+                                                <Textarea id={`step-content-${index}`} value={step.content} onChange={(e) => handleCourseStepChange(step.id, 'content', e.target.value)} />
+                                                 <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => handleRemoveCourseStep(step.id)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                        <Button variant="outline" size="sm" onClick={handleAddCourseStep}>
+                                            <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <Separator />
+
                 <div>
                     <h3 className="text-lg font-semibold">Deposit Settings</h3>
                     <p className="text-sm text-muted-foreground">Manage accepted deposit methods.</p>
@@ -219,7 +295,7 @@ export function SettingsForm() {
                     <Textarea
                         id="schedule"
                         value={settings.withdrawalScheduleInfo}
-                        onChange={(e) => handleScheduleChange(e.target.value)}
+                        onChange={(e) => handleFieldChange('withdrawalScheduleInfo', e.target.value)}
                         placeholder="e.g., Withdrawals are also processed on the 1st and 15th of each month."
                     />
                     <p className="text-xs text-muted-foreground">

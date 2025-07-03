@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTasks, getUserData, getPackage } from '@/lib/database';
+import { getTasks, getUserData, getPackage, getAppSettings } from '@/lib/database';
 import { ArrowRight, Award, CheckCircle, Repeat } from 'lucide-react';
-import { Task, Package } from '@/lib/types';
+import { Task, Package, User, AppSettings } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
+import { OnboardingCourseCard } from './onboarding-course';
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => (
     <Card>
@@ -135,6 +136,8 @@ const FREE_TIER_DAILY_LIMIT = 50;
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userStats, setUserStats] = useState<UserStatsData | null>(null);
+  const [userData, setUserData] = useState<User | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -143,28 +146,31 @@ export default function DashboardPage() {
       if (!user) return;
       setLoading(true);
       try {
-        const [fetchedTasks, userData] = await Promise.all([
+        const [fetchedTasks, fetchedUserData, fetchedSettings] = await Promise.all([
             getTasks(user.uid),
-            getUserData(user.uid)
+            getUserData(user.uid),
+            getAppSettings()
         ]);
         
         setTasks(fetchedTasks);
+        setUserData(fetchedUserData);
+        setSettings(fetchedSettings);
 
-        if (userData) {
+        if (fetchedUserData) {
             let userPackage: Package | null = null;
-            if (userData.packageId) {
-                userPackage = await getPackage(userData.packageId);
+            if (fetchedUserData.packageId) {
+                userPackage = await getPackage(fetchedUserData.packageId);
             }
             
-            const lastReset = userData.lastCompletionReset ? new Date(userData.lastCompletionReset) : new Date(0);
+            const lastReset = fetchedUserData.lastCompletionReset ? new Date(fetchedUserData.lastCompletionReset) : new Date(0);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            const dailyCount = lastReset < today ? 0 : userData.dailyCompletedCount || 0;
+            const dailyCount = lastReset < today ? 0 : fetchedUserData.dailyCompletedCount || 0;
 
             setUserStats({
-                earningsBalance: userData.earningsBalance || 0,
-                completed: userData.completedTasks?.length || 0,
+                earningsBalance: fetchedUserData.earningsBalance || 0,
+                completed: fetchedUserData.completedTasks?.length || 0,
                 dailyCount: dailyCount,
                 dailyLimit: userPackage?.taskLimit || FREE_TIER_DAILY_LIMIT,
             });
@@ -185,6 +191,12 @@ export default function DashboardPage() {
     <div>
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       <p className="text-muted-foreground mt-1">An overview of your contributions and available tasks.</p>
+      
+      {!loading && settings && userData && settings.onboardingCourseEnabled && !userData.onboardingCourseCompleted && (
+        <div className="my-8">
+          <OnboardingCourseCard settings={settings} />
+        </div>
+      )}
 
       <div className="mt-8">
         <h2 className="text-2xl font-bold font-headline mb-4">Your Stats</h2>

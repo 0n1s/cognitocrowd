@@ -1,7 +1,5 @@
 
 
-
-
 export type TaskOption =
   | string
   | { text: string }
@@ -61,6 +59,7 @@ export type User = {
   role?: 'user' | 'admin';
   dailyCompletedCount?: number;
   lastCompletionReset?: any; // Firestore Timestamp
+  onboardingCourseCompleted?: boolean;
 };
 
 export type AdminUser = User & {
@@ -114,12 +113,22 @@ export type PaymentMethod = {
   name: string;
 };
 
+export type OnboardingStep = {
+  id: string;
+  title: string;
+  content: string;
+};
+
 export type AppSettings = {
   id?: 'main';
   paymentMethods: PaymentMethod[];
   depositMethods: PaymentMethod[];
   withdrawalScheduleInfo: string;
   withdrawalDays?: string[];
+  onboardingCourseEnabled?: boolean;
+  onboardingCourseTitle?: string;
+  onboardingCourseDescription?: string;
+  onboardingCourseSteps?: OnboardingStep[];
 };
 
 export type WithdrawalRequest = {

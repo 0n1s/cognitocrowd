@@ -243,7 +243,15 @@ export async function getAppSettings(): Promise<AppSettings> {
         paymentMethods: [{ id: uuidv4(), name: 'PayPal' }],
         depositMethods: [{ id: uuidv4(), name: 'Plisio (Crypto)' }],
         withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.',
-        withdrawalDays: []
+        withdrawalDays: [],
+        onboardingCourseEnabled: false,
+        onboardingCourseTitle: 'Welcome to Trainly!',
+        onboardingCourseDescription: 'Learn how to get started with our platform.',
+        onboardingCourseSteps: [
+            { id: uuidv4(), title: 'Step 1: The Dashboard', content: 'Your dashboard is your central hub. Here you can see your stats and find available contributions.' },
+            { id: uuidv4(), title: 'Step 2: Complete Contributions', content: 'Navigate to the Contributions page to find tasks. Complete them to earn points.' },
+            { id: uuidv4(), title: 'Step 3: Earn & Redeem', content: 'Your points translate to real earnings. Visit the Wallet and Redeem pages to manage your funds.' },
+        ]
     };
 
     if (!db) return defaultSettings;
@@ -253,11 +261,15 @@ export async function getAppSettings(): Promise<AppSettings> {
 
     if (docSnap.exists()) {
         const data = fromDoc<AppSettings>(docSnap);
-        // Ensure depositMethods exists for backward compatibility
-        if (!data.depositMethods) {
-            data.depositMethods = defaultSettings.depositMethods;
+        // Ensure properties exist for backward compatibility
+        const mergedSettings = { ...defaultSettings, ...data };
+        if (!mergedSettings.depositMethods) {
+            mergedSettings.depositMethods = defaultSettings.depositMethods;
         }
-        return { ...defaultSettings, ...data };
+        if (!mergedSettings.onboardingCourseSteps) {
+             mergedSettings.onboardingCourseSteps = defaultSettings.onboardingCourseSteps;
+        }
+        return mergedSettings;
     } else {
         await setDoc(settingsDocRef, defaultSettings);
         return defaultSettings;

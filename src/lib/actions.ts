@@ -633,3 +633,18 @@ export async function updateUserPhotoURL(userId: string, photoURL: string) {
         return { success: false, message };
     }
 }
+
+export async function markOnboardingAsCompleted(userId: string) {
+    if (!db) return { success: false, message: "Database not configured." };
+
+    try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, { onboardingCourseCompleted: true });
+        revalidatePath('/dashboard');
+        return { success: true, message: "Onboarding completed." };
+    } catch (error) {
+        console.error("Error marking onboarding as completed:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
