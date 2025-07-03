@@ -60,6 +60,7 @@ export type User = {
   dailyCompletedCount?: number;
   lastCompletionReset?: any; // Firestore Timestamp
   onboardingCourseCompleted?: boolean;
+  accountExpiresAt?: any; // Firestore Timestamp
 };
 
 export type AdminUser = User & {

@@ -303,6 +303,10 @@ export async function setupNewUser(userId: string, name: string, email: string) 
         }
 
         const userDocRef = doc(db, 'users', userId);
+        const now = Timestamp.now();
+        const twoWeeksInSeconds = 14 * 24 * 60 * 60;
+        const expiryTimestamp = new Timestamp(now.seconds + twoWeeksInSeconds, now.nanoseconds);
+        
         await setDoc(userDocRef, {
             name,
             email,
@@ -312,9 +316,10 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             packageId,
             completedTasks: [],
             role: 'user',
-            createdAt: Timestamp.now(),
+            createdAt: now,
             dailyCompletedCount: 0,
-            lastCompletionReset: Timestamp.now(),
+            lastCompletionReset: now,
+            accountExpiresAt: expiryTimestamp,
         });
         
         return { success: true };
