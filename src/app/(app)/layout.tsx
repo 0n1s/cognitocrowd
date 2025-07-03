@@ -46,8 +46,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { getUserData } from "@/lib/database";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
@@ -70,13 +68,6 @@ const aiToolsNavItems = [
 const AppHeader = () => {
   const { isMobile } = useSidebar();
   const { user } = useAuth();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    if (!auth) return;
-    await signOut(auth);
-    router.push('/login');
-  };
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
@@ -113,7 +104,9 @@ const AppHeader = () => {
             </DropdownMenuItem>
             <DropdownMenuItem>Support</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/logout">Logout</Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -149,12 +142,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     checkOnboardingStatus();
   }, [user, authLoading, router]);
   
-  const handleLogout = async () => {
-    if (!auth) return;
-    await signOut(auth);
-    router.push('/login');
-  };
-
   if (!isAuthorized) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -229,9 +216,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <span>Settings</span>
               </Link>
             </SidebarMenuButton>
-            <SidebarMenuButton tooltip="Logout" onClick={handleLogout}>
-              <LogOut />
-              <span>Logout</span>
+            <SidebarMenuButton asChild tooltip="Logout">
+              <Link href="/logout">
+                <LogOut />
+                <span>Logout</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenu>
         </SidebarFooter>

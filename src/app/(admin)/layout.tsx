@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -38,8 +39,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
@@ -54,14 +53,7 @@ const navItems = [
 const AdminHeader = () => {
   const { isMobile } = useSidebar();
   const { user } = useAuth();
-  const router = useRouter();
   
-  const handleLogout = async () => {
-    if (!auth) return;
-    await signOut(auth);
-    router.push('/login');
-  };
-
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "AD";
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -88,7 +80,9 @@ const AdminHeader = () => {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>{user?.displayName || "Admin Account"}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/logout">Logout</Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -107,12 +101,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.push('/login');
     }
   }, [user, loading, router]);
-
-  const handleLogout = async () => {
-    if (!auth) return;
-    await signOut(auth);
-    router.push('/login');
-  };
 
   if (loading || !user) {
     return (
@@ -159,9 +147,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <span>Back to App</span>
               </Link>
             </SidebarMenuButton>
-            <SidebarMenuButton tooltip="Logout" onClick={handleLogout}>
-              <LogOut />
-              <span>Logout</span>
+            <SidebarMenuButton asChild tooltip="Logout">
+              <Link href="/logout">
+                <LogOut />
+                <span>Logout</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenu>
         </SidebarFooter>
