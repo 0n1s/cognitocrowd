@@ -122,24 +122,50 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return;
+    // Wait until the auth state is fully loaded
+    if (authLoading) {
+      return;
+    }
+
+    // If there's no user, redirect to login page.
     if (!user) {
       router.push('/login');
       return;
     }
 
-    async function checkOnboardingStatus() {
+    // If there is a user, check their status in the database.
+    async function checkUserStatus() {
         const userData = await getUserData(user!.uid);
-        if (userData?.onboardingStatus === 'pending') {
-            router.push('/onboarding/welcome');
-        } else if (userData?.onboardingStatus === 'approved') {
-            setIsAuthorized(true);
-        } else {
-            // Handle rejected or other states if needed, for now, redirect to login
-             router.push('/login');
+
+        // This handles cases where user exists in Auth but not in DB (e.g., failed signup step).
+        // Redirecting to logout is the safest way to clear the bad state.
+        if (!userData) {
+            router.push('/logout');
+            return;
+        }
+
+        switch (userData.onboardingStatus) {
+            case 'approved':
+                // User is approved, allow access to the app.
+                setIsAuthorized(true);
+                break;
+            case 'pending':
+                // User is still pending, send them to the onboarding flow.
+                router.push('/onboarding/welcome');
+                break;
+            case 'rejected':
+                // In a real app, you might have a page explaining the rejection.
+                // For now, logging out prevents them from being stuck.
+                router.push('/logout');
+                break;
+            default:
+                // Fallback for any other state is to log out to prevent loops.
+                router.push('/logout');
+                break;
         }
     }
-    checkOnboardingStatus();
+
+    checkUserStatus();
   }, [user, authLoading, router]);
   
   if (!isAuthorized) {
