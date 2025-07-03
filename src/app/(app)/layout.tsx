@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   SidebarProvider,
   Sidebar,
@@ -45,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
+import { getUserData } from "@/lib/database";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -123,14 +124,30 @@ const AppHeader = () => {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (authLoading) return;
+    if (!user) {
       router.push('/login');
+      return;
     }
-  }, [user, loading, router]);
+
+    async function checkOnboardingStatus() {
+        const userData = await getUserData(user!.uid);
+        if (userData?.onboardingStatus === 'pending') {
+            router.push('/onboarding/welcome');
+        } else if (userData?.onboardingStatus === 'approved') {
+            setIsAuthorized(true);
+        } else {
+            // Handle rejected or other states if needed, for now, redirect to login
+             router.push('/login');
+        }
+    }
+    checkOnboardingStatus();
+  }, [user, authLoading, router]);
   
   const handleLogout = async () => {
     if (!auth) return;
@@ -138,7 +155,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
-  if (loading || !user) {
+  if (!isAuthorized) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />

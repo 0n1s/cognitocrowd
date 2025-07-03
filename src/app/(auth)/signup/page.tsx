@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -45,7 +46,7 @@ export default function SignupPage() {
         title: "Account Created!",
         description: "You have been successfully signed up.",
       });
-      router.push('/dashboard');
+      router.push('/onboarding/welcome');
     } catch (error: any) {
       console.error('Signup error:', error);
       let description = "An unexpected error occurred. Please try again.";

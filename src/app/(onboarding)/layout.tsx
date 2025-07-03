@@ -4,38 +4,42 @@
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect } from "react";
 import { getUserData } from "@/lib/database";
+import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
-export default function AuthLayout({
+export default function OnboardingLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [status, setStatus] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
-    if (!user) return;
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      setStatus('unauthorized');
+      return;
+    }
 
-    const checkOnboarding = async () => {
-      const userData = await getUserData(user.uid);
-      if (userData?.onboardingStatus === 'pending') {
-        router.push('/onboarding/welcome');
-      } else {
-        router.push('/dashboard');
-      }
-    };
-    
-    checkOnboarding();
-  }, [user, loading, router]);
+    async function checkStatus() {
+        const userData = await getUserData(user!.uid);
+        if (userData?.onboardingStatus === 'approved') {
+            router.push('/dashboard');
+        } else {
+            setStatus('authorized');
+        }
+    }
+    checkStatus();
+  }, [user, authLoading, router]);
 
-  if (loading || user) {
+  if (status === 'loading' || status === 'unauthorized') {
      return (
       <div className="flex min-h-screen items-center justify-center">
-        <Skeleton className="h-[450px] w-full max-w-sm rounded-lg" />
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -48,7 +52,9 @@ export default function AuthLayout({
                 <span className="font-bold font-headline text-lg">Trainly</span>
             </Link>
         </div>
-        {!loading && !user && children}
+        <div className="w-full max-w-2xl">
+          {children}
+        </div>
     </div>
   );
 }

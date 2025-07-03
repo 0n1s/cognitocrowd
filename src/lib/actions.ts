@@ -320,6 +320,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             dailyCompletedCount: 0,
             lastCompletionReset: now,
             accountExpiresAt: expiryTimestamp,
+            onboardingStatus: 'pending',
         });
         
         return { success: true };
@@ -635,21 +636,6 @@ export async function updateUserPhotoURL(userId: string, photoURL: string) {
         return { success: true, message: 'Your profile picture has been updated.' };
     } catch (error) {
         console.error("Error updating user photo URL in DB:", error);
-        const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
-    }
-}
-
-export async function markOnboardingAsCompleted(userId: string) {
-    if (!db) return { success: false, message: "Database not configured." };
-
-    try {
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, { onboardingCourseCompleted: true });
-        revalidatePath('/dashboard');
-        return { success: true, message: "Onboarding completed." };
-    } catch (error) {
-        console.error("Error marking onboarding as completed:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }

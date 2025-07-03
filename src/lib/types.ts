@@ -59,7 +59,7 @@ export type User = {
   role?: 'user' | 'admin';
   dailyCompletedCount?: number;
   lastCompletionReset?: any; // Firestore Timestamp
-  onboardingCourseCompleted?: boolean;
+  onboardingStatus?: 'pending' | 'approved' | 'rejected';
   accountExpiresAt?: any; // Firestore Timestamp
 };
 
@@ -114,22 +114,12 @@ export type PaymentMethod = {
   name: string;
 };
 
-export type OnboardingStep = {
-  id: string;
-  title: string;
-  content: string;
-};
-
 export type AppSettings = {
   id?: 'main';
   paymentMethods: PaymentMethod[];
   depositMethods: PaymentMethod[];
   withdrawalScheduleInfo: string;
   withdrawalDays?: string[];
-  onboardingCourseEnabled?: boolean;
-  onboardingCourseTitle?: string;
-  onboardingCourseDescription?: string;
-  onboardingCourseSteps?: OnboardingStep[];
   defaultGenAiModel?: string;
 };
 

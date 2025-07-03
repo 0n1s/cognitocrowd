@@ -6,12 +6,11 @@ import Link from 'next/link';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getTasks, getUserData, getPackage, getAppSettings } from '@/lib/database';
+import { getTasks, getUserData, getPackage } from '@/lib/database';
 import { ArrowRight, Award, CheckCircle, Repeat } from 'lucide-react';
-import { Task, Package, User, AppSettings } from '@/lib/types';
+import { Task, Package, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
-import { OnboardingCourseCard } from './onboarding-course';
 import { cn } from '@/lib/utils';
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => (
@@ -139,8 +138,6 @@ const FREE_TIER_DAILY_LIMIT = 50;
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userStats, setUserStats] = useState<UserStatsData | null>(null);
-  const [userData, setUserData] = useState<User | null>(null);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -149,15 +146,12 @@ export default function DashboardPage() {
       if (!user) return;
       setLoading(true);
       try {
-        const [fetchedTasks, fetchedUserData, fetchedSettings] = await Promise.all([
+        const [fetchedTasks, fetchedUserData] = await Promise.all([
             getTasks(user.uid),
             getUserData(user.uid),
-            getAppSettings()
         ]);
         
         setTasks(fetchedTasks);
-        setUserData(fetchedUserData);
-        setSettings(fetchedSettings);
 
         if (fetchedUserData) {
             let userPackage: Package | null = null;
@@ -195,12 +189,6 @@ export default function DashboardPage() {
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       <p className="text-muted-foreground mt-1">An overview of your contributions and available tasks.</p>
       
-      {!loading && settings && userData && settings.onboardingCourseEnabled && !userData.onboardingCourseCompleted && (
-        <div className="my-8">
-          <OnboardingCourseCard settings={settings} />
-        </div>
-      )}
-
       <div className="mt-8">
         <h2 className="text-2xl font-bold font-headline mb-4">Your Stats</h2>
         <UserStats stats={userStats} loading={loading} />

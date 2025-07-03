@@ -1,4 +1,5 @@
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit } from './types';
@@ -244,14 +245,6 @@ export async function getAppSettings(): Promise<AppSettings> {
         depositMethods: [{ id: uuidv4(), name: 'Plisio (Crypto)' }],
         withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.',
         withdrawalDays: [],
-        onboardingCourseEnabled: false,
-        onboardingCourseTitle: 'Welcome to Trainly!',
-        onboardingCourseDescription: 'Learn how to get started with our platform.',
-        onboardingCourseSteps: [
-            { id: uuidv4(), title: 'Step 1: The Dashboard', content: 'Your dashboard is your central hub. Here you can see your stats and find available contributions.' },
-            { id: uuidv4(), title: 'Step 2: Complete Contributions', content: 'Navigate to the Contributions page to find tasks. Complete them to earn points.' },
-            { id: uuidv4(), title: 'Step 3: Earn & Redeem', content: 'Your points translate to real earnings. Visit the Wallet and Redeem pages to manage your funds.' },
-        ],
         defaultGenAiModel: 'googleai/gemini-2.0-flash',
     };
 
