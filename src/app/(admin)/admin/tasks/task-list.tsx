@@ -197,7 +197,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; o
         points,
         type: taskType,
         options: taskType.includes('choice') || taskType.includes('ranking') || taskType.includes('classification') ? options.filter(o => o.trim() !== '') : [],
-        expertise: expertise,
+        expertise: expertise === "general" ? undefined : expertise,
     });
     
     if (result.success) {
@@ -509,6 +509,7 @@ const getOptionText = (option: TaskOption): string => {
 
 function TaskPreview({ task }: { task: Task }) {
   const getRankedItems = (task: Task) => task.options?.map(opt => getOptionText(opt)) ?? [];
+  const noOptionsMessage = <p className="text-muted-foreground text-center p-4 border rounded-md">No options have been configured for this contribution.</p>;
 
   switch (task.type) {
     case 'open_text_feedback':
@@ -518,6 +519,7 @@ function TaskPreview({ task }: { task: Task }) {
     case 'classification':
     case 'sentiment':
     case 'topic_classification':
+      if (!task.options || task.options.length === 0) return noOptionsMessage;
       return (
         <RadioGroup disabled>
           {task.options?.map((option, index) => (
@@ -530,9 +532,11 @@ function TaskPreview({ task }: { task: Task }) {
       );
 
     case 'ranking':
+      const rankedItems = getRankedItems(task);
+      if (rankedItems.length === 0) return noOptionsMessage;
       return (
         <div className="space-y-2">
-          {getRankedItems(task).map((item, index) => (
+          {rankedItems.map((item, index) => (
             <div key={index} className="flex items-center p-3 border rounded-md bg-muted">
               <span className="font-bold mr-4 text-muted-foreground">{index + 1}</span>
               <span>{item}</span>
@@ -564,6 +568,7 @@ function TaskPreview({ task }: { task: Task }) {
       );
     
     case 'compare_pairwise':
+       if (!task.options || task.options.length === 0) return noOptionsMessage;
       return (
         <RadioGroup disabled className="space-y-4">
           {task.options?.map((option, index) => {
@@ -582,6 +587,7 @@ function TaskPreview({ task }: { task: Task }) {
       );
 
     case 'label_multiple':
+      if (!task.options || task.options.length === 0) return noOptionsMessage;
       return (
         <div className="space-y-2">
           {task.options?.map((option, index) => (
