@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -31,7 +31,7 @@ function TestGenerator() {
     const [timeLeft, setTimeLeft] = useState(TEST_DURATION_SECONDS);
     const [error, setError] = useState<string | null>(null);
 
-    const expertise = searchParams.getAll("expertise");
+    const expertise = useMemo(() => searchParams.getAll("expertise"), [searchParams]);
 
     // Get browser fingerprint
     useEffect(() => {
@@ -46,7 +46,6 @@ function TestGenerator() {
     useEffect(() => {
         if (expertise.length === 0) {
             setError("No expertise was selected. Please go back.");
-            toast({ title: "No Expertise Found", description: "Please go back and select your areas of expertise.", variant: "destructive" });
             setIsLoading(false);
             return;
         }
@@ -58,18 +57,16 @@ function TestGenerator() {
                         setQuestions(data.questions);
                     } else {
                         setError(data.message || "An unknown error occurred.");
-                        toast({ title: "Failed to start test", description: data.message, variant: "destructive" });
                     }
                 })
                 .catch(err => {
                     setError(err.message);
-                    toast({ title: "Failed to start test", description: err.message, variant: "destructive" });
                 })
                 .finally(() => {
                     setIsLoading(false);
                 });
         }
-    }, [user, expertise, router, toast]);
+    }, [user, expertise]);
 
     // Timer logic
     useEffect(() => {
@@ -148,7 +145,7 @@ function TestGenerator() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">{error}</p>
-                    <p className="text-muted-foreground mt-2">Please contact an administrator or try again later.</p>
+                    <p className="text-muted-foreground mt-2">This usually happens if an administrator has not yet created a test for the selected expertise.</p>
                      <Button variant="outline" className="mt-4" onClick={() => router.push('/onboarding/expertise')}>Go Back</Button>
                 </CardContent>
             </Card>
