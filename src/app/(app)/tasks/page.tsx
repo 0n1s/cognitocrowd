@@ -30,7 +30,11 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
         <Card key={task.id} className="flex flex-col">
           <CardHeader className="flex-grow">
             <div className="flex justify-between items-start">
-              <CardTitle className="text-lg truncate">{task.title}</CardTitle>
+              <CardTitle className="text-lg">
+                {task.title.length > 25
+                  ? `${task.title.substring(0, 25)}...`
+                  : task.title}
+              </CardTitle>
               <Badge variant={task.difficulty === 'Easy' ? 'secondary' : task.difficulty === 'Medium' ? 'outline' : 'default'}
                 className={cn(
                   'px-1.5 py-0 text-xxs',
