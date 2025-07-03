@@ -24,9 +24,6 @@ function LogoutLogic() {
           case 'user_data_not_found':
               message = 'Your user data could not be found. For your security, you will be logged out.';
               break;
-          case 'invalid_account_status':
-              message = 'Your account has an invalid status. For your security, you will be logged out.';
-              break;
           default:
               message = 'You are being logged out.';
               break;

@@ -158,7 +158,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 break;
             default:
                 // Fallback for any other state is to log out to prevent loops.
-                router.push('/logout?reason=invalid_account_status');
+                router.push('/logout?reason=user_data_not_found');
                 break;
         }
     }
