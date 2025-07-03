@@ -46,8 +46,8 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
             </div>
           </CardHeader>
           <CardFooter>
-            <Button asChild size="sm" className="w-full">
-              <Link href={`/tasks/${task.id}`}>Start Contribution <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            <Button asChild size="sm" variant="outline" className="w-full">
+              <Link href={`/tasks/${task.id}`}>Contribute <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </CardFooter>
         </Card>
