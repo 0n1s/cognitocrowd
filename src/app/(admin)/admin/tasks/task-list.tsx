@@ -82,6 +82,25 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const handleCopyError = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        toast({
+          title: "Copied!",
+          description: "Error details have been copied to your clipboard.",
+        });
+      },
+      (err) => {
+        toast({
+          title: "Copy Failed",
+          description: "Could not copy error to clipboard.",
+          variant: "destructive",
+        });
+        console.error("Failed to copy text: ", err);
+      }
+    );
+  };
+
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options];
     newOptions[index] = value;
@@ -118,8 +137,25 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps
             setOptions(stringOptions.length > 0 ? stringOptions : ['']);
         }
     } catch (e) {
-        console.error(e);
-        toast({ title: "AI Generation Failed", description: "Could not generate contribution content.", variant: "destructive" });
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        toast({
+            title: "AI Generation Failed",
+            variant: "destructive",
+            duration: Infinity,
+            description: (
+                <div className="w-full">
+                    <div className="flex justify-start items-center gap-4 mb-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleCopyError(errorMessage)}>
+                            <Clipboard className="mr-2 h-4 w-4" /> Copy
+                        </Button>
+                        <p>The AI model returned an error:</p>
+                    </div>
+                    <pre className="mt-1 w-full rounded-md bg-destructive/20 p-2 font-mono text-sm text-destructive-foreground whitespace-pre-wrap">
+                        {errorMessage}
+                    </pre>
+                </div>
+            )
+        });
     } finally {
         setIsGenerating(false);
     }
