@@ -76,35 +76,37 @@ export function OnboardingCourseCard({ settings }: { settings: AppSettings }) {
                             Follow these steps to get familiar with the platform.
                         </DialogDescription>
                     </DialogHeader>
-                    <Carousel className="w-full" setApi={setApi}>
-                        <CarouselContent>
-                            {(settings.onboardingCourseSteps || []).map((step, index) => (
-                                <CarouselItem key={step.id}>
+                    <div className="relative px-12 py-4">
+                        <Carousel className="w-full" setApi={setApi}>
+                            <CarouselContent>
+                                {(settings.onboardingCourseSteps || []).map((step, index) => (
+                                    <CarouselItem key={step.id}>
+                                        <div className="p-1">
+                                            <div className="p-6 border rounded-lg h-56 flex flex-col justify-center">
+                                                <h3 className="text-lg font-semibold mb-2">Step {index + 1}: {step.title.replace(/^Step \d+: /i, '')}</h3>
+                                                <p className="text-muted-foreground">{step.content}</p>
+                                            </div>
+                                        </div>
+                                    </CarouselItem>
+                                ))}
+                                <CarouselItem>
                                     <div className="p-1">
-                                        <div className="p-6 border rounded-lg h-56 flex flex-col justify-center">
-                                            <h3 className="text-lg font-semibold mb-2">Step {index + 1}: {step.title}</h3>
-                                            <p className="text-muted-foreground">{step.content}</p>
+                                        <div className="p-6 border rounded-lg h-56 flex flex-col justify-center items-center text-center">
+                                            <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                                            <h3 className="text-lg font-semibold">You're All Set!</h3>
+                                            <p className="text-muted-foreground mt-2">Click below to complete the onboarding and start your journey.</p>
+                                            <Button className="mt-4" onClick={handleComplete} disabled={isCompleting}>
+                                                {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Complete Onboarding
+                                            </Button>
                                         </div>
                                     </div>
                                 </CarouselItem>
-                            ))}
-                             <CarouselItem>
-                                <div className="p-1">
-                                    <div className="p-6 border rounded-lg h-56 flex flex-col justify-center items-center text-center">
-                                        <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                                        <h3 className="text-lg font-semibold">You're All Set!</h3>
-                                        <p className="text-muted-foreground mt-2">Click below to complete the onboarding and start your journey.</p>
-                                        <Button className="mt-4" onClick={handleComplete} disabled={isCompleting}>
-                                            {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            Complete Onboarding
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CarouselItem>
-                        </CarouselContent>
-                        <CarouselPrevious />
-                        <CarouselNext />
-                    </Carousel>
+                            </CarouselContent>
+                            <CarouselPrevious />
+                            <CarouselNext />
+                        </Carousel>
+                    </div>
                     <div className="flex justify-center mt-2">
                         <p className="text-sm text-muted-foreground">
                             Step {api?.selectedScrollSnap() ? api.selectedScrollSnap() + 1 : 1} of {totalSteps}
