@@ -7,7 +7,7 @@ export type TaskOption =
 export interface LikertScale {
   min: number;
   max: number;
-  labels: { [key: number]: string };
+  labels: { value: number; label: string; }[];
 }
 
 export interface TaskSettings {

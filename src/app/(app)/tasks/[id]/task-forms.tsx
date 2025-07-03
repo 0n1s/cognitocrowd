@@ -208,11 +208,15 @@ export function TaskForms({ task }: { task: Task }) {
       case "likert_scale":
         if (!task.scale) return <p>Task configuration error.</p>;
         const scaleOptions = Array.from({ length: task.scale.max - task.scale.min + 1 }, (_, i) => task.scale.min + i);
+        
+        const minLabel = task.scale.labels.find(l => l.value === task.scale.min)?.label || task.scale.min.toString();
+        const maxLabel = task.scale.labels.find(l => l.value === task.scale.max)?.label || task.scale.max.toString();
+
         formContent = (
             <>
                 <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
-                    <span>{task.scale.labels[task.scale.min]}</span>
-                    <span>{task.scale.labels[task.scale.max]}</span>
+                    <span>{minLabel}</span>
+                    <span>{maxLabel}</span>
                 </div>
                 <RadioGroup name="likert" required className="flex justify-between items-center bg-muted p-2 rounded-lg">
                     {scaleOptions.map(value => (

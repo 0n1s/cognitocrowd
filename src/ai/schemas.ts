@@ -9,7 +9,10 @@ const TaskOptionSchema = z.union([
 const LikertScaleSchema = z.object({
   min: z.number().int().describe("The minimum value of the scale."),
   max: z.number().int().describe("The maximum value of the scale."),
-  labels: z.record(z.string()).describe("Labels for the scale values, e.g., {'1': 'Strongly Disagree', '5': 'Strongly Agree'}"),
+  labels: z.array(z.object({
+      value: z.number().int().describe("The numeric value for the label."),
+      label: z.string().describe("The text label for the value.")
+  })).describe("An array of labels for specific scale values, e.g., [{value: 1, label: 'Strongly Disagree'}, {value: 5, label: 'Strongly Agree'}]"),
 }).describe("Configuration for a Likert scale contribution.");
 
 const TaskSettingsSchema = z.object({
