@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -40,7 +40,7 @@ export function SettingsForm() {
 
     const profileForm = useForm<z.infer<typeof profileFormSchema>>({
         resolver: zodResolver(profileFormSchema),
-        defaultValues: { name: user?.displayName || "" },
+        defaultValues: { name: "" },
     });
 
     const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
@@ -49,9 +49,11 @@ export function SettingsForm() {
     });
 
     // Update form default value when user loads
-    if (user && profileForm.getValues().name !== user.displayName) {
-        profileForm.reset({ name: user.displayName || "" });
-    }
+    useEffect(() => {
+        if (user) {
+            profileForm.reset({ name: user.displayName || "" });
+        }
+    }, [user, profileForm]);
 
     const onProfileSubmit = async (values: z.infer<typeof profileFormSchema>) => {
         if (!user || !auth?.currentUser) {
