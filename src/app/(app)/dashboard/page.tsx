@@ -12,6 +12,7 @@ import { Task, Package, User, AppSettings } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { OnboardingCourseCard } from './onboarding-course';
+import { cn } from '@/lib/utils';
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => (
     <Card>
@@ -89,7 +90,10 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
             <div className="flex justify-between items-start">
               <CardTitle className="text-lg truncate">{task.title}</CardTitle>
               <Badge variant={task.difficulty === 'Easy' ? 'secondary' : task.difficulty === 'Medium' ? 'outline' : 'default'}
-                className={task.difficulty === 'Hard' ? `bg-destructive/80 text-destructive-foreground` : ''}
+                className={cn(
+                  'px-1.5 py-0 text-xxs',
+                  task.difficulty === 'Hard' && 'bg-destructive/80 text-destructive-foreground'
+                )}
               >
                 {task.difficulty}
               </Badge>

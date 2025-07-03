@@ -21,6 +21,9 @@ export default {
         headline: ['Roboto', 'sans-serif'],
         code: ['monospace'],
       },
+      fontSize: {
+        'xxs': '0.65rem',
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

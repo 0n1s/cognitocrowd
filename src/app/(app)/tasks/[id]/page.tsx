@@ -11,6 +11,7 @@ import type { Task } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 function LoadingSkeleton() {
     return (
@@ -92,7 +93,10 @@ export default function TaskPage() {
           <div className="flex justify-between items-start mb-2">
             <CardTitle className="text-3xl font-headline">{task.title}</CardTitle>
             <Badge variant={task.difficulty === 'Easy' ? 'secondary' : task.difficulty === 'Medium' ? 'outline' : 'default'}
-              className={task.difficulty === 'Hard' ? `bg-destructive/80 text-destructive-foreground` : ''}
+              className={cn(
+                'px-1.5 py-0 text-xxs',
+                task.difficulty === 'Hard' && 'bg-destructive/80 text-destructive-foreground'
+              )}
             >
               {task.difficulty}
             </Badge>
