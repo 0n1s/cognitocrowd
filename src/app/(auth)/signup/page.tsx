@@ -46,7 +46,8 @@ export default function SignupPage() {
         title: "Account Created!",
         description: "You have been successfully signed up.",
       });
-      router.push('/onboarding/welcome');
+      // The (auth) layout will now handle the redirect to the correct page.
+      // No router.push() needed here.
     } catch (error: any) {
       console.error('Signup error:', error);
       let description = "An unexpected error occurred. Please try again.";

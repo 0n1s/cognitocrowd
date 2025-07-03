@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserData } from "@/lib/database";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 export default function OnboardingLayout({
   children,
@@ -14,29 +14,36 @@ export default function OnboardingLayout({
   children: React.ReactNode;
 }) {
   const { user, loading: authLoading } = useAuth();
-  const [status, setStatus] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
   const router = useRouter();
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push('/login');
-      setStatus('unauthorized');
+    // Wait for the authentication state to be determined.
+    if (authLoading) {
       return;
     }
 
-    async function checkStatus() {
-        const userData = await getUserData(user!.uid);
-        if (userData?.onboardingStatus === 'approved') {
-            router.push('/dashboard');
-        } else {
-            setStatus('authorized');
-        }
+    // If there is no user, they must log in.
+    if (!user) {
+      router.push('/login');
+      return;
     }
-    checkStatus();
+
+    // If there is a user, check their application status.
+    getUserData(user.uid).then(userData => {
+      // If the user has already been approved, they don't need to be here.
+      // Redirect them to the main application dashboard.
+      if (userData?.onboardingStatus === 'approved') {
+        router.push('/dashboard');
+      }
+      // Otherwise, if their status is 'pending', 'rejected', or undefined,
+      // we allow them to stay on the onboarding pages to complete the process.
+    });
+
   }, [user, authLoading, router]);
 
-  if (status === 'loading' || status === 'unauthorized') {
+  // While authentication is loading or we're waiting for the redirect to happen,
+  // show a loading spinner.
+  if (authLoading || !user) {
      return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -44,6 +51,7 @@ export default function OnboardingLayout({
     );
   }
 
+  // Once we've confirmed the user is logged in and not yet approved, show the onboarding content.
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <div className="absolute top-4 left-4">
