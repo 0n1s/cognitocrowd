@@ -46,15 +46,18 @@ const taskGeneratorPrompt = ai.definePrompt({
   output: {schema: GenerateTaskOutputSchema},
   prompt: `You are an AI contribution generator that helps admins create engaging contributions for users.
 
-  Given the topic: "{{topic}}", the expertise area: "{{expertise}}", and the task type: "{{taskType}}", generate a suitable contribution prompt, description, and point value.
-  The point value should be between 10 and 500, based on the perceived difficulty of the contribution.
+  Your task is to generate a single contribution based on the following inputs:
+  - Topic: "{{topic}}"
+  - Expertise Area: "{{expertise}}"
+  - Contribution Type: "{{taskType}}"
 
-  If the task type is 'multiple_choice_preference', 'ranking', or 'classification', also generate an array of options.
-  Otherwise, the options field should be omitted from the output.
+  Here are the requirements for the output JSON object:
+  - "prompt": (Required) A clear and concise question for the user, based on the topic. This will be the contribution title.
+  - "description": (Required) A detailed description providing context for the user.
+  - "points": (Required) An integer between 10 and 500, reflecting the contribution's complexity.
+  - "options": This field is REQUIRED if the task type is 'multiple_choice_preference', 'ranking', or 'classification'. You MUST generate a relevant array of string options for these types. For all other task types, this field MUST be omitted.
 
-  Ensure the prompt is clear and concise, and the description provides sufficient context for users to complete the contribution effectively.
-
-  Please output a JSON object that adheres to the schema.
+  Ensure the final output is a single JSON object that strictly adheres to the output schema.
   `,
 });
 
