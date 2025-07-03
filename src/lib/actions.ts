@@ -60,7 +60,6 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
         return { success: false, message: 'Database not configured. Please check your environment variables.' };
     }
     
-    // Let errors from the AI flow be thrown and caught by the client
     const generatedData = await bulkGenerateTasks({
         count: data.count,
         expertise: data.expertise,
@@ -80,12 +79,15 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
         const taskToAdd: any = {
             title: task.prompt,
             description: task.description,
-            points: task.points || 100, // Default points
+            points: task.points || 100,
             type: task.taskType,
             status: 'Active',
-            difficulty: 'Medium', // Default difficulty
-            expertise: task.expertise === 'General' ? undefined : task.expertise,
+            difficulty: 'Medium',
         };
+
+        if (task.expertise && task.expertise !== 'General') {
+            taskToAdd.expertise = task.expertise;
+        }
 
         if (task.options) taskToAdd.options = task.options;
         if (task.scale) taskToAdd.scale = task.scale;
