@@ -27,7 +27,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
     <div className="grid gap-6 mt-8 sm:grid-cols-2 lg:grid-cols-3">
       {tasks.map((task) => (
         <Card key={task.id} className="flex flex-col">
-          <CardHeader>
+          <CardHeader className="flex-grow">
             <div className="flex justify-between items-start">
               <CardTitle className="text-lg">{task.title}</CardTitle>
               <Badge variant={task.difficulty === 'Easy' ? 'secondary' : task.difficulty === 'Medium' ? 'outline' : 'default'}
@@ -37,9 +37,6 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="flex-grow">
-            <div className="text-xl font-bold text-primary">${(task.points / 100).toFixed(2)}</div>
-          </CardContent>
           <CardFooter>
             <Button asChild className="w-full">
               <Link href={`/tasks/${task.id}`}>Start Contribution <ArrowRight className="ml-2 h-4 w-4" /></Link>
