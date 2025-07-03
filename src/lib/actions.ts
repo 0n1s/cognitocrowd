@@ -1,13 +1,15 @@
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
-import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit } from "@/lib/types";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
+import { generateQualificationTest, evaluateQualificationTest, type GenerateTestOutput } from "@/ai/flows/ai-qualification-test";
 import { v4 as uuidv4 } from "uuid";
 import { getMostRecentChat, getAppSettings } from './database';
 
@@ -741,24 +743,46 @@ export async function updateUserExpertise(userId: string, data: { expertise: str
     }
 }
 
-export async function submitQualificationTest(userId: string, formData: FormData) {
+export async function generateTestForUser(expertise: string[]): Promise<GenerateTestOutput> {
+    if (!expertise || expertise.length === 0) {
+        throw new Error("Expertise is required to generate a test.");
+    }
+    try {
+        const test = await generateQualificationTest({ expertise });
+        return test;
+    } catch (error) {
+        console.error("Error generating qualification test:", error);
+        throw new Error("Failed to generate a qualification test. Please try again.");
+    }
+}
+
+export async function submitQualificationTest(userId: string, questions: QualificationQuestion[], userAnswers: Record<number, string>, expertise: string[]) {
     if (!db) {
         return { success: false, message: 'Database not configured.' };
     }
     try {
         const userDocRef = doc(db, 'users', userId);
+
+        const submissions = questions.map((q, index) => ({
+            question: q.question,
+            userAnswer: userAnswers[index],
+            correctAnswer: q.answer,
+        }));
         
-        const submission: Record<string, any> = {};
-        formData.forEach((value, key) => {
-            submission[key] = value;
-        });
+        // Call AI to evaluate
+        const evaluation = await evaluateQualificationTest({ submissions, expertise });
 
         await updateDoc(userDocRef, {
-            qualificationSubmission: submission,
+            qualificationSubmission: submissions,
             qualificationTestSubmittedAt: Timestamp.now(),
+            qualificationScore: evaluation.score,
+            qualificationFeedback: evaluation.feedback,
+            qualificationResults: {
+                correctCount: evaluation.correctCount,
+                totalCount: evaluation.totalCount,
+            }
         });
 
-        // The user's onboardingStatus remains 'pending' until an admin reviews it.
         revalidatePath(`/onboarding/test`);
         return { success: true, message: 'Your test has been submitted for review.' };
     } catch (error) {

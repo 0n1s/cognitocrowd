@@ -1,5 +1,6 @@
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -46,6 +47,12 @@ export interface Task {
   status?: 'Active' | 'Archived';
 };
 
+export type QualificationQuestion = {
+  question: string;
+  options: string[];
+  answer: string;
+};
+
 export type User = {
   id: string;
   name: string;
@@ -66,6 +73,9 @@ export type User = {
   expertise?: string[];
   qualificationTestSubmittedAt?: any;
   qualificationSubmission?: Record<string, any>;
+  qualificationScore?: number;
+  qualificationFeedback?: string;
+  qualificationResults?: { correctCount: number; totalCount: number; };
 };
 
 export type AdminUser = User & {
