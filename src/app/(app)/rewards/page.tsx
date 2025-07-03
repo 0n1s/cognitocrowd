@@ -92,7 +92,7 @@ export default function RewardsPage() {
               <TableRow>
                 <TableHead>Contribution</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Points Earned</TableHead>
+                <TableHead className="text-right">Earnings</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -101,7 +101,7 @@ export default function RewardsPage() {
                     <TableRow key={task.id}>
                     <TableCell className="font-medium">{task.title}</TableCell>
                     <TableCell>{task.type}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary">+{task.points}</TableCell>
+                    <TableCell className="text-right font-semibold text-primary">+${(task.points / 100).toFixed(2)}</TableCell>
                     </TableRow>
                 ))
               ) : (

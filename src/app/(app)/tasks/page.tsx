@@ -38,7 +38,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
             </div>
           </CardHeader>
           <CardContent className="flex-grow">
-            <div className="text-2xl font-bold text-primary">{task.points} Points</div>
+            <div className="text-2xl font-bold text-primary">${(task.points / 100).toFixed(2)}</div>
           </CardContent>
           <CardFooter>
             <Button asChild className="w-full">

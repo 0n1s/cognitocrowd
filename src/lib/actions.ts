@@ -100,6 +100,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
     }
 
     let newResponseId: string | undefined;
+    const earningsToAdd = points / 100; // 100 points = $1
 
     try {
         await runTransaction(db, async (transaction) => {
@@ -170,7 +171,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
 
             // 4. Update user stats and create response document in transaction
             const currentEarnings = userData.earningsBalance || 0;
-            const newEarnings = currentEarnings + points;
+            const newEarnings = currentEarnings + earningsToAdd;
             const newCompletedTasks = [...completedTasks, taskId];
             const newDailyCount = dailyCount + 1;
 
@@ -187,7 +188,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
             transaction.set(newResponseRef, {
                 userId,
                 taskId,
-                pointsEarned: points,
+                pointsEarned: points, // Keep storing points in the response doc
                 submittedAt: Timestamp.now(),
                 responseData,
             });
@@ -220,7 +221,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
         revalidatePath(`/tasks/${taskId}`);
         revalidatePath('/rewards');
         revalidatePath('/wallet');
-        return { success: true, points };
+        return { success: true, earnings: earningsToAdd };
 
     } catch (error) {
         console.error("Error submitting task response:", error);

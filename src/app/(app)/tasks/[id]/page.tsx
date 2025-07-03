@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -96,7 +97,7 @@ export default function TaskPage() {
               {task.difficulty}
             </Badge>
           </div>
-          <p className="text-xl font-semibold text-primary">{task.points} Points</p>
+          <p className="text-xl font-semibold text-primary">${(task.points / 100).toFixed(2)}</p>
           <CardDescription className="text-base pt-2">{task.description}</CardDescription>
         </CardHeader>
         <CardContent>
