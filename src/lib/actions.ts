@@ -4,6 +4,7 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -836,23 +837,33 @@ export async function generateAndSaveQualificationTest(expertise: string) {
         return { success: false, message: 'Database not configured.' };
     }
     try {
-        const test = await generateQualificationTest({ expertise: [expertise] });
-        if (!test || !test.questions) {
+        const newQuestionsData = await generateQualificationTest({ expertise: [expertise] });
+        if (!newQuestionsData || !newQuestionsData.questions) {
             throw new Error("AI failed to generate questions.");
         }
         
         const testDocRef = doc(db, 'qualification_tests', expertise);
-        
-        const testData: Omit<QualificationTest, 'id'> = {
-            expertise,
-            questions: test.questions,
-            createdAt: Timestamp.now()
-        };
+        const docSnap = await getDoc(testDocRef);
 
-        await setDoc(testDocRef, testData);
+        let message = '';
+
+        if (docSnap.exists()) {
+            const existingData = docSnap.data() as QualificationTest;
+            const updatedQuestions = [...existingData.questions, ...newQuestionsData.questions];
+            await updateDoc(testDocRef, { questions: updatedQuestions });
+            message = `Added ${newQuestionsData.questions.length} more questions to the ${expertise} test.`;
+        } else {
+            const testData: Omit<QualificationTest, 'id'> = {
+                expertise,
+                questions: newQuestionsData.questions,
+                createdAt: Timestamp.now()
+            };
+            await setDoc(testDocRef, testData);
+            message = `Test for ${expertise} generated successfully.`;
+        }
 
         revalidatePath('/admin/qualifications');
-        return { success: true, message: `Test for ${expertise} generated.` };
+        return { success: true, message };
     } catch (error) {
         console.error("Error generating and saving qualification test:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { getQualificationTestStatuses } from "@/lib/database";
+import { getQualificationTestsSummary } from "@/lib/database";
 import { generateAndSaveQualificationTest } from "@/lib/actions";
 import { Wand2, Loader2, CheckCircle, XCircle } from "lucide-react";
 
@@ -30,6 +30,7 @@ const LoadingSkeleton = () => (
             <TableRow>
               <TableHead>Expertise Area</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Question Count</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
         </TableHeader>
@@ -38,7 +39,8 @@ const LoadingSkeleton = () => (
                 <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-10 w-36" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-10 w-40" /></TableCell>
                 </TableRow>
             ))}
         </TableBody>
@@ -48,17 +50,17 @@ const LoadingSkeleton = () => (
 
 export function TestList() {
     const { toast } = useToast();
-    const [statuses, setStatuses] = useState<Record<string, boolean>>({});
+    const [summaries, setSummaries] = useState<Record<string, { questionCount: number }>>({});
     const [loading, setLoading] = useState(true);
     const [generatingExpertise, setGeneratingExpertise] = useState<string | null>(null);
 
-    const fetchStatuses = async () => {
+    const fetchSummaries = async () => {
         setLoading(true);
         try {
-            const fetchedStatuses = await getQualificationTestStatuses();
-            setStatuses(fetchedStatuses);
+            const fetchedSummaries = await getQualificationTestsSummary();
+            setSummaries(fetchedSummaries);
         } catch (error) {
-            console.error("Failed to fetch test statuses:", error);
+            console.error("Failed to fetch test summaries:", error);
             toast({ title: "Error", description: "Could not load test statuses.", variant: "destructive" });
         } finally {
             setLoading(false);
@@ -66,7 +68,7 @@ export function TestList() {
     };
 
     useEffect(() => {
-        fetchStatuses();
+        fetchSummaries();
     }, []);
 
     const handleGenerate = async (expertise: string) => {
@@ -74,8 +76,8 @@ export function TestList() {
         try {
             const result = await generateAndSaveQualificationTest(expertise);
             if (result.success) {
-                toast({ title: "Success", description: `Test for ${expertise} has been generated and saved.`});
-                await fetchStatuses(); // Refresh the list
+                toast({ title: "Success", description: result.message});
+                await fetchSummaries(); // Refresh the list
             } else {
                 toast({ title: "Error", description: result.message, variant: "destructive" });
             }
@@ -101,15 +103,20 @@ export function TestList() {
                             <TableRow>
                                 <TableHead>Expertise Area</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Question Count</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {EXPERTISE_AREAS.map(expertise => (
+                            {EXPERTISE_AREAS.map(expertise => {
+                                const summary = summaries[expertise];
+                                const hasTest = !!summary;
+                                
+                                return (
                                 <TableRow key={expertise}>
                                     <TableCell className="font-medium">{expertise}</TableCell>
                                     <TableCell>
-                                        {statuses[expertise] ? (
+                                        {hasTest ? (
                                             <Badge variant="secondary" className="text-green-600 border-green-200 bg-green-50">
                                                 <CheckCircle className="mr-1 h-3 w-3" /> Generated
                                             </Badge>
@@ -119,6 +126,7 @@ export function TestList() {
                                             </Badge>
                                         )}
                                     </TableCell>
+                                    <TableCell className="font-medium">{summary?.questionCount || 0}</TableCell>
                                     <TableCell className="text-right">
                                         <Button 
                                             variant="outline"
@@ -131,11 +139,11 @@ export function TestList() {
                                             ) : (
                                                 <Wand2 className="mr-2 h-4 w-4" />
                                             )}
-                                            {statuses[expertise] ? 'Regenerate Test' : 'Generate Test'}
+                                            {hasTest ? 'Add 10 Questions' : 'Generate Test'}
                                         </Button>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
                 )}

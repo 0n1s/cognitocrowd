@@ -1,6 +1,7 @@
 
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
@@ -368,18 +369,19 @@ export async function getAdminUserDetail(userId: string) {
 }
 
 
-export async function getQualificationTestStatuses(): Promise<Record<string, boolean>> {
+export async function getQualificationTestsSummary(): Promise<Record<string, { questionCount: number }>> {
     if (!db) return {};
     try {
         const testsCol = collection(db, 'qualification_tests');
         const snapshot = await getDocs(testsCol);
-        const statuses: Record<string, boolean> = {};
+        const summaries: Record<string, { questionCount: number }> = {};
         snapshot.docs.forEach(doc => {
-            statuses[doc.id] = true;
+            const data = doc.data() as QualificationTest;
+            summaries[doc.id] = { questionCount: data.questions?.length || 0 };
         });
-        return statuses;
+        return summaries;
     } catch (error) {
-        console.error("Error fetching qualification test statuses:", error);
+        console.error("Error fetching qualification test summaries:", error);
         return {};
     }
 }
