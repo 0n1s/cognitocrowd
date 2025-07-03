@@ -76,7 +76,7 @@ export function OnboardingCourseCard({ settings }: { settings: AppSettings }) {
                             Follow these steps to get familiar with the platform.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="relative px-8 sm:px-12 py-4">
+                    <div className="relative py-4">
                         <Carousel className="w-full" setApi={setApi}>
                             <CarouselContent>
                                 {(settings.onboardingCourseSteps || []).map((step, index) => (
