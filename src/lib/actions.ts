@@ -3,17 +3,18 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
-import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion } from "@/lib/types";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
-import { generateQualificationTest, evaluateQualificationTest, type GenerateTestOutput } from "@/ai/flows/ai-qualification-test";
+import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { v4 as uuidv4 } from "uuid";
-import { getMostRecentChat, getAppSettings, getUserData } from './database';
+import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest } from './database';
 import { headers } from "next/headers";
 
 
@@ -737,7 +738,6 @@ export async function updateUserExpertise(userId: string, data: { expertise: str
         });
 
         revalidatePath(`/onboarding/expertise`);
-        // In a future step, we might update the onboarding status here.
         return { success: true, message: 'Expertise information saved.' };
     } catch (error) {
         console.error("Error updating user expertise:", error);
@@ -746,33 +746,44 @@ export async function updateUserExpertise(userId: string, data: { expertise: str
     }
 }
 
-export async function generateTestForUser(userId: string, expertise: string[]): Promise<GenerateTestOutput> {
+export async function startUserQualificationTest(userId: string, expertise: string[]): Promise<{ success: boolean; questions?: QualificationQuestion[]; message?: string; }> {
     if (!db) {
-        throw new Error("Database not configured.");
+        return { success: false, message: 'Database not configured.' };
     }
     if (!expertise || expertise.length === 0) {
-        throw new Error("Expertise is required to generate a test.");
+        return { success: false, message: 'Expertise is required to start a test.' };
     }
     
-    const user = await getUserData(userId);
-    if (user?.qualificationQuestions && user.qualificationQuestions.length > 0) {
-        return { questions: user.qualificationQuestions };
-    }
-
     try {
-        const test = await generateQualificationTest({ expertise });
+        const user = await getUserData(userId);
+        if (!user) {
+            return { success: false, message: 'User not found.' };
+        }
+        if (user.qualificationTestSubmittedAt) {
+            return { success: false, message: 'You have already completed the qualification test.' };
+        }
+        if (user.qualificationQuestions && user.qualificationQuestions.length > 0) {
+            return { success: true, questions: user.qualificationQuestions };
+        }
+
+        const selectedExpertise = expertise[0]; // Use the first selected expertise
+        const test = await getQualificationTest(selectedExpertise);
         
-        // Save the generated test to the user's profile
+        if (!test) {
+            return { success: false, message: `A qualification test for "${selectedExpertise}" has not been created by an administrator yet. Please try again later or contact support.` };
+        }
+
         const userDocRef = doc(db, 'users', userId);
         await updateDoc(userDocRef, {
             qualificationQuestions: test.questions,
             qualificationTestGeneratedAt: Timestamp.now(),
         });
 
-        return test;
+        return { success: true, questions: test.questions };
     } catch (error) {
-        console.error("Error generating qualification test:", error);
-        throw new Error("Failed to generate a qualification test. Please try again.");
+        console.error("Error starting qualification test:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
     }
 }
 
@@ -794,10 +805,8 @@ export async function submitQualificationTest(userId: string, questions: Qualifi
             correctAnswer: q.answer,
         }));
         
-        // Call AI to evaluate
         const evaluation = await evaluateQualificationTest({ submissions, expertise });
         
-        // Get IP address from headers
         const ip = headers().get('x-forwarded-for') ?? 'unknown';
 
         await updateDoc(userDocRef, {
@@ -817,6 +826,35 @@ export async function submitQualificationTest(userId: string, questions: Qualifi
         return { success: true, message: 'Your test has been submitted for review.' };
     } catch (error) {
         console.error("Error submitting qualification test:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function generateAndSaveQualificationTest(expertise: string) {
+     if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const test = await generateQualificationTest({ expertise: [expertise] });
+        if (!test || !test.questions) {
+            throw new Error("AI failed to generate questions.");
+        }
+        
+        const testDocRef = doc(db, 'qualification_tests', expertise);
+        
+        const testData: Omit<QualificationTest, 'id'> = {
+            expertise,
+            questions: test.questions,
+            createdAt: Timestamp.now()
+        };
+
+        await setDoc(testDocRef, testData);
+
+        revalidatePath('/admin/qualifications');
+        return { success: true, message: `Test for ${expertise} generated.` };
+    } catch (error) {
+        console.error("Error generating and saving qualification test:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }

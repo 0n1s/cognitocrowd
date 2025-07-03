@@ -9,8 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Clock } from "lucide-react";
-import { submitQualificationTest, generateTestForUser } from "@/lib/actions";
+import { Loader2, Clock, AlertTriangle } from "lucide-react";
+import { submitQualificationTest, startUserQualificationTest } from "@/lib/actions";
 import { QualificationQuestion } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
@@ -29,6 +29,7 @@ function TestGenerator() {
     const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
     const [fingerprint, setFingerprint] = useState<string>('');
     const [timeLeft, setTimeLeft] = useState(TEST_DURATION_SECONDS);
+    const [error, setError] = useState<string | null>(null);
 
     const expertise = searchParams.getAll("expertise");
 
@@ -44,27 +45,35 @@ function TestGenerator() {
 
     useEffect(() => {
         if (expertise.length === 0) {
+            setError("No expertise was selected. Please go back.");
             toast({ title: "No Expertise Found", description: "Please go back and select your areas of expertise.", variant: "destructive" });
-            router.push('/onboarding/expertise');
+            setIsLoading(false);
             return;
         }
 
         if (user) {
-            generateTestForUser(user.uid, expertise)
+            startUserQualificationTest(user.uid, expertise)
                 .then(data => {
-                    setQuestions(data.questions);
-                    setIsLoading(false);
+                    if (data.success && data.questions) {
+                        setQuestions(data.questions);
+                    } else {
+                        setError(data.message || "An unknown error occurred.");
+                        toast({ title: "Failed to start test", description: data.message, variant: "destructive" });
+                    }
                 })
                 .catch(err => {
-                    toast({ title: "Failed to generate test", description: err.message, variant: "destructive" });
-                    router.push('/onboarding/expertise');
+                    setError(err.message);
+                    toast({ title: "Failed to start test", description: err.message, variant: "destructive" });
+                })
+                .finally(() => {
+                    setIsLoading(false);
                 });
         }
     }, [user, expertise, router, toast]);
 
     // Timer logic
     useEffect(() => {
-        if (isLoading || isSubmitting) return;
+        if (isLoading || isSubmitting || error) return;
 
         if (timeLeft <= 0) {
             toast({ title: "Time's up!", description: "Please submit your answers now.", variant: "destructive" });
@@ -76,7 +85,7 @@ function TestGenerator() {
         }, 1000);
 
         return () => clearInterval(timerId);
-    }, [timeLeft, isLoading, isSubmitting, toast]);
+    }, [timeLeft, isLoading, isSubmitting, toast, error]);
 
 
     const formatTime = (seconds: number) => {
@@ -120,11 +129,27 @@ function TestGenerator() {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle className="font-headline text-2xl">Generating Your Qualification Test...</CardTitle>
-                    <CardDescription>Our AI is preparing a personalized test based on your expertise. This may take a moment.</CardDescription>
+                    <CardTitle className="font-headline text-2xl">Preparing Your Qualification Test...</CardTitle>
+                    <CardDescription>This may take a moment.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex justify-center items-center h-48">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (error) {
+         return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline text-2xl text-destructive flex items-center gap-2"><AlertTriangle /> Error</CardTitle>
+                    <CardDescription>Could not start the qualification test.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">{error}</p>
+                    <p className="text-muted-foreground mt-2">Please contact an administrator or try again later.</p>
+                     <Button variant="outline" className="mt-4" onClick={() => router.push('/onboarding/expertise')}>Go Back</Button>
                 </CardContent>
             </Card>
         );
@@ -176,8 +201,8 @@ function TestPageSkeleton() {
     return (
          <Card>
             <CardHeader>
-                <CardTitle className="font-headline text-2xl">Generating Your Qualification Test...</CardTitle>
-                <CardDescription>Our AI is preparing a personalized test based on your expertise. This may take a moment.</CardDescription>
+                <CardTitle className="font-headline text-2xl">Preparing Your Qualification Test...</CardTitle>
+                <CardDescription>This may take a moment.</CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center items-center h-48">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

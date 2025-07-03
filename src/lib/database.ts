@@ -1,8 +1,9 @@
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit } from './types';
+import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -364,4 +365,36 @@ export async function getAdminUserDetail(userId: string) {
         package: userPackage,
         depositHistory,
     };
+}
+
+
+export async function getQualificationTestStatuses(): Promise<Record<string, boolean>> {
+    if (!db) return {};
+    try {
+        const testsCol = collection(db, 'qualification_tests');
+        const snapshot = await getDocs(testsCol);
+        const statuses: Record<string, boolean> = {};
+        snapshot.docs.forEach(doc => {
+            statuses[doc.id] = true;
+        });
+        return statuses;
+    } catch (error) {
+        console.error("Error fetching qualification test statuses:", error);
+        return {};
+    }
+}
+
+export async function getQualificationTest(expertise: string): Promise<QualificationTest | null> {
+    if (!db) return null;
+    try {
+        const testDocRef = doc(db, 'qualification_tests', expertise);
+        const docSnap = await getDoc(testDocRef);
+        if (docSnap.exists()) {
+            return fromDoc<QualificationTest>(docSnap);
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error fetching test for ${expertise}:`, error);
+        return null;
+    }
 }

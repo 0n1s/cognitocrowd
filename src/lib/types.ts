@@ -3,6 +3,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -53,6 +54,13 @@ export type QualificationQuestion = {
   question: string;
   options: string[];
   answer: string;
+};
+
+export type QualificationTest = {
+  id: string; // The expertise name
+  expertise: string;
+  questions: QualificationQuestion[];
+  createdAt: any; // Firestore Timestamp
 };
 
 export type User = {
