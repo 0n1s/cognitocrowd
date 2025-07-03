@@ -2,6 +2,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -72,6 +73,8 @@ export type User = {
   country?: string;
   languages?: string[];
   expertise?: string[];
+  qualificationTestGeneratedAt?: any; // Firestore Timestamp
+  qualificationQuestions?: QualificationQuestion[];
   qualificationTestSubmittedAt?: any;
   qualificationSubmission?: Record<string, any>;
   qualificationScore?: number;

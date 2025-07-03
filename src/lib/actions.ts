@@ -2,6 +2,7 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -12,7 +13,7 @@ import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bu
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { generateQualificationTest, evaluateQualificationTest, type GenerateTestOutput } from "@/ai/flows/ai-qualification-test";
 import { v4 as uuidv4 } from "uuid";
-import { getMostRecentChat, getAppSettings } from './database';
+import { getMostRecentChat, getAppSettings, getUserData } from './database';
 import { headers } from "next/headers";
 
 
@@ -745,12 +746,29 @@ export async function updateUserExpertise(userId: string, data: { expertise: str
     }
 }
 
-export async function generateTestForUser(expertise: string[]): Promise<GenerateTestOutput> {
+export async function generateTestForUser(userId: string, expertise: string[]): Promise<GenerateTestOutput> {
+    if (!db) {
+        throw new Error("Database not configured.");
+    }
     if (!expertise || expertise.length === 0) {
         throw new Error("Expertise is required to generate a test.");
     }
+    
+    const user = await getUserData(userId);
+    if (user?.qualificationQuestions && user.qualificationQuestions.length > 0) {
+        return { questions: user.qualificationQuestions };
+    }
+
     try {
         const test = await generateQualificationTest({ expertise });
+        
+        // Save the generated test to the user's profile
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, {
+            qualificationQuestions: test.questions,
+            qualificationTestGeneratedAt: Timestamp.now(),
+        });
+
         return test;
     } catch (error) {
         console.error("Error generating qualification test:", error);
@@ -762,8 +780,13 @@ export async function submitQualificationTest(userId: string, questions: Qualifi
     if (!db) {
         return { success: false, message: 'Database not configured.' };
     }
+
     try {
         const userDocRef = doc(db, 'users', userId);
+        const user = await getUserData(userId);
+        if (user?.qualificationTestSubmittedAt) {
+            return { success: false, message: 'You have already submitted a qualification test.' };
+        }
 
         const submissions = questions.map((q, index) => ({
             question: q.question,

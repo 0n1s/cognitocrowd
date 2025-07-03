@@ -56,7 +56,7 @@ export default function OnboardingExpertisePage() {
         if (result.success) {
             const params = new URLSearchParams();
             selectedExpertise.forEach(exp => params.append("expertise", exp));
-            router.push(`/onboarding/test?${params.toString()}`);
+            router.push(`/onboarding/test/ready?${params.toString()}`);
         } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
             setIsLoading(false);

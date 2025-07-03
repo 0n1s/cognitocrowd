@@ -43,21 +43,24 @@ function TestGenerator() {
     }, []);
 
     useEffect(() => {
-        if (expertise.length > 0) {
-            generateTestForUser(expertise)
+        if (expertise.length === 0) {
+            toast({ title: "No Expertise Found", description: "Please go back and select your areas of expertise.", variant: "destructive" });
+            router.push('/onboarding/expertise');
+            return;
+        }
+
+        if (user) {
+            generateTestForUser(user.uid, expertise)
                 .then(data => {
                     setQuestions(data.questions);
                     setIsLoading(false);
                 })
                 .catch(err => {
                     toast({ title: "Failed to generate test", description: err.message, variant: "destructive" });
-                    router.back();
+                    router.push('/onboarding/expertise');
                 });
-        } else {
-             toast({ title: "No Expertise Found", description: "Please go back and select your areas of expertise.", variant: "destructive" });
-             router.back();
         }
-    }, []);
+    }, [user, expertise, router, toast]);
 
     // Timer logic
     useEffect(() => {
