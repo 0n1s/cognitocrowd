@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
-import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession } from "@/lib/types";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit } from "@/lib/types";
 import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { v4 as uuidv4 } from "uuid";
@@ -650,6 +650,84 @@ export async function markOnboardingAsCompleted(userId: string) {
         return { success: true, message: "Onboarding completed." };
     } catch (error) {
         console.error("Error marking onboarding as completed:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function purchasePackage(userId: string, packageId: string) {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+
+    try {
+        const packageRef = doc(db, 'packages', packageId);
+        const userRef = doc(db, 'users', userId);
+
+        const packageDocForMessage = await getDoc(packageRef);
+        if (!packageDocForMessage.exists()) {
+             throw new Error("Package not found.");
+        }
+        const pkgName = packageDocForMessage.data().name;
+
+        await runTransaction(db, async (transaction) => {
+            const [packageDoc, userDoc] = await Promise.all([
+                transaction.get(packageRef),
+                transaction.get(userRef)
+            ]);
+
+            if (!packageDoc.exists()) throw new Error("Package not found.");
+            if (!userDoc.exists()) throw new Error("User not found.");
+
+            const pkg = packageDoc.data() as Package;
+            const user = userDoc.data() as User;
+
+            let price = 0;
+            if (pkg.price.toLowerCase() !== 'free' && pkg.price.startsWith('$')) {
+                price = parseFloat(pkg.price.substring(1));
+            }
+
+            const userDepositBalance = user.depositBalance || 0;
+            if (userDepositBalance < price) {
+                throw new Error("Insufficient deposit balance. Please add funds to your wallet.");
+            }
+
+            const currentExpiryTimestamp = user.accountExpiresAt as Timestamp | undefined;
+            const currentExpiry = currentExpiryTimestamp ? currentExpiryTimestamp.toDate() : new Date(0);
+            const now = new Date();
+            const baseDate = currentExpiry > now ? currentExpiry : now;
+
+            const [valueStr, unit] = pkg.expiryPeriod.split(' ');
+            const value = parseInt(valueStr, 10);
+            const newExpiryDate = new Date(baseDate);
+
+            if (unit.startsWith('week')) {
+                newExpiryDate.setDate(newExpiryDate.getDate() + value * 7);
+            } else if (unit.startsWith('month')) {
+                newExpiryDate.setMonth(newExpiryDate.getMonth() + value);
+            } else if (unit.startsWith('day')) {
+                newExpiryDate.setDate(newExpiryDate.getDate() + value);
+            } else if (unit.startsWith('year')) {
+                newExpiryDate.setFullYear(newExpiryDate.getFullYear() + value);
+            }
+
+            const newDepositBalance = userDepositBalance - price;
+            const updates = {
+                packageId: packageId,
+                accountExpiresAt: Timestamp.fromDate(newExpiryDate),
+                depositBalance: newDepositBalance,
+            };
+
+            transaction.update(userRef, updates);
+        });
+
+        revalidatePath('/packages');
+        revalidatePath('/wallet');
+        revalidatePath('/dashboard');
+        return { success: true, message: `Successfully subscribed to the ${pkgName} package!` };
+
+    } catch (error) {
+        console.error("Error purchasing package:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }
