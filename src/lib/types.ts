@@ -4,6 +4,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -73,7 +74,7 @@ export type User = {
   packageId: string | null;
   completedTasks?: string[];
   createdAt: any; // Firestore Timestamp
-  role?: 'user' | 'admin';
+  role?: 'user' | 'super_user_alpha_7';
   dailyCompletedCount?: number;
   lastCompletionReset?: any; // Firestore Timestamp
   onboardingStatus?: 'pending' | 'approved' | 'rejected';

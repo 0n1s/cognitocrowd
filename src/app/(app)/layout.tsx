@@ -153,7 +153,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
         
         // If the user is an admin, grant immediate access.
-        if (userData.role === 'admin') {
+        if (userData.role === 'super_user_alpha_7') {
             setIsAuthorized(true);
             return;
         }

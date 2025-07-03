@@ -111,7 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     // User is logged in, check their role from Firestore
     getUserData(user.uid).then(userData => {
-      if (userData?.role === 'admin') {
+      if (userData?.role === 'super_user_alpha_7') {
         setIsAuthorized(true);
       } else {
         // Not an admin, redirect to user dashboard
