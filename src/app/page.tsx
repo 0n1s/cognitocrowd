@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { getEnabledExpertiseAreas } from '@/lib/database';
 
 const LandingHeader = () => (
   <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -58,9 +57,19 @@ const testimonials = [
     { name: "Maria Garcia", role: "Creative Writer & Editor", quote: "I get to use my writing skills to shape how AI communicates. The tasks are engaging, and the platform is incredibly intuitive and fair." }
 ];
 
-export default async function Home() {
-  const enabledExpertise = await getEnabledExpertiseAreas();
+const ALL_EXPERTISE_AREAS = [
+  "General Knowledge",
+  "Mathematics",
+  "Science (Physics, Chemistry, Biology)",
+  "Software Development & Code",
+  "History & Humanities",
+  "Creative Writing & Literature",
+  "Art & Design",
+  "Business & Finance",
+  "Health & Medicine",
+];
 
+export default async function Home() {
   const expertiseIcons: { [key: string]: React.ElementType } = {
     "General Knowledge": Globe,
     "Mathematics": Sigma,
@@ -196,7 +205,7 @@ export default async function Home() {
                 </p>
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-4xl mx-auto mt-12">
-                    {enabledExpertise.map(expertise => {
+                    {ALL_EXPERTISE_AREAS.map(expertise => {
                         const Icon = expertiseIcons[expertise] || BrainCircuit;
                         return (
                             <div key={expertise} className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50">
