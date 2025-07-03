@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 import { updateUserExpertise } from "@/lib/actions";
 
 const EXPERTISE_OPTIONS = [
@@ -88,7 +88,7 @@ export default function OnboardingExpertisePage() {
                 <CardFooter>
                     <Button type="submit" disabled={isLoading}>
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Continue to Qualification Test
+                        Continue to Qualification Test <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 </CardFooter>
             </form>

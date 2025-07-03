@@ -1,6 +1,7 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -12,6 +13,7 @@ import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { generateQualificationTest, evaluateQualificationTest, type GenerateTestOutput } from "@/ai/flows/ai-qualification-test";
 import { v4 as uuidv4 } from "uuid";
 import { getMostRecentChat, getAppSettings } from './database';
+import { headers } from "next/headers";
 
 
 export type CreateTaskInput = {
@@ -756,7 +758,7 @@ export async function generateTestForUser(expertise: string[]): Promise<Generate
     }
 }
 
-export async function submitQualificationTest(userId: string, questions: QualificationQuestion[], userAnswers: Record<number, string>, expertise: string[]) {
+export async function submitQualificationTest(userId: string, questions: QualificationQuestion[], userAnswers: Record<number, string>, expertise: string[], browserFingerprint: string) {
     if (!db) {
         return { success: false, message: 'Database not configured.' };
     }
@@ -771,6 +773,9 @@ export async function submitQualificationTest(userId: string, questions: Qualifi
         
         // Call AI to evaluate
         const evaluation = await evaluateQualificationTest({ submissions, expertise });
+        
+        // Get IP address from headers
+        const ip = headers().get('x-forwarded-for') ?? 'unknown';
 
         await updateDoc(userDocRef, {
             qualificationSubmission: submissions,
@@ -780,7 +785,9 @@ export async function submitQualificationTest(userId: string, questions: Qualifi
             qualificationResults: {
                 correctCount: evaluation.correctCount,
                 totalCount: evaluation.totalCount,
-            }
+            },
+            ipAddress: ip,
+            browserFingerprint: browserFingerprint,
         });
 
         revalidatePath(`/onboarding/test`);

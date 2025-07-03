@@ -1,6 +1,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -76,6 +77,8 @@ export type User = {
   qualificationScore?: number;
   qualificationFeedback?: string;
   qualificationResults?: { correctCount: number; totalCount: number; };
+  ipAddress?: string;
+  browserFingerprint?: string;
 };
 
 export type AdminUser = User & {

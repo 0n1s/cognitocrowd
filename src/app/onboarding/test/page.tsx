@@ -9,10 +9,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2 } from "lucide-react";
+import { Loader2, Clock } from "lucide-react";
 import { submitQualificationTest, generateTestForUser } from "@/lib/actions";
 import { QualificationQuestion } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
+
+const TEST_DURATION_SECONDS = 600; // 10 minutes
 
 function TestGenerator() {
     const { user } = useAuth();
@@ -24,8 +27,20 @@ function TestGenerator() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
+    const [fingerprint, setFingerprint] = useState<string>('');
+    const [timeLeft, setTimeLeft] = useState(TEST_DURATION_SECONDS);
 
     const expertise = searchParams.getAll("expertise");
+
+    // Get browser fingerprint
+    useEffect(() => {
+        const getFingerprint = async () => {
+            const fp = await FingerprintJS.load();
+            const result = await fp.get();
+            setFingerprint(result.visitorId);
+        };
+        getFingerprint();
+    }, []);
 
     useEffect(() => {
         if (expertise.length > 0) {
@@ -44,6 +59,29 @@ function TestGenerator() {
         }
     }, []);
 
+    // Timer logic
+    useEffect(() => {
+        if (isLoading || isSubmitting) return;
+
+        if (timeLeft <= 0) {
+            toast({ title: "Time's up!", description: "Please submit your answers now.", variant: "destructive" });
+            return;
+        }
+
+        const timerId = setInterval(() => {
+            setTimeLeft(prevTime => prevTime - 1);
+        }, 1000);
+
+        return () => clearInterval(timerId);
+    }, [timeLeft, isLoading, isSubmitting, toast]);
+
+
+    const formatTime = (seconds: number) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    };
+
     const handleAnswerChange = (questionIndex: number, value: string) => {
         setUserAnswers(prev => ({...prev, [questionIndex]: value}));
     };
@@ -58,9 +96,13 @@ function TestGenerator() {
             toast({ title: "Incomplete Test", description: "Please answer all questions before submitting.", variant: "destructive" });
             return;
         }
+         if (!fingerprint) {
+            toast({ title: "Error", description: "Could not verify browser. Please refresh and try again.", variant: "destructive" });
+            return;
+        }
 
         setIsSubmitting(true);
-        const result = await submitQualificationTest(user.uid, questions, userAnswers, expertise);
+        const result = await submitQualificationTest(user.uid, questions, userAnswers, expertise, fingerprint);
         
         if (result.success) {
             toast({ title: "Test Submitted!", description: "Your application is now under review." });
@@ -89,8 +131,16 @@ function TestGenerator() {
         <Card>
             <form onSubmit={handleSubmit}>
                 <CardHeader>
-                    <CardTitle className="font-headline text-2xl">Qualification Test</CardTitle>
-                    <CardDescription>Please complete this test to demonstrate your skills. Your response will be reviewed by our team.</CardDescription>
+                     <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="font-headline text-2xl">Qualification Test</CardTitle>
+                            <CardDescription>Please complete this timed test to demonstrate your skills. Your response will be reviewed by our team.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2 font-mono text-lg font-semibold rounded-md border px-3 py-1.5">
+                            <Clock className="h-5 w-5" />
+                            <span>{formatTime(timeLeft)}</span>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-8">
                     {questions.map((q, index) => (
@@ -108,7 +158,7 @@ function TestGenerator() {
                     ))}
                 </CardContent>
                 <CardFooter>
-                    <Button type="submit" disabled={isSubmitting}>
+                    <Button type="submit" disabled={isSubmitting || timeLeft <= 0}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit Test for Review
                     </Button>

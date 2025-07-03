@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 import { COUNTRIES } from "@/lib/countries";
 import { updateUserOnboardingProfile } from "@/lib/actions";
 
@@ -82,7 +82,7 @@ export default function OnboardingProfilePage() {
                 <CardFooter>
                     <Button type="submit" disabled={isLoading}>
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Continue
+                        Continue <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 </CardFooter>
             </form>
