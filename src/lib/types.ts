@@ -1,5 +1,6 @@
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -62,14 +63,6 @@ export type User = {
 
 export type AdminUser = User & {
   packageName: string;
-};
-
-export type Reward = {
-  id: string;
-  name: string;
-  description: string;
-  cost: number;
-  image: string;
 };
 
 export type LeaderboardEntry = {

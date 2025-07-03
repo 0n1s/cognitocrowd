@@ -1,4 +1,4 @@
-import { Task, LeaderboardEntry, Reward, CompletedTask, Package, TaskType } from './types';
+import { Task, LeaderboardEntry, CompletedTask, Package, TaskType } from './types';
 
 export const mockTasks: Task[] = [
   {
@@ -198,37 +198,6 @@ export const mockLeaderboard: LeaderboardEntry[] = [
   { rank: 8, user: { name: 'Henry' }, points: 8100 },
   { rank: 9, user: { name: 'Isabella' }, points: 7600 },
   { rank: 10, user: { name: 'Jack' }, points: 7200 },
-];
-
-export const mockRewards: Reward[] = [
-  {
-    id: '1',
-    name: '$5 Coffee Gift Card',
-    description: 'Get a digital gift card for your favorite coffee shop.',
-    cost: 5,
-    image: 'https://placehold.co/600x400.png',
-  },
-  {
-    id: '2',
-    name: '$10 Streaming Service Credit',
-    description: 'Enjoy a movie night on us with a credit for popular streaming services.',
-    cost: 10,
-    image: 'https://placehold.co/600x400.png',
-  },
-  {
-    id: '3',
-    name: '$25 Online Retailer Gift Card',
-    description: 'Shop for anything you want with a gift card for a major online retailer.',
-    cost: 25,
-    image: 'https://placehold.co/600x400.png',
-  },
-  {
-    id: '4',
-    name: 'Exclusive CognitoCrowd T-Shirt',
-    description: 'Show your support with a high-quality, branded t-shirt.',
-    cost: 15,
-    image: 'https://placehold.co/600x400.png',
-  },
 ];
 
 export const mockCompletedTasks: CompletedTask[] = [

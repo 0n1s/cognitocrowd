@@ -2,16 +2,13 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { mockRewards } from '@/lib/data';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserData, getAppSettings, getUserWithdrawalRequests } from '@/lib/database';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Reward, AppSettings, WithdrawalRequest } from '@/lib/types';
+import { AppSettings, WithdrawalRequest } from '@/lib/types';
 import { WithdrawalForm } from './withdrawal-form';
 
 const statusColors: Record<WithdrawalRequest['status'], string> = {
@@ -29,12 +26,12 @@ function RedeemPageLoadingSkeleton() {
             <div className="mt-4">
                 <Skeleton className="h-7 w-48" />
             </div>
-             <div className="grid gap-8 mt-8 lg:grid-cols-3">
-                <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+                <div className="md:col-span-1">
                     <Skeleton className="h-96 w-full" />
                 </div>
-                <div>
-                     <Skeleton className="h-64 w-full" />
+                <div className="md:col-span-2">
+                     <Skeleton className="h-96 w-full" />
                 </div>
              </div>
         </div>
@@ -44,7 +41,14 @@ function RedeemPageLoadingSkeleton() {
 function WithdrawalHistory({ requests }: { requests: WithdrawalRequest[] }) {
     if (requests.length === 0) {
         return (
-            <p className="text-sm text-center text-muted-foreground mt-4">You have no withdrawal history.</p>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Withdrawal History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-center text-muted-foreground py-12">You have no withdrawal history.</p>
+                </CardContent>
+            </Card>
         );
     }
     
@@ -98,7 +102,6 @@ export default function RedeemPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const rewards: Reward[] = mockRewards; 
 
   const fetchPageData = async () => {
     if (!user) {
@@ -137,48 +140,13 @@ export default function RedeemPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold font-headline">Redeem & Withdraw</h1>
-      <p className="text-muted-foreground mt-1">Use your earnings to claim rewards or withdraw your balance.</p>
+      <h1 className="text-3xl font-bold font-headline">Withdraw Earnings</h1>
+      <p className="text-muted-foreground mt-1">Request a withdrawal of your available earnings balance.</p>
       <div className="mt-4 text-lg">Your Earnings Balance: <span className="font-bold text-primary">${earningsBalance.toFixed(2)}</span></div>
       <p className="text-xs text-muted-foreground mt-1">(1 point from contributions = $1.00 USD)</p>
 
-        <div className="grid gap-8 mt-8 lg:grid-cols-5">
-            <div className="lg:col-span-3 space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Redeem Gift Cards</CardTitle>
-                        <CardDescription>Instantly claim gift cards with your earnings.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-6 sm:grid-cols-2">
-                        {rewards.map((reward) => (
-                        <Card key={reward.id} className="flex flex-col">
-                            <CardHeader className="p-0">
-                            <Image
-                                src={reward.image}
-                                alt={reward.name}
-                                width={600}
-                                height={400}
-                                className="rounded-t-lg object-cover aspect-[3/2]"
-                                data-ai-hint="gift card"
-                            />
-                            </CardHeader>
-                            <div className="p-4 flex flex-col flex-grow">
-                                <CardTitle className="text-base">{reward.name}</CardTitle>
-                                <div className="mt-2 flex-grow">
-                                     <p className="text-lg font-bold text-primary">${reward.cost.toFixed(2)}</p>
-                                </div>
-                            </div>
-                            <CardFooter className="p-2">
-                            <Button className="w-full" disabled={earningsBalance < reward.cost}>
-                                Redeem
-                            </Button>
-                            </CardFooter>
-                        </Card>
-                        ))}
-                    </CardContent>
-                </Card>
-            </div>
-            <div className="lg:col-span-2 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+            <div className="md:col-span-1">
                 {user && settings && (
                     <WithdrawalForm 
                         user={user} 
@@ -187,6 +155,8 @@ export default function RedeemPage() {
                         onWithdrawal={fetchPageData}
                     />
                 )}
+            </div>
+            <div className="md:col-span-2">
                 <WithdrawalHistory requests={requests} />
             </div>
         </div>
