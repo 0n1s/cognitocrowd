@@ -7,6 +7,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -51,6 +52,7 @@ export interface Task {
     explanation: string;
   };
   status?: 'Active' | 'Archived';
+  expertise?: string;
 };
 
 export type QualificationQuestion = {
@@ -129,6 +131,7 @@ export type AdminTask = {
     type: string;
     points: number;
     status: 'Active' | 'Archived';
+    expertise?: string;
 };
 
 export type TaskResponse = {

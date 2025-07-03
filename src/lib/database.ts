@@ -7,6 +7,7 @@
 
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, AdminTask, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
@@ -41,19 +42,43 @@ export async function getTasks(userId?: string): Promise<Task[]> {
     if (!db) return Promise.resolve([]);
 
     let completedTaskIds: string[] = [];
+    let userExpertise: string[] = [];
+
     if (userId) {
         const userDoc = await getUserData(userId);
-        if (userDoc?.completedTasks) {
-            completedTaskIds = userDoc.completedTasks;
+        if (userDoc) {
+            completedTaskIds = userDoc.completedTasks || [];
+            userExpertise = userDoc.expertise || [];
         }
     }
 
     const tasksCol = collection(db, 'tasks');
-    const q = query(tasksCol, where('status', '==', 'Active'));
-    const snapshot = await getDocs(q);
+    const queriesToRun = [];
 
-    let allTasks: Task[] = [];
-    if (snapshot.empty && mockTasks.length > 0) {
+    // Query for tasks matching user's expertise
+    if (userExpertise.length > 0) {
+        queriesToRun.push(query(tasksCol, where('status', '==', 'Active'), where('expertise', 'in', userExpertise)));
+    }
+
+    // Query for general tasks (no expertise assigned)
+    queriesToRun.push(query(tasksCol, where('status', '==', 'Active'), where('expertise', '==', null)));
+
+    const querySnapshots = await Promise.all(queriesToRun.map(q => getDocs(q)));
+
+    const allTasksMap = new Map<string, Task>();
+
+    querySnapshots.forEach(snapshot => {
+        snapshot.docs.forEach(doc => {
+            if (!allTasksMap.has(doc.id)) {
+                allTasksMap.set(doc.id, fromDoc<Task>(doc));
+            }
+        });
+    });
+    
+    let allTasks = Array.from(allTasksMap.values());
+
+    // Seeding logic if no tasks exist at all
+    if (allTasks.length === 0 && mockTasks.length > 0) {
         console.log('No contributions found. Seeding database with mock data...');
         const batch = writeBatch(db);
         mockTasks.forEach((task) => {
@@ -63,11 +88,11 @@ export async function getTasks(userId?: string): Promise<Task[]> {
         });
         await batch.commit();
         console.log('Database seeded.');
-        const seededSnapshot = await getDocs(q);
+        // Re-fetch general tasks after seeding
+        const seededSnapshot = await getDocs(query(tasksCol, where('status', '==', 'Active'), where('expertise', '==', null)));
         allTasks = seededSnapshot.docs.map(d => fromDoc<Task>(d));
-    } else {
-        allTasks = snapshot.docs.map(doc => fromDoc<Task>(doc));
     }
+
 
     if (completedTaskIds.length > 0) {
         return allTasks.filter(task => !completedTaskIds.includes(task.id));
@@ -150,6 +175,7 @@ export async function getAdminTasks(): Promise<AdminTask[]> {
             type: data.type,
             points: data.points,
             status: data.status || 'Active',
+            expertise: data.expertise
         } as AdminTask;
     });
 }

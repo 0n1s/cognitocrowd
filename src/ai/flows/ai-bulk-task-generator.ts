@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview AI-powered bulk contribution generator for admins.
@@ -26,7 +27,7 @@ const TASK_TYPES = [
 
 const BulkGenerateTasksInputSchema = z.object({
   count: z.number().int().min(1).max(10).describe('The number of contributions to generate.'),
-  taskTypes: z.array(z.enum(TASK_TYPES)).min(1).describe('The types of contributions to generate from.'),
+  expertise: z.string().describe('The expertise area for which to generate contributions.'),
 });
 export type BulkGenerateTasksInput = z.infer<typeof BulkGenerateTasksInputSchema>;
 
@@ -47,14 +48,14 @@ const prompt = ai.definePrompt({
   name: 'bulkTaskGeneratorPrompt',
   input: {schema: BulkGenerateTasksInputSchema},
   output: {schema: BulkGenerateTasksOutputSchema},
-  prompt: `You are an AI contribution generator that helps admins create a batch of engaging and diverse contributions for users.
+  prompt: `You are an AI contribution generator that helps admins create a batch of engaging and diverse contributions for users within the expertise area of "{{expertise}}".
 
 Generate {{count}} contributions. For each contribution, randomly select a contribution type from the following list:
 {{#each taskTypes}}
 - {{this}}
 {{/each}}
 
-For each generated contribution, you MUST provide a JSON object that strictly adheres to the output schema. The generated contributions should be diverse, covering subjects like professional communication, user support, general knowledge, and safety/bias detection.
+For each generated contribution, you MUST provide a JSON object that strictly adheres to the output schema. The generated contributions should be diverse, but all related to the core expertise of "{{expertise}}".
 
 Here are the requirements for each field:
 - "taskType": (Required) The type of the generated contribution, from the list provided.
@@ -86,7 +87,10 @@ const bulkGenerateTasksFlow = ai.defineFlow(
   async (input) => {
     const settings = await getAppSettings();
     const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
-    const {output} = await prompt(input, { model });
+    const {output} = await prompt(
+        {...input, taskTypes: TASK_TYPES as any}, 
+        { model }
+    );
     return output!;
   }
 );

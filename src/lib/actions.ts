@@ -7,13 +7,14 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
 import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest } from "@/lib/types";
-import { bulkGenerateTasks, type BulkGenerateTasksInput } from "@/ai/flows/ai-bulk-task-generator";
+import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { v4 as uuidv4 } from "uuid";
@@ -27,6 +28,7 @@ export type CreateTaskInput = {
     points: number;
     type: TaskType;
     options: string[];
+    expertise?: string;
 };
 
 export async function createAdminTask(data: CreateTaskInput) {
@@ -42,6 +44,7 @@ export async function createAdminTask(data: CreateTaskInput) {
             options: data.options,
             status: 'Active',
             difficulty: 'Medium', // Assign a default difficulty
+            expertise: data.expertise || undefined,
         };
 
         await addDoc(collection(db, "tasks"), taskToAdd);
@@ -55,12 +58,17 @@ export async function createAdminTask(data: CreateTaskInput) {
     }
 }
 
-export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
+export type BulkCreateTasksInput = {
+    count: number;
+    expertise: string;
+};
+
+export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
     if (!db) {
         return { success: false, message: 'Database not configured. Please check your environment variables.' };
     }
     try {
-        const generatedData = await bulkGenerateTasks(data);
+        const generatedData = await bulkGenerateTasks({ count: data.count, expertise: data.expertise });
 
         if (!generatedData || !generatedData.tasks || generatedData.tasks.length === 0) {
             return { success: false, message: 'AI failed to generate contributions.' };
@@ -79,6 +87,7 @@ export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
                 type: task.taskType,
                 status: 'Active',
                 difficulty: 'Medium', // Default difficulty
+                expertise: data.expertise,
             };
 
             if (task.options) taskToAdd.options = task.options;
@@ -92,7 +101,7 @@ export async function bulkCreateAdminTasks(data: BulkGenerateTasksInput) {
         await batch.commit();
 
         revalidatePath("/admin/tasks");
-        return { success: true, message: `${generatedData.tasks.length} contributions created successfully.` };
+        return { success: true, message: `${generatedData.tasks.length} contributions created successfully for ${data.expertise}.` };
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";

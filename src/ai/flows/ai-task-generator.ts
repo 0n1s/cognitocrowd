@@ -17,6 +17,7 @@ import { getAppSettings } from '@/lib/database';
 const GenerateTaskInputSchema = z.object({
   topic: z.string().describe('The topic or subject of the contribution.'),
   taskType: z.enum(['open_text_feedback', 'multiple_choice_preference', 'ranking', 'classification']).describe('The type of contribution to generate.'),
+  expertise: z.string().optional().describe('The expertise area for the contribution.'),
 });
 export type GenerateTaskInput = z.infer<typeof GenerateTaskInputSchema>;
 
@@ -32,7 +33,7 @@ const taskGeneratorPrompt = ai.definePrompt({
   output: {schema: GenerateTaskOutputSchema},
   prompt: `You are an AI contribution generator that helps admins create engaging contributions for users.
 
-  Given the topic: "{{topic}}" and the task type: "{{taskType}}", generate a suitable contribution prompt and description.
+  Given the topic: "{{topic}}", the expertise area: "{{expertise}}", and the task type: "{{taskType}}", generate a suitable contribution prompt and description.
 
   If the task type is 'multiple_choice_preference', also generate an array of options.
   Otherwise, the options field should be omitted from the output.

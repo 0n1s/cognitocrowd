@@ -1,0 +1,463 @@
+
+"use client";
+
+import { useState, useEffect } from "react";
+import { AdminTask, TaskType } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PlusCircle, Loader2, Wand2 } from "lucide-react";
+import { generateTask } from "@/ai/flows/ai-task-generator";
+import { useToast } from "@/hooks/use-toast";
+import { createAdminTask, bulkCreateAdminTasks } from "@/lib/actions";
+import { getAdminTasks } from "@/lib/database";
+
+const EXPERTISE_AREAS = [
+  "General Knowledge",
+  "Mathematics",
+  "Science (Physics, Chemistry, Biology)",
+  "Software Development & Code",
+  "History & Humanities",
+  "Creative Writing & Literature",
+  "Art & Design",
+  "Business & Finance",
+  "Health & Medicine",
+];
+
+type AddTaskDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTaskCreated: () => void;
+};
+
+function AddTaskDialog({ open, onOpenChange, onTaskCreated }: AddTaskDialogProps) {
+  const { toast } = useToast();
+  const [taskType, setTaskType] = useState<TaskType>("open_text_feedback");
+  const [expertise, setExpertise] = useState<string>("");
+  const [options, setOptions] = useState<string[]>([""]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [points, setPoints] = useState(100);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleOptionChange = (index: number, value: string) => {
+    const newOptions = [...options];
+    newOptions[index] = value;
+    setOptions(newOptions);
+  };
+
+  const addOption = () => setOptions([...options, ""]);
+  const removeOption = (index: number) => {
+    if (options.length > 1) {
+      setOptions(options.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!title || !expertise) {
+        toast({ title: "Missing Info", description: "Please provide a topic and select an expertise to generate with AI.", variant: "destructive" });
+        return;
+    }
+    setIsGenerating(true);
+    try {
+        const result = await generateTask({ topic: title, taskType, expertise });
+        setTitle(result.prompt);
+        setDescription(result.description);
+        if(result.options && result.options.length > 0) {
+            const stringOptions = result.options.map(opt => {
+                if (typeof opt === 'string') return opt;
+                if (typeof opt === 'object' && opt !== null && 'text' in opt) return (opt as { text: string }).text;
+                if (typeof opt === 'object' && opt !== null && 'label' in opt) return (opt as { label: string }).label;
+                return '';
+            }).filter(Boolean);
+            setOptions(stringOptions.length > 0 ? stringOptions : ['']);
+        }
+    } catch (e) {
+        console.error(e);
+        toast({ title: "AI Generation Failed", description: "Could not generate contribution content.", variant: "destructive" });
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+  
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setPoints(100);
+    setTaskType("open_text_feedback");
+    setExpertise("");
+    setOptions([""]);
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    const result = await createAdminTask({
+        title,
+        description,
+        points,
+        type: taskType,
+        options: taskType.includes('choice') || taskType.includes('ranking') || taskType.includes('label') ? options : [],
+        expertise,
+    });
+    
+    if (result.success) {
+        toast({ title: "Success", description: result.message });
+        onOpenChange(false);
+        resetForm();
+        onTaskCreated();
+    } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+    setIsSubmitting(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="font-headline">Add New Contribution</DialogTitle>
+          <DialogDescription>
+            Configure the details for the new contribution. Use the title field to provide a topic for AI generation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="title" className="text-right">
+              Title/Topic
+            </Label>
+            <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="col-span-3" placeholder="e.g., 'Describe a sunset'" />
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="description" className="text-right pt-2">
+              Description
+            </Label>
+            <div className="col-span-3 space-y-2">
+                <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder="A detailed prompt for the user." />
+                 <Button onClick={handleGenerate} disabled={isGenerating || !title || !expertise} variant="outline" size="sm">
+                    {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    Generate with AI
+                </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="expertise" className="text-right">
+              Expertise
+            </Label>
+            <Select value={expertise} onValueChange={setExpertise}>
+              <SelectTrigger id="expertise" className="col-span-3">
+                <SelectValue placeholder="Select an expertise (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">General (for all users)</SelectItem>
+                {EXPERTISE_AREAS.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="points" className="text-right">
+              Points
+            </Label>
+            <Input id="points" type="number" value={points} onChange={e => setPoints(Number(e.target.value))} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="task-type" className="text-right">
+              Contribution Type
+            </Label>
+            <Select
+              value={taskType}
+              onValueChange={(value) => setTaskType(value as TaskType)}
+            >
+              <SelectTrigger id="task-type" className="col-span-3">
+                <SelectValue placeholder="Select a type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open_text_feedback">Open Text Feedback</SelectItem>
+                <SelectItem value="multiple_choice_preference">Multiple Choice</SelectItem>
+                <SelectItem value="ranking">Ranking</SelectItem>
+                <SelectItem value="classification">Classification</SelectItem>
+                <SelectItem value="sentiment">Sentiment Analysis</SelectItem>
+                <SelectItem value="topic_classification">Topic Classification</SelectItem>
+                <SelectItem value="likert_scale">Likert Scale</SelectItem>
+                <SelectItem value="compare_pairwise">Pairwise Comparison</SelectItem>
+                <SelectItem value="label_multiple">Multi-label</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification" || taskType === "sentiment" || taskType === "topic_classification" || taskType === "compare_pairwise" || taskType === "label_multiple") && (
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">Options</Label>
+              <div className="col-span-3 space-y-2">
+                {options.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      placeholder={`Option ${index + 1}`}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeOption(index)}
+                      disabled={options.length <= 1}
+                    >
+                      &times;
+                    </Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addOption}>
+                  Add Option
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleSubmit} disabled={isSubmitting || isGenerating}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Create Contribution
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type AutoGenerateDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTasksGenerated: () => void;
+};
+
+
+function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: AutoGenerateDialogProps) {
+  const { toast } = useToast();
+  const [count, setCount] = useState(5);
+  const [expertise, setExpertise] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    if (count <= 0 || !expertise) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter a valid count and select an expertise.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsGenerating(true);
+    const result = await bulkCreateAdminTasks({
+      count,
+      expertise,
+    });
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      onOpenChange(false);
+      setExpertise("");
+      onTasksGenerated();
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+    setIsGenerating(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-headline">Bulk Generate Contributions with AI</DialogTitle>
+          <DialogDescription>
+            Select the number of contributions and the expertise area for generation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-6 py-4">
+          <div>
+            <Label htmlFor="count">Number of Contributions (1-10)</Label>
+            <Input
+              id="count"
+              type="number"
+              value={count}
+              onChange={(e) => setCount(Number(e.target.value))}
+              min="1"
+              max="10"
+              className="mt-2"
+            />
+          </div>
+          <div>
+            <Label htmlFor="expertise-bulk">Expertise Area</Label>
+            <Select value={expertise} onValueChange={setExpertise}>
+              <SelectTrigger id="expertise-bulk" className="mt-2">
+                <SelectValue placeholder="Select an expertise" />
+              </SelectTrigger>
+              <SelectContent>
+                {EXPERTISE_AREAS.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleGenerate} disabled={isGenerating || count <= 0 || !expertise}>
+            {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+            Generate
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const LoadingSkeleton = () => (
+    <Table>
+        <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Expertise</TableHead>
+              <TableHead>Points</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+        </TableHeader>
+        <TableBody>
+            {[...Array(5)].map((_, i) => (
+                <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-28 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                    <TableCell></TableCell>
+                </TableRow>
+            ))}
+        </TableBody>
+    </Table>
+)
+
+
+export function TaskList() {
+    const [tasks, setTasks] = useState<AdminTask[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [isAutoGenerateDialogOpen, setIsAutoGenerateDialogOpen] = useState(false);
+
+    const fetchTasks = async () => {
+      setLoading(true);
+      try {
+        const fetchedTasks = await getAdminTasks();
+        setTasks(fetchedTasks);
+      } catch (error) {
+        console.error("Failed to fetch contributions:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    useEffect(() => {
+        fetchTasks();
+    }, []);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row justify-between items-center">
+        <CardTitle>All Contributions</CardTitle>
+        <div className="flex gap-2">
+            <Button onClick={() => setIsAutoGenerateDialogOpen(true)} variant="outline">
+                <Wand2 className="mr-2 h-4 w-4" /> Bulk Generate
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Contribution
+            </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? <LoadingSkeleton /> : (
+            <>
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Expertise</TableHead>
+                    <TableHead>Points</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>
+                        <span className="sr-only">Actions</span>
+                    </TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {tasks.map((task) => (
+                    <TableRow key={task.id}>
+                        <TableCell className="font-medium">{task.title}</TableCell>
+                        <TableCell>{task.type}</TableCell>
+                        <TableCell>
+                            <Badge variant="outline">{task.expertise || 'General'}</Badge>
+                        </TableCell>
+                        <TableCell>{task.points}</TableCell>
+                        <TableCell>
+                        <Badge variant={task.status === "Active" ? "secondary" : "outline"}>
+                            {task.status}
+                        </Badge>
+                        </TableCell>
+                        <TableCell>
+                        {/* Action buttons can go here */}
+                        </TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+                {tasks.length === 0 && (
+                    <div className="text-center p-8 text-muted-foreground">
+                        No contributions found. Click 'Add Contribution' to create one.
+                    </div>
+                )}
+            </>
+        )}
+      </CardContent>
+       <AddTaskDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onTaskCreated={fetchTasks} />
+       <AutoGenerateDialog open={isAutoGenerateDialogOpen} onOpenChange={setIsAutoGenerateDialogOpen} onTasksGenerated={fetchTasks} />
+    </Card>
+  );
+}
