@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Cpu, Coins, Scaling, ArrowRight } from 'lucide-react';
+import { Cpu, Coins, Scaling, ArrowRight, Globe, Sigma, FlaskConical, Code, ScrollText, Feather, Palette, Briefcase, Stethoscope, BrainCircuit } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { getEnabledExpertiseAreas } from '@/lib/database';
 
 const LandingHeader = () => (
   <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -15,6 +16,7 @@ const LandingHeader = () => (
       <nav className="hidden flex-1 items-center space-x-6 text-sm font-medium md:flex">
         <Link href="#features" className="text-muted-foreground transition-colors hover:text-foreground">Features</Link>
         <Link href="#how-it-works" className="text-muted-foreground transition-colors hover:text-foreground">Process</Link>
+         <Link href="#hiring" className="text-muted-foreground transition-colors hover:text-foreground">Opportunities</Link>
       </nav>
       <div className="flex flex-1 items-center justify-end space-x-2">
         <ThemeToggle />
@@ -57,7 +59,21 @@ const FeatureCard = ({ icon: Icon, title, description }: { icon: React.ElementTy
   </Card>
 );
 
-export default function Home() {
+export default async function Home() {
+  const enabledExpertise = await getEnabledExpertiseAreas();
+
+  const expertiseIcons: { [key: string]: React.ElementType } = {
+    "General Knowledge": Globe,
+    "Mathematics": Sigma,
+    "Science (Physics, Chemistry, Biology)": FlaskConical,
+    "Software Development & Code": Code,
+    "History & Humanities": ScrollText,
+    "Creative Writing & Literature": Feather,
+    "Art & Design": Palette,
+    "Business & Finance": Briefcase,
+    "Health & Medicine": Stethoscope,
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <LandingHeader />
@@ -149,8 +165,40 @@ export default function Home() {
           </div>
         </section>
         
+        {/* Hiring Section */}
+        <section id="hiring" className="py-20 relative overflow-hidden">
+            <div className="absolute inset-0 z-0 opacity-10">
+                <Image src="https://placehold.co/1920x1080.png" alt="Abstract network background" layout="fill" objectFit="cover" data-ai-hint="abstract network" />
+                <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background/80"></div>
+            </div>
+            <div className="container relative z-10 text-center">
+                <h2 className="font-headline text-4xl font-bold tracking-tighter">Now hiring: researchers, innovators, and trainers</h2>
+                <p className="mx-auto max-w-[600px] text-lg text-muted-foreground mt-4">
+                    Whether you have expertise in organic chemistry or creative writing, there’s a place for you.
+                </p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-4xl mx-auto mt-12">
+                    {enabledExpertise.map(expertise => {
+                        const Icon = expertiseIcons[expertise] || BrainCircuit;
+                        return (
+                            <div key={expertise} className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50">
+                                <Icon className="h-5 w-5 text-primary" />
+                                <span className="text-sm font-medium">{expertise}</span>
+                            </div>
+                        )
+                    })}
+                </div>
+                
+                <div className="mt-12">
+                    <Button size="lg" asChild>
+                        <Link href="/signup">Explore available freelance roles and sign up today!</Link>
+                    </Button>
+                </div>
+            </div>
+        </section>
+
         {/* CTA Section */}
-        <section className="container py-24 text-center">
+        <section className="container py-24 text-center border-t border-border/30">
           <h2 className="font-headline text-4xl font-bold tracking-tighter">Ready to Shape the Future?</h2>
           <p className="mx-auto max-w-[600px] text-lg text-muted-foreground md:text-xl mt-4">
             Join a global community of experts and enthusiasts building the next generation of intelligence.
