@@ -27,7 +27,7 @@ const TASK_TYPES = [
 
 const BulkGenerateTasksInputSchema = z.object({
   count: z.number().int().min(1).max(10).describe('The number of contributions to generate.'),
-  expertise: z.string().describe('The expertise area for which to generate contributions.'),
+  expertise: z.array(z.string()).min(1).describe('The expertise areas for which to generate contributions.'),
   taskTypes: z.array(z.enum(TASK_TYPES)).describe("The types of contributions to generate.")
 });
 export type BulkGenerateTasksInput = z.infer<typeof BulkGenerateTasksInputSchema>;
@@ -36,6 +36,7 @@ const BulkGenerateTasksOutputSchema = z.object({
   tasks: z.array(
     GenerateTaskOutputSchema.extend({
       taskType: z.enum(TASK_TYPES).describe("The type of the generated contribution."),
+      expertise: z.string().describe("The expertise area for this specific contribution, chosen from the input list."),
     })
   ),
 });
@@ -49,16 +50,22 @@ const prompt = ai.definePrompt({
   name: 'bulkTaskGeneratorPrompt',
   input: {schema: BulkGenerateTasksInputSchema},
   output: {schema: BulkGenerateTasksOutputSchema},
-  prompt: `You are an AI contribution generator that helps admins create a batch of engaging and diverse contributions for users within the expertise area of "{{expertise}}".
+  prompt: `You are an AI contribution generator that helps admins create a batch of engaging and diverse contributions for users.
 
-Generate {{count}} contributions. For each contribution, randomly select a contribution type from the following list:
+Generate {{count}} contributions. For each contribution, you MUST perform the following steps:
+1. Randomly select an expertise area from this list:
+{{#each expertise}}
+- {{this}}
+{{/each}}
+2. Randomly select a contribution type from this list:
 {{#each taskTypes}}
 - {{this}}
 {{/each}}
 
-For each generated contribution, you MUST provide a JSON object that strictly adheres to the output schema. The generated contributions should be diverse, but all related to the core expertise of "{{expertise}}".
+For each generated contribution, you MUST provide a JSON object that strictly adheres to the output schema. The generated contributions should be diverse, but each one must relate to its assigned expertise area.
 
 Here are the requirements for each field:
+- "expertise": (Required) The expertise area you selected for the contribution from the list provided.
 - "taskType": (Required) The type of the generated contribution, from the list provided.
 - "prompt": (Required) The main question for the user. This will be the contribution title.
 - "description": (Required) The context or detailed instruction for the contribution.

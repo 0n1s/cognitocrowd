@@ -51,7 +51,7 @@ export async function createAdminTask(data: CreateTaskInput) {
 
 export type BulkCreateTasksInput = {
     count: number;
-    expertise: string;
+    expertise: string[];
     taskTypes: TaskType[];
 };
 
@@ -83,7 +83,7 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
                 type: task.taskType,
                 status: 'Active',
                 difficulty: 'Medium', // Default difficulty
-                expertise: data.expertise,
+                expertise: task.expertise,
             };
 
             if (task.options) taskToAdd.options = task.options;
@@ -97,7 +97,7 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
         await batch.commit();
 
         revalidatePath("/admin/tasks");
-        return { success: true, message: `${generatedData.tasks.length} contributions created successfully for ${data.expertise}.` };
+        return { success: true, message: `${generatedData.tasks.length} contributions created successfully across selected expertises.` };
     } catch (error) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
