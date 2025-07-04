@@ -341,7 +341,7 @@ export default async function Home() {
         {/* Hiring Section */}
         <section id="hiring" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30 relative overflow-hidden">
             <div className="absolute inset-0 z-0 opacity-10">
-                <Image src={hiringBackgroundImage} alt="Abstract network background" layout="fill" objectFit="cover" data-ai-hint="abstract network" />
+                <Image src={hiringBackgroundImage} alt="Abstract network background" fill className="object-cover" data-ai-hint="abstract network" />
                 <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background/80"></div>
             </div>
             <div className="container relative z-10 text-center">
