@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -17,13 +18,10 @@ const LandingHeader = () => (
         <span className="font-bold font-headline text-lg">Trainly</span>
       </Link>
       <nav className="hidden flex-1 items-center space-x-6 text-sm font-medium md:flex">
-        <Link href="#platform" className="text-muted-foreground transition-colors hover:text-foreground">Platform</Link>
-        <Link href="#why-trainly" className="text-muted-foreground transition-colors hover:text-foreground">Why Trainly</Link>
+        <Link href="#why-trainly" className="text-muted-foreground transition-colors hover:text-foreground">Why Us</Link>
         <Link href="#tools" className="text-muted-foreground transition-colors hover:text-foreground">AI Tools</Link>
-        <Link href="#process" className="text-muted-foreground transition-colors hover:text-foreground">Process</Link>
         <Link href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
         <Link href="#testimonials" className="text-muted-foreground transition-colors hover:text-foreground">Testimonials</Link>
-        <Link href="#hiring" className="text-muted-foreground transition-colors hover:text-foreground">Opportunities</Link>
       </nav>
       <div className="flex flex-1 items-center justify-end space-x-2">
         <ThemeToggle />
@@ -171,7 +169,7 @@ export default async function Home() {
         <section id="why-trainly" className="py-20">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
-                <h2 className="font-headline text-4xl font-bold">Why Trainly?</h2>
+                <h2 className="font-headline text-4xl font-bold">Why Us?</h2>
                 <p className="text-muted-foreground mt-4 text-lg">We're building more than just AI. We're building a new paradigm for human-machine collaboration, founded on respect for expertise and a commitment to quality.</p>
             </div>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
