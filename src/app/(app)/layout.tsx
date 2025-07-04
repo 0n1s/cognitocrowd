@@ -121,6 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     // Wait until the auth state is fully loaded
@@ -154,6 +155,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         
         // If the user is an admin, grant immediate access.
         if (userData.role === 'super_user_alpha_7') {
+            setIsAdmin(true);
             setIsAuthorized(true);
             return;
         }
@@ -243,12 +245,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
-            <SidebarMenuButton asChild tooltip="Admin Panel">
-                <Link href="/admin/dashboard">
-                    <BarChart />
-                    <span>Admin Panel</span>
-                </Link>
-            </SidebarMenuButton>
+            {isAdmin && (
+                <SidebarMenuButton asChild tooltip="Admin Panel">
+                    <Link href="/admin/dashboard">
+                        <BarChart />
+                        <span>Admin Panel</span>
+                    </Link>
+                </SidebarMenuButton>
+            )}
             <SidebarMenuButton asChild tooltip="Settings">
               <Link href="/settings">
                 <Settings />
