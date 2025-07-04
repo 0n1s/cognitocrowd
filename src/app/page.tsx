@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getEnabledExpertiseAreas, getPackages } from '@/lib/database';
@@ -19,6 +19,7 @@ const LandingHeader = () => (
       </Link>
       <nav className="hidden flex-1 items-center space-x-6 text-sm font-medium md:flex">
         <Link href="#platform" className="text-muted-foreground transition-colors hover:text-foreground">Platform</Link>
+        <Link href="#why-trainly" className="text-muted-foreground transition-colors hover:text-foreground">Why Trainly</Link>
         <Link href="#tools" className="text-muted-foreground transition-colors hover:text-foreground">AI Tools</Link>
         <Link href="#process" className="text-muted-foreground transition-colors hover:text-foreground">Process</Link>
         <Link href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
@@ -55,6 +56,13 @@ const featureItems = [
     { icon: Code, title: "Technical & Code Reviews", description: "Review and write code, debug algorithms, and test for vulnerabilities to improve AI's logical reasoning." },
     { icon: Shield, title: "Safety & Ethics Evaluation", description: "Identify and flag biased, harmful, or unethical responses to build safer and more responsible AI." },
     { icon: Bot, title: "AI Model Interaction", description: "Engage in conversations with AI, testing its capabilities and providing feedback on its performance and helpfulness." }
+];
+
+const whyUsItems = [
+    { icon: TrendingUp, title: "Make a Tangible Impact", description: "Your contributions directly refine the world's most advanced AI models. See the results of your work and be part of the technology that's shaping our future." },
+    { icon: Award, title: "Be Valued and Rewarded", description: "We believe expertise should be compensated fairly. Our platform offers competitive rewards for your time and knowledge, with transparent and reliable payments." },
+    { icon: Clock, title: "Work on Your Terms", description: "Enjoy the freedom to work from anywhere, at any time. Choose tasks that interest you and fit your schedule, creating a perfect work-life balance." },
+    { icon: ShieldCheck, title: "Join an Elite Community", description: "Pass our qualification to join a vetted network of top-tier experts. Collaborate with the best and contribute to a high-quality, trusted data ecosystem." }
 ];
 
 const aiToolItems = [
@@ -105,7 +113,7 @@ export default async function Home() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative w-full h-[80vh] flex items-center justify-center text-center overflow-hidden">
-            <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,theme(colors.border/0.1),transparent_1px),linear-gradient(to_bottom,theme(colors.border/0.1),transparent_1px)] bg-[size:3rem_3rem]">
+            <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,rgba(var(--primary-rgb),0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(var(--primary-rgb),0.1)_1px,transparent_1px)] bg-[size:3rem_3rem]">
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
                {/* Animated Robots */}
@@ -152,8 +160,33 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* Why Us Section */}
+        <section id="why-trainly" className="py-20">
+          <div className="container">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+                <h2 className="font-headline text-4xl font-bold">Why Trainly?</h2>
+                <p className="text-muted-foreground mt-4 text-lg">We're building more than just AI. We're building a new paradigm for human-machine collaboration, founded on respect for expertise and a commitment to quality.</p>
+            </div>
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+                {whyUsItems.map(item => (
+                    <Card key={item.title} className="bg-card/50 border-border/30 backdrop-blur-sm text-center">
+                       <CardHeader className="items-center">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4 border border-primary/20">
+                            <item.icon className="h-6 w-6 text-primary" />
+                        </div>
+                        <CardTitle>{item.title}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-muted-foreground">{item.description}</p>
+                      </CardContent>
+                    </Card>
+                ))}
+            </div>
+          </div>
+        </section>
+
         {/* AI Tools Section */}
-        <section id="tools" className="py-20">
+        <section id="tools" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
                 <h2 className="font-headline text-4xl font-bold">Explore Our AI Models</h2>
@@ -178,7 +211,7 @@ export default async function Home() {
         </section>
         
         {/* Process Section */}
-        <section id="process" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
+        <section id="process" className="py-20">
            <div className="container">
               <div className="text-center max-w-2xl mx-auto mb-16">
                   <h2 className="font-headline text-4xl font-bold tracking-tight">Simple Process, Powerful Impact</h2>
@@ -215,7 +248,7 @@ export default async function Home() {
         </section>
 
         {/* Pricing Section */}
-        <section id="pricing" className="py-20">
+        <section id="pricing" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
               <h2 className="font-headline text-4xl font-bold">Find a Plan to Power Your Ambition</h2>
@@ -270,7 +303,7 @@ export default async function Home() {
 
 
         {/* Testimonials Section */}
-        <section id="testimonials" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
+        <section id="testimonials" className="py-20">
             <div className="container">
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     <h2 className="font-headline text-4xl font-bold">Trusted by Experts Worldwide</h2>
@@ -294,7 +327,7 @@ export default async function Home() {
         </section>
 
         {/* Hiring Section */}
-        <section id="hiring" className="py-20 relative overflow-hidden">
+        <section id="hiring" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30 relative overflow-hidden">
             <div className="absolute inset-0 z-0 opacity-10">
                 <Image src="https://placehold.co/1920x1080.png" alt="Abstract network background" layout="fill" objectFit="cover" data-ai-hint="abstract network" />
                 <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background/80"></div>
@@ -309,7 +342,7 @@ export default async function Home() {
                     {ALL_EXPERTISE_AREAS.map(expertise => {
                         const Icon = expertiseIcons[expertise] || BrainCircuit;
                         return (
-                            <div key={expertise} className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50">
+                            <div key={expertise} className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50 backdrop-blur-sm">
                                 <Icon className="h-5 w-5 text-primary" />
                                 <span className="text-sm font-medium">{expertise}</span>
                             </div>
@@ -326,7 +359,7 @@ export default async function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="container py-24 text-center border-t border-border/30">
+        <section className="container py-24 text-center">
           <h2 className="font-headline text-4xl font-bold tracking-tighter">Ready to Shape the Future?</h2>
           <p className="mx-auto max-w-[600px] text-lg text-muted-foreground md:text-xl mt-4">
             Join a global community of experts and enthusiasts building the next generation of intelligence.
