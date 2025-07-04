@@ -1,15 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
-
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest } from './types';
@@ -284,6 +273,12 @@ export async function getAppSettings(): Promise<AppSettings> {
         withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.',
         withdrawalDays: [],
         defaultGenAiModel: 'googleai/gemini-2.0-flash',
+        landingPageContent: {
+            processImage1: "https://placehold.co/800x600.png",
+            processImage2: "https://placehold.co/800x600.png",
+            processImage3: "https://placehold.co/800x600.png",
+            hiringBackgroundImage: "https://placehold.co/1920x1080.png",
+        }
     };
 
     if (!db) return defaultSettings;

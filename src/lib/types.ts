@@ -151,6 +151,12 @@ export type AppSettings = {
   onboardingCourseTitle?: string;
   onboardingCourseDescription?: string;
   onboardingCourseSteps?: OnboardingStep[];
+  landingPageContent?: {
+      processImage1: string;
+      processImage2: string;
+      processImage3: string;
+      hiringBackgroundImage: string;
+  };
 };
 
 export type WithdrawalRequest = {

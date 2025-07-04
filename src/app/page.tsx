@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { getEnabledExpertiseAreas, getPackages } from '@/lib/database';
+import { getEnabledExpertiseAreas, getPackages, getAppSettings } from '@/lib/database';
 import { Package } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -99,8 +99,15 @@ export default async function Home() {
     "Health & Medicine": Stethoscope,
   };
   
+  const settings = await getAppSettings();
   const enabledExpertise = await getEnabledExpertiseAreas();
   const packages = await getPackages();
+
+  const { landingPageContent } = settings;
+  const processImage1 = landingPageContent?.processImage1 || "https://placehold.co/800x600.png";
+  const processImage2 = landingPageContent?.processImage2 || "https://placehold.co/800x600.png";
+  const processImage3 = landingPageContent?.processImage3 || "https://placehold.co/800x600.png";
+  const hiringBackgroundImage = landingPageContent?.hiringBackgroundImage || "https://placehold.co/1920x1080.png";
 
 
   return (
@@ -228,12 +235,12 @@ export default async function Home() {
                       <p className="mt-4 text-muted-foreground">Create an account and tell us about your skills. You'll take a short, one-time qualification test in your chosen domains to unlock relevant, high-paying tasks. This ensures we maintain the highest quality standards.</p>
                   </div>
                    <div className="w-full h-80 rounded-lg overflow-hidden">
-                       <Image src="https://placehold.co/800x600.png" alt="Person taking a test online" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="person computer" />
+                       <Image src={processImage1} alt="Person taking a test online" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="person computer" />
                   </div>
               </div>
                <div className="grid md:grid-cols-2 gap-16 items-center mt-16">
                   <div className="w-full h-80 rounded-lg overflow-hidden md:order-last">
-                       <Image src="https://placehold.co/800x600.png" alt="Dashboard showing tasks" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="dashboard screen" />
+                       <Image src={processImage2} alt="Dashboard showing tasks" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="dashboard screen" />
                   </div>
                   <div className="md:order-first">
                       <h3 className="text-2xl font-bold font-headline">2. Complete Paid Tasks</h3>
@@ -246,7 +253,7 @@ export default async function Home() {
                       <p className="mt-4 text-muted-foreground">Your work has real value. Track your earnings in your wallet and easily cash out your balance through multiple secure payment methods. We believe in rewarding expertise, fairly and transparently.</p>
                   </div>
                    <div className="w-full h-80 rounded-lg overflow-hidden">
-                       <Image src="https://placehold.co/800x600.png" alt="Wallet showing earnings" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="payment success" />
+                       <Image src={processImage3} alt="Wallet showing earnings" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="payment success" />
                   </div>
               </div>
            </div>
@@ -334,7 +341,7 @@ export default async function Home() {
         {/* Hiring Section */}
         <section id="hiring" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30 relative overflow-hidden">
             <div className="absolute inset-0 z-0 opacity-10">
-                <Image src="https://placehold.co/1920x1080.png" alt="Abstract network background" layout="fill" objectFit="cover" data-ai-hint="abstract network" />
+                <Image src={hiringBackgroundImage} alt="Abstract network background" layout="fill" objectFit="cover" data-ai-hint="abstract network" />
                 <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background/80"></div>
             </div>
             <div className="container relative z-10 text-center">

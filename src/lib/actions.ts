@@ -419,7 +419,9 @@ export async function updateAppSettings(data: AppSettings) {
     const dataToSave = {...data, onboardingCourseSteps: validSteps};
     await setDoc(doc(db, "settings", "main"), dataToSave, { merge: true });
     revalidatePath("/admin/settings");
+    revalidatePath("/admin/landing");
     revalidatePath("/redeem");
+    revalidatePath("/");
     return { success: true, message: "Settings updated successfully." };
   } catch (error) {
     console.error("Error updating settings:", error);
