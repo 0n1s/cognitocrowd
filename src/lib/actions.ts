@@ -240,28 +240,7 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
             });
         });
 
-        // 5. After transaction, trigger non-critical AI ranking
-        if (newResponseId) {
-             const newResponseDocRef = doc(db, 'task_responses', newResponseId);
-             const newResponseSnapshot = await getDoc(newResponseDocRef);
-             if (newResponseSnapshot.exists()) {
-                const responseData = newResponseSnapshot.data().responseData;
-                 try {
-                     const rankOutput = await rankTaskResponse({
-                         taskId,
-                         response: { userId, responseData }
-                     });
-                     if (rankOutput) {
-                         await updateDoc(newResponseDocRef, {
-                             rank: rankOutput.rank,
-                             rankExplanation: rankOutput.explanation
-                         });
-                     }
-                 } catch (rankError) {
-                     console.error("Failed to rank contribution response:", rankError);
-                 }
-             }
-        }
+        // AI ranking logic removed.
         
         revalidatePath('/dashboard');
         revalidatePath(`/tasks/${taskId}`);

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Task, TaskSettings } from "@/lib/types";
@@ -120,13 +121,13 @@ export function TaskForms({ task }: { task: Task }) {
     if (result.success) {
         toast({
             title: "Contribution Submitted!",
-            description: `You've earned ${task.points} points for completing "${task.title}".`,
+            description: `You've earned ${task.points} points. Taking you to the next contribution in 3 seconds.`,
         });
 
-        // Redirect to results page after a short delay
+        // Redirect to the main tasks list page
         setTimeout(() => {
-            router.push(`/tasks/${task.id}/results`);
-        }, 1500);
+            router.push(`/tasks`);
+        }, 3000);
     } else {
         toast({
             title: "Submission Failed",
