@@ -1,7 +1,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -118,16 +118,13 @@ export default async function Home() {
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
               
-              {/* Animated Robots */}
-              <Bot className="absolute h-12 w-12 text-primary/10 animate-[robot-float-1] [animation-delay:-10s]" />
-              <Bot className="absolute h-20 w-20 text-accent/10 animate-[robot-float-2]" />
-              <Bot className="absolute h-8 w-8 text-primary/5 animate-[robot-float-3] [animation-delay:-5s]" />
-              <Bot className="absolute h-16 w-16 text-accent/5 animate-[robot-float-4] [animation-delay:-2s]" />
-
-              {/* Shooting Stars */}
-              <div className="absolute top-0 left-1/4 h-80 w-1 animate-shooting-star rounded-full bg-gradient-to-b from-primary/40 to-transparent" />
-              <div className="absolute top-0 left-1/2 h-80 w-1 animate-shooting-star [animation-delay:3s] [animation-duration:8s] rounded-full bg-gradient-to-b from-accent/40 to-transparent" />
-              <div className="absolute top-0 left-3/4 h-80 w-1 animate-shooting-star [animation-delay:5s] [animation-duration:12s] rounded-full bg-gradient-to-b from-primary/40 to-transparent" />
+               {/* Data Packets */}
+              <div className="absolute top-0 left-0 h-1.5 w-1.5 rounded-full bg-primary blur-sm animate-grid-flow-1" />
+              <div className="absolute top-1/4 left-1/4 h-1.5 w-1.5 rounded-full bg-accent blur-sm animate-grid-flow-2 [animation-delay:2s]" />
+              <div className="absolute bottom-1/2 left-1/2 h-1.5 w-1.5 rounded-full bg-primary blur-sm animate-grid-flow-3 [animation-delay:4s]" />
+              <div className="absolute top-1/3 right-1/4 h-1.5 w-1.5 rounded-full bg-accent blur-sm animate-grid-flow-4 [animation-delay:6s]" />
+              <div className="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full bg-primary blur-sm animate-grid-flow-1 [animation-delay:8s]" />
+              <div className="absolute bottom-1/4 right-1/4 h-1.5 w-1.5 rounded-full bg-accent blur-sm animate-grid-flow-2 [animation-delay:10s]" />
             </div>
             <div className="container relative z-10">
                 <h1 className="font-headline text-5xl font-extrabold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-muted-foreground">
@@ -294,11 +291,6 @@ export default async function Home() {
                         ))}
                       </ul>
                     </CardContent>
-                    <CardFooter>
-                      <Button asChild className="w-full" variant={pkg.isPrimary ? 'default' : 'outline'}>
-                        <Link href="/signup">{pkg.isPrimary ? 'Choose Plan' : 'Get Started'}</Link>
-                      </Button>
-                    </CardFooter>
                   </Card>
                 ))}
               </div>
