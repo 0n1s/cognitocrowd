@@ -105,7 +105,7 @@ export default async function Home() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative w-full h-[80vh] flex items-center justify-center text-center overflow-hidden">
-            <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,theme(colors.border/0.05),transparent_1px),linear-gradient(to_bottom,theme(colors.border/0.05),transparent_1px)] bg-[size:3rem_3rem]">
+            <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,theme(colors.border/0.1),transparent_1px),linear-gradient(to_bottom,theme(colors.border/0.1),transparent_1px)] bg-[size:3rem_3rem]">
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
                {/* Animated Robots */}
