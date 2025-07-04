@@ -977,3 +977,40 @@ export async function updateUserApprovalStatus(userId: string, status: 'approved
         return { success: false, message: `Failed to update user status: ${errorMessage}` };
     }
 }
+
+export async function deleteAllAdminTasks() {
+    if (!db) {
+        return { success: false, message: 'Database not configured.' };
+    }
+    try {
+        const tasksCol = collection(db, "tasks");
+        const snapshot = await getDocs(tasksCol);
+        
+        if (snapshot.empty) {
+            return { success: true, message: 'There are no contributions to delete.' };
+        }
+
+        const BATCH_SIZE = 500;
+        const totalDocs = snapshot.size;
+        const batches = [];
+        
+        for (let i = 0; i < totalDocs; i += BATCH_SIZE) {
+            const batch = writeBatch(db);
+            const end = Math.min(i + BATCH_SIZE, totalDocs);
+            const batchDocs = snapshot.docs.slice(i, end);
+            batchDocs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            batches.push(batch.commit());
+        }
+
+        await Promise.all(batches);
+        
+        revalidatePath("/admin/tasks");
+        return { success: true, message: `Successfully deleted ${totalDocs} contributions.` };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to delete all contributions: ${errorMessage}` };
+    }
+}
