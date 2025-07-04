@@ -209,8 +209,18 @@ export function TaskForms({ task }: { task: Task }) {
         if (!task.scale) return <p>Task configuration error.</p>;
         const scaleOptions = Array.from({ length: task.scale.max - task.scale.min + 1 }, (_, i) => task.scale.min + i);
         
-        const minLabel = task.scale.labels.find(l => l.value === task.scale.min)?.label || task.scale.min.toString();
-        const maxLabel = task.scale.labels.find(l => l.value === task.scale.max)?.label || task.scale.max.toString();
+        let minLabel: string;
+        let maxLabel: string;
+
+        if (Array.isArray(task.scale.labels)) {
+            minLabel = task.scale.labels.find(l => l.value === task.scale.min)?.label || task.scale.min.toString();
+            maxLabel = task.scale.labels.find(l => l.value === task.scale.max)?.label || task.scale.max.toString();
+        } else {
+            // Handle old object format for backward compatibility
+            const labelsObject = task.scale.labels as unknown as Record<string, string>;
+            minLabel = labelsObject?.[task.scale.min] || task.scale.min.toString();
+            maxLabel = labelsObject?.[task.scale.max] || task.scale.max.toString();
+        }
 
         formContent = (
             <>

@@ -50,10 +50,10 @@ export const mockTasks: Task[] = [
     scale: {
       min: 1,
       max: 5,
-      labels: {
-        "1": "Very unclear",
-        "5": "Very clear"
-      }
+      labels: [
+        { value: 1, label: "Very unclear" },
+        { value: 5, label: "Very clear" }
+      ]
     },
     settings: {
       allow_comment: true,
