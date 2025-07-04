@@ -3,12 +3,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest, OnboardingStep } from "@/lib/types";
 import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
-import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
+import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
 import { v4 as uuidv4 } from "uuid";
 import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks } from './database';
 import { headers } from "next/headers";
@@ -395,9 +396,14 @@ export async function deleteAdminUser(userId: string) {
 export async function updateAppSettings(data: AppSettings) {
   if (!db) return { success: false, message: "Database not configured." };
   try {
-    const validSteps = (data.onboardingCourseSteps || []).filter(step => step.title && step.content);
-    const dataToSave = {...data, onboardingCourseSteps: validSteps};
+    const dataToSave = { ...data };
+    // Ensure arrays are filtered for empty entries before saving
+    dataToSave.paymentMethods = (data.paymentMethods || []).filter(m => m.name.trim() !== '');
+    dataToSave.depositMethods = (data.depositMethods || []).filter(m => m.name.trim() !== '');
+    dataToSave.onboardingCourseSteps = (data.onboardingCourseSteps || []).filter(s => s.title.trim() !== '' && s.content.trim() !== '');
+    
     await setDoc(doc(db, "settings", "main"), dataToSave, { merge: true });
+
     revalidatePath("/admin/settings");
     revalidatePath("/admin/landing");
     revalidatePath("/redeem");
@@ -992,5 +998,53 @@ export async function deleteAllAdminTasks() {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message: `Failed to delete all contributions: ${errorMessage}` };
+    }
+}
+
+export async function updateLandingPageImage(field: string, imageDataUri: string) {
+    if (!db || !storage) return { success: false, message: "Firebase not configured." };
+
+    try {
+        const storageRef = ref(storage, `landing-page/${field}-${uuidv4()}.jpg`);
+        
+        const base64Data = imageDataUri.split(',')[1];
+
+        const snapshot = await uploadString(storageRef, base64Data, 'base64', {
+            contentType: 'image/jpeg'
+        });
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        const settings = await getAppSettings();
+        const newLandingPageContent = {
+            ...settings.landingPageContent,
+            [field]: downloadURL,
+        };
+
+        const result = await updateAppSettings({ 
+            ...settings, 
+            landingPageContent: newLandingPageContent
+        });
+
+        if (result.success) {
+             return { success: true, message: "Image updated successfully.", url: downloadURL };
+        } else {
+             throw new Error(result.message);
+        }
+
+    } catch (error) {
+        console.error("Error uploading/updating landing page image:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function generateLandingImage(prompt: string) {
+    try {
+        const result = await generateLandingImageFlow({ prompt });
+        return { success: true, imageDataUri: result.imageDataUri };
+    } catch (error) {
+        console.error("Error generating landing page image:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
     }
 }
