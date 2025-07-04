@@ -1,7 +1,6 @@
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -113,18 +112,22 @@ export default async function Home() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative w-full h-[80vh] flex items-center justify-center text-center overflow-hidden">
-            <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,rgba(var(--primary-rgb),0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(var(--primary-rgb),0.1)_1px,transparent_1px)] bg-[size:3rem_3rem]">
+            <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,rgba(var(--primary-rgb),0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(var(--primary-rgb),0.2)_1px,transparent_1px)] bg-[size:3rem_3rem]">
               {/* Radial Gradients */}
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
               
-               {/* Data Packets */}
-              <div className="absolute top-0 left-0 h-1.5 w-1.5 rounded-full bg-primary blur-sm animate-grid-flow-1" />
-              <div className="absolute top-1/4 left-1/4 h-1.5 w-1.5 rounded-full bg-accent blur-sm animate-grid-flow-2 [animation-delay:2s]" />
-              <div className="absolute bottom-1/2 left-1/2 h-1.5 w-1.5 rounded-full bg-primary blur-sm animate-grid-flow-3 [animation-delay:4s]" />
-              <div className="absolute top-1/3 right-1/4 h-1.5 w-1.5 rounded-full bg-accent blur-sm animate-grid-flow-4 [animation-delay:6s]" />
-              <div className="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full bg-primary blur-sm animate-grid-flow-1 [animation-delay:8s]" />
-              <div className="absolute bottom-1/4 right-1/4 h-1.5 w-1.5 rounded-full bg-accent blur-sm animate-grid-flow-2 [animation-delay:10s]" />
+               {/* Shooting Stars */}
+              <div className="absolute top-0 left-[10%] h-64 w-0.5 animate-shooting-star bg-gradient-to-b from-primary/80 to-transparent" style={{ '--duration': '10s' } as React.CSSProperties} />
+              <div className="absolute top-0 left-[30%] h-48 w-0.5 animate-shooting-star bg-gradient-to-b from-accent/80 to-transparent" style={{ '--duration': '8s', animationDelay: '2s' } as React.CSSProperties} />
+              <div className="absolute top-0 left-[50%] h-80 w-0.5 animate-shooting-star bg-gradient-to-b from-primary/80 to-transparent" style={{ '--duration': '12s', animationDelay: '5s' } as React.CSSProperties} />
+              <div className="absolute top-0 left-[70%] h-40 w-0.5 animate-shooting-star bg-gradient-to-b from-accent/80 to-transparent" style={{ '--duration': '7s', animationDelay: '1s' } as React.CSSProperties} />
+              <div className="absolute top-0 left-[90%] h-56 w-0.5 animate-shooting-star bg-gradient-to-b from-primary/80 to-transparent" style={{ '--duration': '9s', animationDelay: '3s' } as React.CSSProperties} />
+              
+              {/* Bot animations */}
+              <Bot className="absolute h-8 w-8 text-primary/50 top-1/4 left-1/3 animate-float-1" />
+              <Bot className="absolute h-12 w-12 text-accent/40 bottom-1/4 right-1/3 animate-float-2" />
+              <Bot className="absolute h-6 w-6 text-primary/30 bottom-1/2 left-1/2 animate-float-3" />
             </div>
             <div className="container relative z-10">
                 <h1 className="font-headline text-5xl font-extrabold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-muted-foreground">
@@ -136,7 +139,7 @@ export default async function Home() {
                 <div className="mt-8 flex justify-center gap-4">
                     <Button size="lg" asChild className="shadow-lg shadow-primary/30">
                         <Link href="/signup">
-                            Start Earning Today <ArrowRight className="ml-2 h-5 w-5" />
+                            Sign Up Now <ArrowRight className="ml-2 h-5 w-5" />
                         </Link>
                     </Button>
                 </div>
@@ -291,6 +294,11 @@ export default async function Home() {
                         ))}
                       </ul>
                     </CardContent>
+                    <CardFooter>
+                      <Button className="w-full" asChild>
+                        <Link href="/signup">Get Started</Link>
+                      </Button>
+                    </CardFooter>
                   </Card>
                 ))}
               </div>
