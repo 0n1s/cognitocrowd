@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -174,6 +175,55 @@ export function SettingsForm() {
     return (
         <Card>
             <CardContent className="pt-6 space-y-12">
+
+                <Separator />
+
+                <div>
+                    <h3 className="text-lg font-semibold">User Approval Settings</h3>
+                    <p className="text-sm text-muted-foreground">Automate the qualification test approval process based on user scores.</p>
+                </div>
+                <div className="space-y-6">
+                    <div className="flex items-center space-x-2">
+                        <Switch id="auto-approval-enabled" checked={settings.autoApprovalEnabled} onCheckedChange={(checked) => handleFieldChange('autoApprovalEnabled', checked)} />
+                        <Label htmlFor="auto-approval-enabled">Enable Auto-Approval</Label>
+                    </div>
+                    {settings.autoApprovalEnabled && (
+                        <div className="grid grid-cols-2 gap-4 pl-8">
+                             <div className="space-y-2">
+                                <Label htmlFor="auto-approval-threshold">Minimum Score for Approval (%)</Label>
+                                <Input 
+                                    id="auto-approval-threshold" 
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={settings.autoApprovalThreshold || 90} 
+                                    onChange={(e) => handleFieldChange('autoApprovalThreshold', Number(e.target.value))} 
+                                />
+                                <p className="text-xs text-muted-foreground">Users scoring this or higher will be automatically approved.</p>
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex items-center space-x-2">
+                        <Switch id="auto-rejection-enabled" checked={settings.autoRejectionEnabled} onCheckedChange={(checked) => handleFieldChange('autoRejectionEnabled', checked)} />
+                        <Label htmlFor="auto-rejection-enabled">Enable Auto-Rejection</Label>
+                    </div>
+                     {settings.autoRejectionEnabled && (
+                        <div className="grid grid-cols-2 gap-4 pl-8">
+                             <div className="space-y-2">
+                                <Label htmlFor="auto-rejection-threshold">Score for Rejection (%)</Label>
+                                <Input 
+                                    id="auto-rejection-threshold" 
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={settings.autoRejectionThreshold || 50} 
+                                    onChange={(e) => handleFieldChange('autoRejectionThreshold', Number(e.target.value))} 
+                                />
+                                <p className="text-xs text-muted-foreground">Users scoring below this will be automatically rejected.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
                 
                  <div>
                     <h3 className="text-lg font-semibold">Onboarding Course Settings</h3>

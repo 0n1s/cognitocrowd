@@ -836,10 +836,20 @@ export async function submitQualificationTest(userId: string, questions: Qualifi
         }));
         
         const evaluation = await evaluateQualificationTest({ submissions, expertise });
+        const settings = await getAppSettings();
+
+        let onboardingStatus: 'pending' | 'approved' | 'rejected' = 'pending';
+
+        if (settings.autoApprovalEnabled && evaluation.score >= (settings.autoApprovalThreshold ?? 101)) {
+            onboardingStatus = 'approved';
+        } else if (settings.autoRejectionEnabled && evaluation.score < (settings.autoRejectionThreshold ?? 0)) {
+            onboardingStatus = 'rejected';
+        }
         
         const ip = headers().get('x-forwarded-for') ?? 'unknown';
 
         await updateDoc(userDocRef, {
+            onboardingStatus: onboardingStatus,
             qualificationSubmission: submissions,
             qualificationTestSubmittedAt: Timestamp.now(),
             qualificationScore: evaluation.score,

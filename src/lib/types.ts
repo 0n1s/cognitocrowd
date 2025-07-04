@@ -157,6 +157,10 @@ export type AppSettings = {
       processImage3: string;
       hiringBackgroundImage: string;
   };
+  autoApprovalEnabled?: boolean;
+  autoApprovalThreshold?: number;
+  autoRejectionEnabled?: boolean;
+  autoRejectionThreshold?: number;
 };
 
 export type WithdrawalRequest = {
