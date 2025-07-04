@@ -11,7 +11,7 @@ import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
 import { v4 as uuidv4 } from "uuid";
-import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks } from './database';
+import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks, getPendingApprovals } from './database';
 import { headers } from "next/headers";
 
 
@@ -972,6 +972,48 @@ export async function updateUserApprovalStatus(userId: string, status: 'approved
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message: `Failed to update user status: ${errorMessage}` };
     }
+}
+
+export async function bulkUpdateUserApprovalStatus(
+  ids: string[] | 'all',
+  status: 'approved' | 'rejected'
+) {
+  if (!db) {
+    return { success: false, message: 'Database not configured.' };
+  }
+  try {
+    let userIdsToUpdate: string[];
+
+    if (ids === 'all') {
+      const pendingUsers = await getPendingApprovals();
+      userIdsToUpdate = pendingUsers.map(user => user.id);
+    } else {
+      userIdsToUpdate = ids;
+    }
+
+    if (userIdsToUpdate.length === 0) {
+      return { success: true, message: 'No users to update.' };
+    }
+
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < userIdsToUpdate.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const batchIds = userIdsToUpdate.slice(i, i + BATCH_SIZE);
+        batchIds.forEach(userId => {
+            const userDoc = doc(db, 'users', userId);
+            batch.update(userDoc, { onboardingStatus: status });
+        });
+        await batch.commit();
+    }
+
+    revalidatePath("/admin/approvals");
+    const userCount = userIdsToUpdate.length;
+    return { success: true, message: `${userCount} ${userCount === 1 ? 'user has' : 'users have'} been ${status}.` };
+  } catch (error) {
+    console.error(error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { success: false, message: `Failed to update users: ${errorMessage}` };
+  }
 }
 
 export async function deleteAllAdminTasks() {
