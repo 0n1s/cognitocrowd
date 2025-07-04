@@ -34,3 +34,11 @@ export const GenerateTaskOutputSchema = z.object({
     explanation: z.string().describe("Explanation of why this contribution is valuable.")
   }).optional().describe("Criteria for awarding points."),
 });
+
+export const GenerateLandingImageInputSchema = z.object({
+  prompt: z.string().describe('A text prompt to generate an image from.'),
+});
+
+export const GenerateLandingImageOutputSchema = z.object({
+    imageDataUri: z.string().describe("The generated image as a data URI. Expected format: 'data:image/png;base64,<encoded_data>'."),
+});

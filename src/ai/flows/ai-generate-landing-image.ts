@@ -5,15 +5,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { GenerateLandingImageInputSchema, GenerateLandingImageOutputSchema } from '@/ai/schemas';
 
-export const GenerateLandingImageInputSchema = z.object({
-  prompt: z.string().describe('A text prompt to generate an image from.'),
-});
 export type GenerateLandingImageInput = z.infer<typeof GenerateLandingImageInputSchema>;
-
-export const GenerateLandingImageOutputSchema = z.object({
-    imageDataUri: z.string().describe("The generated image as a data URI. Expected format: 'data:image/png;base64,<encoded_data>'."),
-});
 export type GenerateLandingImageOutput = z.infer<typeof GenerateLandingImageOutputSchema>;
 
 export async function generateLandingImage(input: GenerateLandingImageInput): Promise<GenerateLandingImageOutput> {
