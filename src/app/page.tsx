@@ -114,13 +114,20 @@ export default async function Home() {
         {/* Hero Section */}
         <section className="relative w-full h-[80vh] flex items-center justify-center text-center overflow-hidden">
             <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,rgba(var(--primary-rgb),0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(var(--primary-rgb),0.1)_1px,transparent_1px)] bg-[size:3rem_3rem]">
+              {/* Radial Gradients */}
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
-               {/* Animated Robots */}
+              
+              {/* Animated Robots */}
               <Bot className="absolute h-12 w-12 text-primary/10 animate-[robot-float-1] [animation-delay:-10s]" />
               <Bot className="absolute h-20 w-20 text-accent/10 animate-[robot-float-2]" />
               <Bot className="absolute h-8 w-8 text-primary/5 animate-[robot-float-3] [animation-delay:-5s]" />
               <Bot className="absolute h-16 w-16 text-accent/5 animate-[robot-float-4] [animation-delay:-2s]" />
+
+              {/* Shooting Stars */}
+              <div className="absolute top-0 right-0 h-1 w-60 animate-shooting-star rounded-full bg-gradient-to-l from-primary/40 to-transparent" />
+              <div className="absolute top-1/2 right-0 h-1 w-60 animate-shooting-star [animation-delay:3s] [animation-duration:8s] rounded-full bg-gradient-to-l from-accent/40 to-transparent" />
+              <div className="absolute top-0 right-1/3 h-1 w-60 animate-shooting-star [animation-delay:5s] [animation-duration:12s] rounded-full bg-gradient-to-l from-primary/40 to-transparent" />
             </div>
             <div className="container relative z-10">
                 <h1 className="font-headline text-5xl font-extrabold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-muted-foreground">
