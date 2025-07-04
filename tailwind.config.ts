@@ -123,8 +123,8 @@ export default {
           '100%': { transform: 'translate(75vw, -100px) scale(0.6)', opacity: '0' },
         },
         'shooting-star': {
-          '0%': { transform: 'translateX(0) translateY(0)', opacity: '1' },
-          '100%': { transform: 'translateX(-150vw) translateY(150vh)', opacity: '0' },
+          '0%': { transform: 'translateY(-100vh)', opacity: '1' },
+          '100%': { transform: 'translateY(100vh)', opacity: '1' },
         },
       },
       animation: {

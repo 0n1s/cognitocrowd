@@ -125,9 +125,9 @@ export default async function Home() {
               <Bot className="absolute h-16 w-16 text-accent/5 animate-[robot-float-4] [animation-delay:-2s]" />
 
               {/* Shooting Stars */}
-              <div className="absolute top-0 right-0 h-1 w-60 animate-shooting-star rounded-full bg-gradient-to-l from-primary/40 to-transparent" />
-              <div className="absolute top-1/2 right-0 h-1 w-60 animate-shooting-star [animation-delay:3s] [animation-duration:8s] rounded-full bg-gradient-to-l from-accent/40 to-transparent" />
-              <div className="absolute top-0 right-1/3 h-1 w-60 animate-shooting-star [animation-delay:5s] [animation-duration:12s] rounded-full bg-gradient-to-l from-primary/40 to-transparent" />
+              <div className="absolute top-0 left-1/4 h-80 w-1 animate-shooting-star rounded-full bg-gradient-to-b from-primary/40 to-transparent" />
+              <div className="absolute top-0 left-1/2 h-80 w-1 animate-shooting-star [animation-delay:3s] [animation-duration:8s] rounded-full bg-gradient-to-b from-accent/40 to-transparent" />
+              <div className="absolute top-0 left-3/4 h-80 w-1 animate-shooting-star [animation-delay:5s] [animation-duration:12s] rounded-full bg-gradient-to-b from-primary/40 to-transparent" />
             </div>
             <div className="container relative z-10">
                 <h1 className="font-headline text-5xl font-extrabold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-muted-foreground">
