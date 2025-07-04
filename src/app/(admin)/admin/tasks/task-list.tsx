@@ -4,7 +4,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { Task, TaskType, TaskOption } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
