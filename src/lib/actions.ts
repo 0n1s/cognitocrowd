@@ -10,7 +10,7 @@ import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { rankTaskResponse } from "@/ai/flows/ai-rank-response";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { v4 as uuidv4 } from "uuid";
-import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest } from './database';
+import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks } from './database';
 import { headers } from "next/headers";
 
 
@@ -145,7 +145,6 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
         return { success: false, message: 'User not authenticated.' };
     }
 
-    let newResponseId: string | undefined;
     const earningsToAdd = points / 100; // 100 points = $1
 
     try {
@@ -229,7 +228,6 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
             });
 
             const newResponseRef = doc(collection(db, "task_responses"));
-            newResponseId = newResponseRef.id;
 
             transaction.set(newResponseRef, {
                 userId,
@@ -240,13 +238,16 @@ export async function submitTaskResponse(taskId: string, points: number, formDat
             });
         });
 
-        // AI ranking logic removed.
-        
+        // Find the next available task for the user
+        const availableTasks = await getTasks(userId);
+        const nextTask = availableTasks.length > 0 ? availableTasks[0] : null;
+
         revalidatePath('/dashboard');
         revalidatePath(`/tasks/${taskId}`);
         revalidatePath('/rewards');
         revalidatePath('/wallet');
-        return { success: true, earnings: earningsToAdd };
+        
+        return { success: true, earnings: earningsToAdd, nextTaskId: nextTask?.id || null };
 
     } catch (error) {
         console.error("Error submitting task response:", error);

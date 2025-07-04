@@ -121,13 +121,21 @@ export function TaskForms({ task }: { task: Task }) {
     if (result.success) {
         toast({
             title: "Contribution Submitted!",
-            description: `You've earned ${task.points} points. Taking you to the next contribution in 3 seconds.`,
+            description: `You've earned ${task.points} points. Loading next contribution...`,
         });
 
-        // Redirect to the main tasks list page
+        // Redirect to the next available task, or back to the list if none are left.
         setTimeout(() => {
-            router.push(`/tasks`);
-        }, 3000);
+            if ('nextTaskId' in result && result.nextTaskId) {
+                router.push(`/tasks/${result.nextTaskId}`);
+            } else {
+                toast({
+                    title: "All done for now!",
+                    description: "You have completed all available contributions. Check back later.",
+                });
+                router.push('/dashboard');
+            }
+        }, 1500);
     } else {
         toast({
             title: "Submission Failed",
