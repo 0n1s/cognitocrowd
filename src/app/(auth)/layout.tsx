@@ -7,6 +7,39 @@ import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 import { getUserData } from "@/lib/database";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+
+const AuthLayoutSkeleton = () => (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <div className="absolute top-4 left-4">
+            <div className="flex items-center space-x-2">
+                <Skeleton className="h-6 w-6" />
+                <Skeleton className="h-5 w-20" />
+            </div>
+        </div>
+        <Card className="w-full max-w-sm">
+            <CardHeader>
+                <Skeleton className="h-7 w-24 mb-2" />
+                <Skeleton className="h-4 w-4/5" />
+            </CardHeader>
+            <CardContent className="grid gap-4">
+                <div className="grid gap-2">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="grid gap-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                <Skeleton className="h-10 w-full" />
+            </CardContent>
+            <CardFooter className="justify-center">
+                <Skeleton className="h-5 w-40" />
+            </CardFooter>
+        </Card>
+    </div>
+);
+
 
 export default function AuthLayout({
   children,
@@ -33,11 +66,7 @@ export default function AuthLayout({
   }, [user, loading, router]);
 
   if (loading || user) {
-     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Skeleton className="h-[450px] w-full max-w-sm rounded-lg" />
-      </div>
-    );
+     return <AuthLayoutSkeleton />;
   }
 
   return (
