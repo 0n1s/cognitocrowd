@@ -1,10 +1,14 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { getEnabledExpertiseAreas, getPackages } from '@/lib/database';
+import { Package } from '@/lib/types';
+import { cn } from '@/lib/utils';
+
 
 const LandingHeader = () => (
   <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -15,7 +19,9 @@ const LandingHeader = () => (
       </Link>
       <nav className="hidden flex-1 items-center space-x-6 text-sm font-medium md:flex">
         <Link href="#platform" className="text-muted-foreground transition-colors hover:text-foreground">Platform</Link>
+        <Link href="#tools" className="text-muted-foreground transition-colors hover:text-foreground">AI Tools</Link>
         <Link href="#process" className="text-muted-foreground transition-colors hover:text-foreground">Process</Link>
+        <Link href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
         <Link href="#testimonials" className="text-muted-foreground transition-colors hover:text-foreground">Testimonials</Link>
         <Link href="#hiring" className="text-muted-foreground transition-colors hover:text-foreground">Opportunities</Link>
       </nav>
@@ -51,6 +57,12 @@ const featureItems = [
     { icon: Bot, title: "AI Model Interaction", description: "Engage in conversations with AI, testing its capabilities and providing feedback on its performance and helpfulness." }
 ];
 
+const aiToolItems = [
+    { icon: MessageCircle, title: "Chat Models", description: "Converse with our advanced language models to test their conversational abilities, knowledge, and reasoning skills." },
+    { icon: ImageIcon, title: "Image Generation", description: "Generate stunning, high-quality images from text prompts and help refine the AI's creative and descriptive capabilities." },
+    { icon: Video, title: "Video Generation", description: "Create and modify video clips using simple text commands, pushing the boundaries of AI-powered multimedia generation. (Coming Soon)" }
+];
+
 const testimonials = [
     { name: "Aisha Khan", role: "Software Engineer", quote: "Trainly provides the most interesting and challenging code-related tasks. It's rewarding to know my work directly improves the models I use daily." },
     { name: "Dr. Ben Carter", role: "Medical Researcher", quote: "The platform's focus on quality and accuracy is impressive. It's a fantastic way to contribute specialized knowledge and stay at the cutting edge of AI." },
@@ -81,6 +93,10 @@ export default async function Home() {
     "Business & Finance": Briefcase,
     "Health & Medicine": Stethoscope,
   };
+  
+  const enabledExpertise = await getEnabledExpertiseAreas();
+  const packages = await getPackages();
+
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -119,7 +135,7 @@ export default async function Home() {
         <section id="platform" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
-                <h2 className="font-headline text-4xl font-bold">The World's Most Advanced AI Training Platform</h2>
+                <h2 className="font-headline text-4xl font-bold">What You'll Do</h2>
                 <p className="text-muted-foreground mt-4 text-lg">We connect human intelligence with machine learning to solve complex reasoning problems at scale.</p>
             </div>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
@@ -135,9 +151,34 @@ export default async function Home() {
             </div>
           </div>
         </section>
+
+        {/* AI Tools Section */}
+        <section id="tools" className="py-20">
+          <div className="container">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+                <h2 className="font-headline text-4xl font-bold">Explore Our AI Models</h2>
+                <p className="text-muted-foreground mt-4 text-lg">Go beyond tasks. Directly interact with and shape our suite of generative AI tools.</p>
+            </div>
+            <div className="grid gap-8 md:grid-cols-3">
+              {aiToolItems.map(item => (
+                <Card key={item.title} className="bg-card/50 border-border/30 backdrop-blur-sm">
+                   <CardHeader className="items-center text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4 border border-primary/20">
+                        <item.icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <CardTitle>{item.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <p className="text-muted-foreground">{item.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
         
         {/* Process Section */}
-        <section id="process" className="py-20">
+        <section id="process" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
            <div className="container">
               <div className="text-center max-w-2xl mx-auto mb-16">
                   <h2 className="font-headline text-4xl font-bold tracking-tight">Simple Process, Powerful Impact</h2>
@@ -172,6 +213,61 @@ export default async function Home() {
               </div>
            </div>
         </section>
+
+        {/* Pricing Section */}
+        <section id="pricing" className="py-20">
+          <div className="container">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+              <h2 className="font-headline text-4xl font-bold">Find a Plan to Power Your Ambition</h2>
+              <p className="text-muted-foreground mt-4 text-lg">
+                Subscribers get priority access to test our newest models first.
+              </p>
+            </div>
+            {packages.length > 0 ? (
+              <div className="grid gap-8 md:grid-cols-3 items-start max-w-5xl mx-auto">
+                {packages.sort((a, b) => a.price.localeCompare(b.price)).map((pkg) => (
+                  <Card key={pkg.id} className={cn("flex flex-col", pkg.isPrimary && "border-2 border-primary shadow-lg shadow-primary/20")}>
+                    <CardHeader className="items-center text-center">
+                      <CardTitle className="text-2xl font-headline">{pkg.name}</CardTitle>
+                      <div className="text-4xl font-bold">
+                        {pkg.price.startsWith('$') ? (
+                          <>
+                            {pkg.price.split('/')[0]}
+                            <span className="text-sm font-normal text-muted-foreground">/{pkg.price.split('/')[1]}</span>
+                          </>
+                        ) : (
+                          pkg.price
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <ul className="space-y-3">
+                        <li className="flex items-center gap-3">
+                          <Check className="h-5 w-5 text-green-500" />
+                          <span className="text-muted-foreground">{`${pkg.taskLimit} tasks / ${pkg.expiryPeriod.replace('1 ', '')}`}</span>
+                        </li>
+                        {pkg.features.map((feature, i) => (
+                          <li key={i} className="flex items-center gap-3">
+                            <Check className="h-5 w-5 text-green-500" />
+                            <span className="text-muted-foreground">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                    <CardFooter>
+                      <Button asChild className="w-full" variant={pkg.isPrimary ? 'default' : 'outline'}>
+                        <Link href="/signup">{pkg.isPrimary ? 'Choose Plan' : 'Get Started'}</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground">Pricing plans will be available soon.</p>
+            )}
+          </div>
+        </section>
+
 
         {/* Testimonials Section */}
         <section id="testimonials" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
