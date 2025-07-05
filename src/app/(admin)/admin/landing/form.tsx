@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Wand2, Upload } from "lucide-react";
+import { Loader2, Wand2, Upload, Clipboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateAppSettings, updateLandingPageImage, generateLandingImage as generateImageAction } from "@/lib/actions";
 import { getAppSettings } from "@/lib/database";
@@ -80,6 +80,25 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
         }
     };
     
+    const handleCopyError = (text: string) => {
+        navigator.clipboard.writeText(text).then(
+            () => {
+                toast({
+                    title: "Copied!",
+                    description: "Error details have been copied to your clipboard.",
+                });
+            },
+            (err) => {
+                toast({
+                    title: "Copy Failed",
+                    description: "Could not copy error to clipboard.",
+                    variant: "destructive",
+                });
+                console.error("Failed to copy text: ", err);
+            }
+        );
+    };
+    
     const handleGenerate = async () => {
         if (!prompt) {
             toast({ title: "Missing Prompt", description: "Please enter a prompt to generate an image.", variant: "destructive" });
@@ -102,7 +121,25 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
                  throw new Error(uploadResult.message || "Failed to save generated image.");
             }
         } catch (error) {
-            toast({ title: "Error", description: error instanceof Error ? error.message : "An error occurred.", variant: "destructive" });
+            const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+            toast({
+                title: "Generation Failed",
+                variant: "destructive",
+                duration: Infinity,
+                description: (
+                    <div className="w-full">
+                        <div className="flex justify-start items-center gap-4 mb-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleCopyError(errorMessage)}>
+                                <Clipboard className="mr-2 h-4 w-4" /> Copy
+                            </Button>
+                            <p>The AI model returned an error:</p>
+                        </div>
+                        <pre className="mt-1 w-full rounded-md bg-destructive/20 p-2 font-mono text-sm text-destructive-foreground whitespace-pre-wrap">
+                            {errorMessage}
+                        </pre>
+                    </div>
+                )
+            });
         } finally {
             setIsLoading(false);
         }
