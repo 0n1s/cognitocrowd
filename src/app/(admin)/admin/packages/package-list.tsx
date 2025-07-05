@@ -48,6 +48,7 @@ import { PlusCircle, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createAdminPackage, updateAdminPackage, deleteAdminPackage } from "@/lib/actions";
 import { getPackages } from "@/lib/database";
+import { Separator } from "@/components/ui/separator";
 
 type AddPackageDialogProps = {
   open: boolean;
@@ -64,6 +65,8 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
   const [taskLimit, setTaskLimit] = useState("100");
   const [expiryNumber, setExpiryNumber] = useState(1);
   const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">("months");
+  const [referralBonusType, setReferralBonusType] = useState<'percentage' | 'fixed'>('percentage');
+  const [referralBonusAmount, setReferralBonusAmount] = useState("10");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFeatureChange = (index: number, value: string) => {
@@ -87,6 +90,8 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
     setTaskLimit("100");
     setExpiryNumber(1);
     setExpiryUnit("months");
+    setReferralBonusType('percentage');
+    setReferralBonusAmount("10");
   };
 
   const handleSubmit = async () => {
@@ -97,7 +102,9 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
         features: features.filter(f => f.trim() !== ''),
         isPrimary,
         taskLimit: parseInt(taskLimit, 10) || 0,
-        expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`
+        expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
+        referralBonusType: referralBonusType,
+        referralBonusAmount: parseFloat(referralBonusAmount) || 0,
     });
     
     if (result.success) {
@@ -180,6 +187,20 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
                     <Label htmlFor="isPrimary" className="ml-2 font-normal text-sm text-muted-foreground">Make this the highlighted package.</Label>
                 </div>
           </div>
+          <Separator />
+           <div className="grid grid-cols-4 items-center gap-4">
+             <Label className="text-right">Referral Bonus</Label>
+              <div className="col-span-3 grid grid-cols-2 gap-2">
+                  <Select value={referralBonusType} onValueChange={(v) => setReferralBonusType(v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="percentage">Percentage (%)</SelectItem>
+                          <SelectItem value="fixed">Fixed ($)</SelectItem>
+                      </SelectContent>
+                  </Select>
+                  <Input type="number" value={referralBonusAmount} onChange={e => setReferralBonusAmount(e.target.value)} />
+              </div>
+           </div>
         </div>
         <DialogFooter>
           <DialogClose asChild>
@@ -218,6 +239,8 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
 
     const [expiryNumber, setExpiryNumber] = useState(initialExpiryNumber);
     const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">(initialExpiryUnit);
+    const [referralBonusType, setReferralBonusType] = useState(pkg.referralBonusType || 'percentage');
+    const [referralBonusAmount, setReferralBonusAmount] = useState(String(pkg.referralBonusAmount || 10));
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleFeatureChange = (index: number, value: string) => {
@@ -241,7 +264,9 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             features: features.filter(f => f.trim() !== ''),
             isPrimary,
             taskLimit: parseInt(taskLimit, 10) || 0,
-            expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`
+            expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
+            referralBonusType: referralBonusType,
+            referralBonusAmount: parseFloat(referralBonusAmount) || 0,
         });
         
         if (result.success) {
@@ -265,16 +290,16 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name</Label>
-            <Input id="name" value={name} onChange={e => setName(e.target.value)} className="col-span-3" placeholder="e.g., Pro" />
+            <Label htmlFor="name-edit" className="text-right">Name</Label>
+            <Input id="name-edit" value={name} onChange={e => setName(e.target.value)} className="col-span-3" placeholder="e.g., Pro" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="price" className="text-right">Price</Label>
-            <Input id="price" value={price} onChange={e => setPrice(e.target.value)} className="col-span-3" placeholder="e.g., $10/mo or Free" />
+            <Label htmlFor="price-edit" className="text-right">Price</Label>
+            <Input id="price-edit" value={price} onChange={e => setPrice(e.target.value)} className="col-span-3" placeholder="e.g., $10/mo or Free" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="taskLimit" className="text-right">Contribution Limit</Label>
-            <Input id="taskLimit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
+            <Label htmlFor="taskLimit-edit" className="text-right">Contribution Limit</Label>
+            <Input id="taskLimit-edit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Expiry</Label>
@@ -317,10 +342,24 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="isPrimary" className="text-right">Primary?</Label>
+                <Label htmlFor="isPrimary-edit" className="text-right">Primary?</Label>
                 <div className="col-span-3 flex items-center">
-                    <Checkbox id="isPrimary" checked={isPrimary} onCheckedChange={checked => setIsPrimary(checked as boolean)} />
-                    <Label htmlFor="isPrimary" className="ml-2 font-normal text-sm text-muted-foreground">Make this the highlighted package.</Label>
+                    <Checkbox id="isPrimary-edit" checked={isPrimary} onCheckedChange={checked => setIsPrimary(checked as boolean)} />
+                    <Label htmlFor="isPrimary-edit" className="ml-2 font-normal text-sm text-muted-foreground">Make this the highlighted package.</Label>
+                </div>
+            </div>
+             <Separator />
+             <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Referral Bonus</Label>
+                <div className="col-span-3 grid grid-cols-2 gap-2">
+                    <Select value={referralBonusType} onValueChange={(v) => setReferralBonusType(v as any)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="percentage">Percentage (%)</SelectItem>
+                            <SelectItem value="fixed">Fixed ($)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Input type="number" value={referralBonusAmount} onChange={e => setReferralBonusAmount(e.target.value)} />
                 </div>
             </div>
         </div>
@@ -392,6 +431,7 @@ const LoadingSkeleton = () => (
               <TableHead>Price</TableHead>
               <TableHead>Contribution Limit</TableHead>
               <TableHead>Expiry</TableHead>
+              <TableHead>Referral Bonus</TableHead>
               <TableHead>Primary</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -402,6 +442,7 @@ const LoadingSkeleton = () => (
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
@@ -455,6 +496,7 @@ export function PackageList() {
                     <TableHead>Price</TableHead>
                     <TableHead>Contribution Limit</TableHead>
                     <TableHead>Expiry</TableHead>
+                    <TableHead>Referral Bonus</TableHead>
                     <TableHead>Primary</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -466,6 +508,12 @@ export function PackageList() {
                         <TableCell>{pkg.price}</TableCell>
                         <TableCell>{pkg.taskLimit}</TableCell>
                         <TableCell>{pkg.expiryPeriod}</TableCell>
+                        <TableCell>
+                          {pkg.referralBonusAmount ? 
+                              (pkg.referralBonusType === 'percentage' ? `${pkg.referralBonusAmount}%` : `$${pkg.referralBonusAmount.toFixed(2)}`)
+                              : 'N/A'
+                          }
+                        </TableCell>
                         <TableCell>
                         {pkg.isPrimary && <Badge variant="secondary">Yes</Badge>}
                         </TableCell>

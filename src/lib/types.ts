@@ -90,6 +90,8 @@ export type User = {
   qualificationResults?: { correctCount: number; totalCount: number; };
   ipAddress?: string;
   browserFingerprint?: string;
+  referralCode?: string;
+  referredBy?: string;
 };
 
 export type AdminUser = User & {
@@ -128,6 +130,8 @@ export type Package = {
   isPrimary?: boolean;
   taskLimit: number;
   expiryPeriod: string;
+  referralBonusType?: 'percentage' | 'fixed';
+  referralBonusAmount?: number;
 };
 
 export type TaskResponse = {

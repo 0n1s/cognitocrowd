@@ -1,6 +1,7 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -351,6 +352,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             lastCompletionReset: now,
             accountExpiresAt: expiryTimestamp,
             onboardingStatus: appSettings.onboardingCourseEnabled ? 'pending' : 'approved',
+            referralCode: uuidv4().substring(0, 8).toUpperCase(),
         });
         
         return { success: true };
