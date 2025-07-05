@@ -10,6 +10,7 @@ import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, Cha
 import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
+import { improveLandingPageText as improveLandingPageTextFlow } from "@/ai/flows/ai-improve-landing-page-text";
 import { v4 as uuidv4 } from "uuid";
 import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks, getPendingApprovals } from './database';
 import { headers } from "next/headers";
@@ -1097,6 +1098,20 @@ export async function generateLandingImage(prompt: string) {
         return { success: true, imageDataUri: result.imageDataUri };
     } catch (error) {
         console.error("Error generating landing page image:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function improveLandingPageText(originalText: string, context: string) {
+    try {
+        const result = await improveLandingPageTextFlow({ originalText, context });
+        if (!result || !result.improvedText) {
+             throw new Error("AI did not return improved text.");
+        }
+        return { success: true, improvedText: result.improvedText };
+    } catch (error) {
+        console.error("Error improving text with AI:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }

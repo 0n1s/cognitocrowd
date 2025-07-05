@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Wand2, Upload, Clipboard, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateAppSettings, updateLandingPageImage, generateLandingImage as generateImageAction } from "@/lib/actions";
+import { updateAppSettings, updateLandingPageImage, generateLandingImage as generateImageAction, improveLandingPageText } from "@/lib/actions";
 import { getAppSettings } from "@/lib/database";
 import { cn } from "@/lib/utils";
 
@@ -191,6 +191,94 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
     );
 }
 
+type TextInputWithAIProps = {
+    id: string;
+    label: string;
+    value: string;
+    context: string;
+    onChange: (value: string) => void;
+    isTextarea?: boolean;
+    disabled?: boolean;
+};
+
+function TextInputWithAI({ id, label, value, context, onChange, isTextarea = false, disabled = false }: TextInputWithAIProps) {
+    const { toast } = useToast();
+    const [isImproving, setIsImproving] = useState(false);
+
+    const handleCopyError = (text: string) => {
+        navigator.clipboard.writeText(text).then(
+            () => toast({ title: "Copied!", description: "Error details have been copied to your clipboard." }),
+            () => toast({ title: "Copy Failed", description: "Could not copy error to clipboard.", variant: "destructive" })
+        );
+    };
+
+    const handleImprove = async () => {
+        if (!value) {
+            toast({ title: "No text to improve", description: "Please enter some text first.", variant: "destructive" });
+            return;
+        }
+        setIsImproving(true);
+        try {
+            const result = await improveLandingPageText(value, context);
+            if (result.success && result.improvedText) {
+                onChange(result.improvedText);
+                toast({ title: "Success", description: "Text has been improved by AI." });
+            } else {
+                throw new Error(result.message || "Failed to improve text.");
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+            toast({
+                title: "Improvement Failed",
+                variant: "destructive",
+                duration: Infinity,
+                description: (
+                    <div className="w-full">
+                        <div className="flex justify-start items-center gap-4 mb-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleCopyError(errorMessage)}>
+                                <Clipboard className="mr-2 h-4 w-4" /> Copy
+                            </Button>
+                            <p>The AI model returned an error.</p>
+                        </div>
+                        <pre className="mt-1 w-full rounded-md bg-destructive/20 p-2 font-mono text-sm text-destructive-foreground whitespace-pre-wrap">
+                            {errorMessage}
+                        </pre>
+                    </div>
+                )
+            });
+        } finally {
+            setIsImproving(false);
+        }
+    };
+
+    const InputComponent = isTextarea ? Textarea : Input;
+
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center">
+                <Label htmlFor={id}>{label}</Label>
+                <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleImprove} 
+                    disabled={disabled || isImproving || !value}
+                >
+                    {isImproving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    Improve
+                </Button>
+            </div>
+            <InputComponent 
+                id={id} 
+                value={value} 
+                onChange={(e) => onChange(e.target.value)} 
+                disabled={disabled || isImproving}
+            />
+        </div>
+    );
+}
+
+
 const LoadingSkeleton = () => (
     <Card>
         <CardHeader>
@@ -273,38 +361,66 @@ export function LandingPageForm() {
                     <AccordionItem value="item-1">
                         <AccordionTrigger className="text-lg font-semibold">Hero Section</AccordionTrigger>
                         <AccordionContent className="space-y-4 pt-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="heroTitle">Title</Label>
-                                <Input id="heroTitle" value={content.heroTitle} onChange={e => handleContentChange('landingPageContent.heroTitle', e.target.value)} />
-                            </div>
-                             <div className="space-y-2">
-                                <Label htmlFor="heroSubtitle">Subtitle</Label>
-                                <Textarea id="heroSubtitle" value={content.heroSubtitle} onChange={e => handleContentChange('landingPageContent.heroSubtitle', e.target.value)} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="heroCtaButton">Button Text</Label>
-                                <Input id="heroCtaButton" value={content.heroCtaButton} onChange={e => handleContentChange('landingPageContent.heroCtaButton', e.target.value)} />
-                            </div>
+                            <TextInputWithAI
+                                id="heroTitle"
+                                label="Title"
+                                value={content.heroTitle}
+                                onChange={value => handleContentChange('landingPageContent.heroTitle', value)}
+                                context="Hero section title"
+                            />
+                             <TextInputWithAI
+                                id="heroSubtitle"
+                                label="Subtitle"
+                                value={content.heroSubtitle}
+                                onChange={value => handleContentChange('landingPageContent.heroSubtitle', value)}
+                                context="Hero section subtitle"
+                                isTextarea
+                            />
+                            <TextInputWithAI
+                                id="heroCtaButton"
+                                label="Button Text"
+                                value={content.heroCtaButton}
+                                onChange={value => handleContentChange('landingPageContent.heroCtaButton', value)}
+                                context="Call to action button text"
+                            />
                         </AccordionContent>
                     </AccordionItem>
                     
                     <AccordionItem value="item-2">
                          <AccordionTrigger className="text-lg font-semibold">Platform Features Section</AccordionTrigger>
                         <AccordionContent className="space-y-6 pt-4">
-                             <div className="space-y-2">
-                                <Label>Title</Label>
-                                <Input value={content.platformTitle} onChange={e => handleContentChange('landingPageContent.platformTitle', e.target.value)} />
-                            </div>
-                             <div className="space-y-2">
-                                <Label>Subtitle</Label>
-                                <Textarea value={content.platformSubtitle} onChange={e => handleContentChange('landingPageContent.platformSubtitle', e.target.value)} />
-                            </div>
+                            <TextInputWithAI
+                                id="platformTitle"
+                                label="Title"
+                                value={content.platformTitle}
+                                onChange={value => handleContentChange('landingPageContent.platformTitle', value)}
+                                context="Platform features section title"
+                            />
+                            <TextInputWithAI
+                                id="platformSubtitle"
+                                label="Subtitle"
+                                value={content.platformSubtitle}
+                                onChange={value => handleContentChange('landingPageContent.platformSubtitle', value)}
+                                context="Platform features section subtitle"
+                                isTextarea
+                            />
                             {content.featureItems.map((item, index) => (
-                                <div key={index} className="p-4 border rounded-lg space-y-2">
-                                    <Label>Feature {index+1} Title</Label>
-                                    <Input value={item.title} onChange={e => handleContentChange(`landingPageContent.featureItems.${index}.title`, e.target.value)} />
-                                    <Label>Feature {index+1} Description</Label>
-                                    <Textarea value={item.description} onChange={e => handleContentChange(`landingPageContent.featureItems.${index}.description`, e.target.value)} />
+                                <div key={index} className="p-4 border rounded-lg space-y-4">
+                                    <TextInputWithAI
+                                        id={`feature-${index}-title`}
+                                        label={`Feature ${index+1} Title`}
+                                        value={item.title}
+                                        onChange={value => handleContentChange(`landingPageContent.featureItems.${index}.title`, value)}
+                                        context="Feature item title"
+                                    />
+                                    <TextInputWithAI
+                                        id={`feature-${index}-desc`}
+                                        label={`Feature ${index+1} Description`}
+                                        value={item.description}
+                                        onChange={value => handleContentChange(`landingPageContent.featureItems.${index}.description`, value)}
+                                        context="Feature item description"
+                                        isTextarea
+                                    />
                                 </div>
                             ))}
                         </AccordionContent>
@@ -313,20 +429,38 @@ export function LandingPageForm() {
                     <AccordionItem value="item-3">
                          <AccordionTrigger className="text-lg font-semibold">"Why Us" Section</AccordionTrigger>
                         <AccordionContent className="space-y-6 pt-4">
-                             <div className="space-y-2">
-                                <Label>Title</Label>
-                                <Input value={content.whyUsTitle} onChange={e => handleContentChange('landingPageContent.whyUsTitle', e.target.value)} />
-                            </div>
-                             <div className="space-y-2">
-                                <Label>Subtitle</Label>
-                                <Textarea value={content.whyUsSubtitle} onChange={e => handleContentChange('landingPageContent.whyUsSubtitle', e.target.value)} />
-                            </div>
+                             <TextInputWithAI
+                                id="whyUsTitle"
+                                label="Title"
+                                value={content.whyUsTitle}
+                                onChange={value => handleContentChange('landingPageContent.whyUsTitle', value)}
+                                context="'Why Us' section title"
+                            />
+                            <TextInputWithAI
+                                id="whyUsSubtitle"
+                                label="Subtitle"
+                                value={content.whyUsSubtitle}
+                                onChange={value => handleContentChange('landingPageContent.whyUsSubtitle', value)}
+                                context="'Why Us' section subtitle"
+                                isTextarea
+                            />
                             {content.whyUsItems.map((item, index) => (
-                                <div key={index} className="p-4 border rounded-lg space-y-2">
-                                    <Label>Item {index+1} Title</Label>
-                                    <Input value={item.title} onChange={e => handleContentChange(`landingPageContent.whyUsItems.${index}.title`, e.target.value)} />
-                                    <Label>Item {index+1} Description</Label>
-                                    <Textarea value={item.description} onChange={e => handleContentChange(`landingPageContent.whyUsItems.${index}.description`, e.target.value)} />
+                                <div key={index} className="p-4 border rounded-lg space-y-4">
+                                     <TextInputWithAI
+                                        id={`whyus-${index}-title`}
+                                        label={`Item ${index+1} Title`}
+                                        value={item.title}
+                                        onChange={value => handleContentChange(`landingPageContent.whyUsItems.${index}.title`, value)}
+                                        context="'Why Us' item title"
+                                    />
+                                    <TextInputWithAI
+                                        id={`whyus-${index}-desc`}
+                                        label={`Item ${index+1} Description`}
+                                        value={item.description}
+                                        onChange={value => handleContentChange(`landingPageContent.whyUsItems.${index}.description`, value)}
+                                        context="'Why Us' item description"
+                                        isTextarea
+                                    />
                                 </div>
                             ))}
                         </AccordionContent>
@@ -335,22 +469,45 @@ export function LandingPageForm() {
                      <AccordionItem value="item-4">
                          <AccordionTrigger className="text-lg font-semibold">Testimonials Section</AccordionTrigger>
                         <AccordionContent className="space-y-6 pt-4">
-                             <div className="space-y-2">
-                                <Label>Title</Label>
-                                <Input value={content.testimonialsTitle} onChange={e => handleContentChange('landingPageContent.testimonialsTitle', e.target.value)} />
-                            </div>
-                             <div className="space-y-2">
-                                <Label>Subtitle</Label>
-                                <Textarea value={content.testimonialsSubtitle} onChange={e => handleContentChange('landingPageContent.testimonialsSubtitle', e.target.value)} />
-                            </div>
+                            <TextInputWithAI
+                                id="testimonialsTitle"
+                                label="Title"
+                                value={content.testimonialsTitle}
+                                onChange={value => handleContentChange('landingPageContent.testimonialsTitle', value)}
+                                context="Testimonials section title"
+                            />
+                            <TextInputWithAI
+                                id="testimonialsSubtitle"
+                                label="Subtitle"
+                                value={content.testimonialsSubtitle}
+                                onChange={value => handleContentChange('landingPageContent.testimonialsSubtitle', value)}
+                                context="Testimonials section subtitle"
+                                isTextarea
+                            />
                             {content.testimonials.map((item, index) => (
-                                <div key={index} className="p-4 border rounded-lg space-y-2">
-                                    <Label>Testimonial {index+1} Name</Label>
-                                    <Input value={item.name} onChange={e => handleContentChange(`landingPageContent.testimonials.${index}.name`, e.target.value)} />
-                                     <Label>Testimonial {index+1} Role</Label>
-                                    <Input value={item.role} onChange={e => handleContentChange(`landingPageContent.testimonials.${index}.role`, e.target.value)} />
-                                    <Label>Testimonial {index+1} Quote</Label>
-                                    <Textarea value={item.quote} onChange={e => handleContentChange(`landingPageContent.testimonials.${index}.quote`, e.target.value)} />
+                                <div key={index} className="p-4 border rounded-lg space-y-4">
+                                    <TextInputWithAI
+                                        id={`testimonial-${index}-name`}
+                                        label={`Testimonial ${index+1} Name`}
+                                        value={item.name}
+                                        onChange={value => handleContentChange(`landingPageContent.testimonials.${index}.name`, value)}
+                                        context="Testimonial author name"
+                                    />
+                                     <TextInputWithAI
+                                        id={`testimonial-${index}-role`}
+                                        label={`Testimonial ${index+1} Role`}
+                                        value={item.role}
+                                        onChange={value => handleContentChange(`landingPageContent.testimonials.${index}.role`, value)}
+                                        context="Testimonial author role"
+                                    />
+                                     <TextInputWithAI
+                                        id={`testimonial-${index}-quote`}
+                                        label={`Testimonial ${index+1} Quote`}
+                                        value={item.quote}
+                                        onChange={value => handleContentChange(`landingPageContent.testimonials.${index}.quote`, value)}
+                                        context="Testimonial quote"
+                                        isTextarea
+                                    />
                                 </div>
                             ))}
                         </AccordionContent>
