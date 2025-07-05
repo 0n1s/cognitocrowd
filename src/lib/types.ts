@@ -140,6 +140,48 @@ export type OnboardingStep = {
     content: string;
 };
 
+export type LandingPageContent = {
+    processImage1: string;
+    processImage2: string;
+    processImage3: string;
+    hiringBackgroundImage: string;
+
+    heroTitle: string;
+    heroSubtitle: string;
+    heroCtaButton: string;
+
+    platformTitle: string;
+    platformSubtitle: string;
+    featureItems: { title: string; description: string; }[];
+
+    whyUsTitle: string;
+    whyUsSubtitle: string;
+    whyUsItems: { title: string; description: string; }[];
+
+    toolsTitle: string;
+    toolsSubtitle: string;
+    toolsItems: { title: string; description: string; }[];
+
+    processTitle: string;
+    processSubtitle: string;
+    processSteps: { title: string; description: string; }[];
+
+    pricingTitle: string;
+    pricingSubtitle: string;
+
+    testimonialsTitle: string;
+    testimonialsSubtitle: string;
+    testimonials: { name: string; role: string; quote: string; }[];
+
+    hiringTitle: string;
+    hiringSubtitle: string;
+
+    ctaTitle: string;
+    ctaSubtitle: string;
+    ctaButton: string;
+};
+
+
 export type AppSettings = {
   id?: 'main';
   paymentMethods: PaymentMethod[];
@@ -151,12 +193,7 @@ export type AppSettings = {
   onboardingCourseTitle?: string;
   onboardingCourseDescription?: string;
   onboardingCourseSteps?: OnboardingStep[];
-  landingPageContent?: {
-      processImage1: string;
-      processImage2: string;
-      processImage3: string;
-      hiringBackgroundImage: string;
-  };
+  landingPageContent?: LandingPageContent;
   autoApprovalEnabled?: boolean;
   autoApprovalThreshold?: number;
   autoRejectionEnabled?: boolean;

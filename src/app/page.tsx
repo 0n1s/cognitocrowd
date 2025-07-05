@@ -1,4 +1,5 @@
 
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -48,31 +49,9 @@ const LandingFooter = () => (
   </footer>
 );
 
-const featureItems = [
-    { icon: PencilRuler, title: "Creative & Writing Tasks", description: "Edit, proofread, and generate creative text to enhance language models' fluency and style." },
-    { icon: Code, title: "Technical & Code Reviews", description: "Review and write code, debug algorithms, and test for vulnerabilities to improve AI's logical reasoning." },
-    { icon: Shield, title: "Safety & Ethics Evaluation", description: "Identify and flag biased, harmful, or unethical responses to build safer and more responsible AI." },
-    { icon: Bot, title: "AI Model Interaction", description: "Engage in conversations with AI, testing its capabilities and providing feedback on its performance and helpfulness." }
-];
-
-const whyUsItems = [
-    { icon: TrendingUp, title: "Make a Tangible Impact", description: "Your contributions directly refine the world's most advanced AI models. See the results of your work and be part of the technology that's shaping our future." },
-    { icon: Award, title: "Be Valued and Rewarded", description: "We believe expertise should be compensated fairly. Our platform offers competitive rewards for your time and knowledge, with transparent and reliable payments." },
-    { icon: Clock, title: "Work on Your Terms", description: "Enjoy the freedom to work from anywhere, at any time. Choose tasks that interest you and fit your schedule, creating a perfect work-life balance." },
-    { icon: ShieldCheck, title: "Join an Elite Community", description: "Pass our qualification to join a vetted network of top-tier experts. Collaborate with the best and contribute to a high-quality, trusted data ecosystem." }
-];
-
-const aiToolItems = [
-    { icon: MessageCircle, title: "Chat Models", description: "Converse with our advanced language models to test their conversational abilities, knowledge, and reasoning skills." },
-    { icon: ImageIcon, title: "Image Generation", description: "Generate stunning, high-quality images from text prompts and help refine the AI's creative and descriptive capabilities." },
-    { icon: Video, title: "Video Generation", description: "Create and modify video clips using simple text commands, pushing the boundaries of AI-powered multimedia generation. (Coming Soon)" }
-];
-
-const testimonials = [
-    { name: "Aisha Khan", role: "Software Engineer", quote: "Trainly provides the most interesting and challenging code-related tasks. It's rewarding to know my work directly improves the models I use daily." },
-    { name: "Dr. Ben Carter", role: "Medical Researcher", quote: "The platform's focus on quality and accuracy is impressive. It's a fantastic way to contribute specialized knowledge and stay at the cutting edge of AI." },
-    { name: "Maria Garcia", role: "Creative Writer & Editor", quote: "I get to use my writing skills to shape how AI communicates. The tasks are engaging, and the platform is incredibly intuitive and fair." }
-];
+const featureIcons = [PencilRuler, Code, Shield, Bot];
+const whyUsIcons = [TrendingUp, Award, Clock, ShieldCheck];
+const aiToolIcons = [MessageCircle, ImageIcon, Video];
 
 const ALL_EXPERTISE_AREAS = [
   "General Knowledge",
@@ -104,11 +83,23 @@ export default async function Home() {
   const packages = await getPackages();
 
   const { landingPageContent } = settings;
-  const processImage1 = landingPageContent?.processImage1 || "https://placehold.co/800x600.png";
-  const processImage2 = landingPageContent?.processImage2 || "https://placehold.co/800x600.png";
-  const processImage3 = landingPageContent?.processImage3 || "https://placehold.co/800x600.png";
-  const hiringBackgroundImage = landingPageContent?.hiringBackgroundImage || "https://placehold.co/1920x1080.png";
-
+  
+  if (!landingPageContent) {
+    return <div>Landing page content not configured.</div>;
+  }
+  
+  const { 
+    heroTitle, heroSubtitle, heroCtaButton,
+    platformTitle, platformSubtitle, featureItems,
+    whyUsTitle, whyUsSubtitle, whyUsItems,
+    toolsTitle, toolsSubtitle, toolsItems,
+    processTitle, processSubtitle, processSteps,
+    pricingTitle, pricingSubtitle,
+    testimonialsTitle, testimonialsSubtitle, testimonials,
+    hiringTitle, hiringSubtitle,
+    ctaTitle, ctaSubtitle, ctaButton,
+    processImage1, processImage2, processImage3, hiringBackgroundImage
+  } = landingPageContent;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -118,33 +109,23 @@ export default async function Home() {
         {/* Hero Section */}
         <section className="relative w-full h-[80vh] flex items-center justify-center text-center overflow-hidden">
             <div className="absolute inset-0 z-0 bg-background overflow-hidden bg-[linear-gradient(to_right,rgba(var(--primary-rgb),0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(var(--primary-rgb),0.2)_1px,transparent_1px)] bg-[size:3rem_3rem]">
-              {/* Radial Gradients */}
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
-              
-               {/* Shooting Stars */}
-              <div className="absolute top-0 left-[10%] h-64 w-0.5 animate-shooting-star bg-gradient-to-b from-primary/80 to-transparent" style={{ '--duration': '10s' } as React.CSSProperties} />
-              <div className="absolute top-0 left-[30%] h-48 w-0.5 animate-shooting-star bg-gradient-to-b from-accent/80 to-transparent" style={{ '--duration': '8s', animationDelay: '2s' } as React.CSSProperties} />
-              <div className="absolute top-0 left-[50%] h-80 w-0.5 animate-shooting-star bg-gradient-to-b from-primary/80 to-transparent" style={{ '--duration': '12s', animationDelay: '5s' } as React.CSSProperties} />
-              <div className="absolute top-0 left-[70%] h-40 w-0.5 animate-shooting-star bg-gradient-to-b from-accent/80 to-transparent" style={{ '--duration': '7s', animationDelay: '1s' } as React.CSSProperties} />
-              <div className="absolute top-0 left-[90%] h-56 w-0.5 animate-shooting-star bg-gradient-to-b from-primary/80 to-transparent" style={{ '--duration': '9s', animationDelay: '3s' } as React.CSSProperties} />
-              
-              {/* Bot animations */}
               <Bot className="absolute h-8 w-8 text-primary/50 top-1/4 left-1/3 animate-float-1" />
               <Bot className="absolute h-12 w-12 text-accent/40 bottom-1/4 right-1/3 animate-float-2" />
               <Bot className="absolute h-6 w-6 text-primary/30 bottom-1/2 left-1/2 animate-float-3" />
             </div>
             <div className="container relative z-10">
                 <h1 className="font-headline text-5xl font-extrabold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-muted-foreground">
-                    Build Superhuman AI
+                    {heroTitle}
                 </h1>
                 <p className="mx-auto max-w-[700px] text-lg text-muted-foreground md:text-xl mt-6">
-                    Join an elite network of human experts training the next generation of artificial intelligence. Your knowledge fuels the future.
+                    {heroSubtitle}
                 </p>
                 <div className="mt-8 flex justify-center gap-4">
                     <Button size="lg" asChild className="shadow-lg shadow-primary/30">
                         <Link href="/signup">
-                            Sign Up Now <ArrowRight className="ml-2 h-5 w-5" />
+                            {heroCtaButton} <ArrowRight className="ml-2 h-5 w-5" />
                         </Link>
                     </Button>
                 </div>
@@ -155,19 +136,22 @@ export default async function Home() {
         <section id="platform" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
-                <h2 className="font-headline text-4xl font-bold">What You'll Do</h2>
-                <p className="text-muted-foreground mt-4 text-lg">We connect human intelligence with machine learning to solve complex reasoning problems at scale.</p>
+                <h2 className="font-headline text-4xl font-bold">{platformTitle}</h2>
+                <p className="text-muted-foreground mt-4 text-lg">{platformSubtitle}</p>
             </div>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-              {featureItems.map(item => (
-                <div key={item.title} className="text-center">
-                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4 border border-primary/20">
-                    <item.icon className="h-6 w-6 text-primary" />
+              {featureItems.map((item, index) => {
+                const Icon = featureIcons[index] || BrainCircuit;
+                return (
+                  <div key={item.title} className="text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4 border border-primary/20">
+                      <Icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold">{item.title}</h3>
+                    <p className="text-muted-foreground mt-2">{item.description}</p>
                   </div>
-                  <h3 className="text-lg font-semibold">{item.title}</h3>
-                  <p className="text-muted-foreground mt-2">{item.description}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </section>
@@ -176,15 +160,17 @@ export default async function Home() {
         <section id="why-trainly" className="py-20">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
-                <h2 className="font-headline text-4xl font-bold">Why Us?</h2>
-                <p className="text-muted-foreground mt-4 text-lg">We're building more than just AI. We're building a new paradigm for human-machine collaboration, founded on respect for expertise and a commitment to quality.</p>
+                <h2 className="font-headline text-4xl font-bold">{whyUsTitle}</h2>
+                <p className="text-muted-foreground mt-4 text-lg">{whyUsSubtitle}</p>
             </div>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-                {whyUsItems.map(item => (
+                {whyUsItems.map((item, index) => {
+                  const Icon = whyUsIcons[index] || Check;
+                  return (
                     <Card key={item.title} className="bg-card/50 border-border/30 backdrop-blur-sm text-center">
-                       <CardHeader className="items-center">
+                      <CardHeader className="items-center">
                         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4 border border-primary/20">
-                            <item.icon className="h-6 w-6 text-primary" />
+                            <Icon className="h-6 w-6 text-primary" />
                         </div>
                         <CardTitle>{item.title}</CardTitle>
                       </CardHeader>
@@ -192,7 +178,8 @@ export default async function Home() {
                         <p className="text-muted-foreground">{item.description}</p>
                       </CardContent>
                     </Card>
-                ))}
+                  )
+                })}
             </div>
           </div>
         </section>
@@ -201,23 +188,26 @@ export default async function Home() {
         <section id="tools" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
-                <h2 className="font-headline text-4xl font-bold">Explore Our AI Models</h2>
-                <p className="text-muted-foreground mt-4 text-lg">Go beyond tasks. Directly interact with and shape our suite of generative AI tools.</p>
+                <h2 className="font-headline text-4xl font-bold">{toolsTitle}</h2>
+                <p className="text-muted-foreground mt-4 text-lg">{toolsSubtitle}</p>
             </div>
             <div className="grid gap-8 md:grid-cols-3">
-              {aiToolItems.map(item => (
-                <Card key={item.title} className="bg-card/50 border-border/30 backdrop-blur-sm">
-                   <CardHeader className="items-center text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4 border border-primary/20">
-                        <item.icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <CardTitle>{item.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-center">
-                    <p className="text-muted-foreground">{item.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
+              {toolsItems.map((item, index) => {
+                const Icon = aiToolIcons[index] || MessageCircle;
+                return (
+                  <Card key={item.title} className="bg-card/50 border-border/30 backdrop-blur-sm">
+                    <CardHeader className="items-center text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4 border border-primary/20">
+                          <Icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <CardTitle>{item.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <p className="text-muted-foreground">{item.description}</p>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -226,13 +216,14 @@ export default async function Home() {
         <section id="process" className="py-20">
            <div className="container">
               <div className="text-center max-w-2xl mx-auto mb-16">
-                  <h2 className="font-headline text-4xl font-bold tracking-tight">Simple Process, Powerful Impact</h2>
-                  <p className="mt-4 text-lg text-muted-foreground">From sign-up to earning, our streamlined process makes it easy to make a difference.</p>
+                  <h2 className="font-headline text-4xl font-bold tracking-tight">{processTitle}</h2>
+                  <p className="mt-4 text-lg text-muted-foreground">{processSubtitle}</p>
               </div>
+              
               <div className="grid md:grid-cols-2 gap-16 items-center">
                   <div>
-                      <h3 className="text-2xl font-bold font-headline">1. Qualify Your Expertise</h3>
-                      <p className="mt-4 text-muted-foreground">Create an account and tell us about your skills. You'll take a short, one-time qualification test in your chosen domains to unlock relevant, high-paying tasks. This ensures we maintain the highest quality standards.</p>
+                      <h3 className="text-2xl font-bold font-headline">{processSteps[0].title}</h3>
+                      <p className="mt-4 text-muted-foreground">{processSteps[0].description}</p>
                   </div>
                    <div className="w-full h-80 rounded-lg overflow-hidden">
                        <Image src={processImage1} alt="Person taking a test online" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="person computer" />
@@ -243,14 +234,14 @@ export default async function Home() {
                        <Image src={processImage2} alt="Dashboard showing tasks" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="dashboard screen" />
                   </div>
                   <div className="md:order-first">
-                      <h3 className="text-2xl font-bold font-headline">2. Complete Paid Tasks</h3>
-                      <p className="mt-4 text-muted-foreground">Once approved, you'll gain access to a personalized dashboard with a stream of contributions. Choose tasks that match your skills, from simple data labeling to complex problem-solving, and earn rewards for every quality submission.</p>
+                      <h3 className="text-2xl font-bold font-headline">{processSteps[1].title}</h3>
+                      <p className="mt-4 text-muted-foreground">{processSteps[1].description}</p>
                   </div>
               </div>
               <div className="grid md:grid-cols-2 gap-16 items-center mt-16">
                   <div>
-                      <h3 className="text-2xl font-bold font-headline">3. Withdraw Your Earnings</h3>
-                      <p className="mt-4 text-muted-foreground">Your work has real value. Track your earnings in your wallet and easily cash out your balance through multiple secure payment methods. We believe in rewarding expertise, fairly and transparently.</p>
+                      <h3 className="text-2xl font-bold font-headline">{processSteps[2].title}</h3>
+                      <p className="mt-4 text-muted-foreground">{processSteps[2].description}</p>
                   </div>
                    <div className="w-full h-80 rounded-lg overflow-hidden">
                        <Image src={processImage3} alt="Wallet showing earnings" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="payment success" />
@@ -263,10 +254,8 @@ export default async function Home() {
         <section id="pricing" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
           <div className="container">
             <div className="text-center max-w-2xl mx-auto mb-12">
-              <h2 className="font-headline text-4xl font-bold">Find a Plan to Power Your Ambition</h2>
-              <p className="text-muted-foreground mt-4 text-lg">
-                Subscribers get priority access to test our newest models first.
-              </p>
+              <h2 className="font-headline text-4xl font-bold">{pricingTitle}</h2>
+              <p className="text-muted-foreground mt-4 text-lg">{pricingSubtitle}</p>
             </div>
             {packages.length > 0 ? (
               <div className="grid gap-8 md:grid-cols-3 items-start max-w-5xl mx-auto">
@@ -318,8 +307,8 @@ export default async function Home() {
         <section id="testimonials" className="py-20">
             <div className="container">
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <h2 className="font-headline text-4xl font-bold">Trusted by Experts Worldwide</h2>
-                    <p className="text-muted-foreground mt-4 text-lg">Our contributors are the backbone of the next AI revolution. Here's what they have to say.</p>
+                    <h2 className="font-headline text-4xl font-bold">{testimonialsTitle}</h2>
+                    <p className="text-muted-foreground mt-4 text-lg">{testimonialsSubtitle}</p>
                 </div>
                 <div className="grid gap-8 md:grid-cols-3">
                     {testimonials.map((testimonial, index) => (
@@ -345,10 +334,8 @@ export default async function Home() {
                 <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background/80"></div>
             </div>
             <div className="container relative z-10 text-center">
-                <h2 className="font-headline text-4xl font-bold tracking-tighter">Now hiring: researchers, innovators, and trainers</h2>
-                <p className="mx-auto max-w-[600px] text-lg text-muted-foreground mt-4">
-                    Whether you have expertise in organic chemistry or creative writing, there’s a place for you.
-                </p>
+                <h2 className="font-headline text-4xl font-bold tracking-tighter">{hiringTitle}</h2>
+                <p className="mx-auto max-w-[600px] text-lg text-muted-foreground mt-4">{hiringSubtitle}</p>
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-4xl mx-auto mt-12">
                     {ALL_EXPERTISE_AREAS.map(expertise => {
@@ -372,13 +359,11 @@ export default async function Home() {
 
         {/* CTA Section */}
         <section className="container py-24 text-center">
-          <h2 className="font-headline text-4xl font-bold tracking-tighter">Ready to Shape the Future?</h2>
-          <p className="mx-auto max-w-[600px] text-lg text-muted-foreground md:text-xl mt-4">
-            Join a global community of experts and enthusiasts building the next generation of intelligence.
-          </p>
+          <h2 className="font-headline text-4xl font-bold tracking-tighter">{ctaTitle}</h2>
+          <p className="mx-auto max-w-[600px] text-lg text-muted-foreground md:text-xl mt-4">{ctaSubtitle}</p>
           <div className="mt-8">
             <Button size="lg" asChild className="shadow-lg shadow-primary/30">
-              <Link href="/signup">Sign Up & Start Earning</Link>
+              <Link href="/signup">{ctaButton}</Link>
             </Button>
           </div>
         </section>
