@@ -1,5 +1,6 @@
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -72,7 +73,7 @@ export type User = {
   packageId: string | null;
   completedTasks?: string[];
   createdAt: any; // Firestore Timestamp
-  role?: 'user' | 'super_user_alpha_7';
+  role?: 'user' | 'super_user_alpha_7' | 'country_partner';
   dailyCompletedCount?: number;
   lastCompletionReset?: any; // Firestore Timestamp
   onboardingStatus?: 'pending' | 'approved' | 'rejected';
@@ -93,6 +94,17 @@ export type User = {
 
 export type AdminUser = User & {
   packageName: string;
+};
+
+export type CountryPartner = {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  country: string;
+  depositFeePercent: number;
+  withdrawalFeePercent: number;
+  isActive: boolean;
 };
 
 export type LeaderboardEntry = {

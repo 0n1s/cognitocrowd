@@ -1,12 +1,13 @@
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest, OnboardingStep } from "@/lib/types";
+import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest, OnboardingStep, CountryPartner } from "@/lib/types";
 import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
@@ -940,25 +941,6 @@ export async function toggleQualificationTestStatus(expertise: string, isEnabled
     }
 }
 
-export async function updateUserNameInDB(userId: string, name: string) {
-    if (!db) {
-        return { success: false, message: 'Database not configured.' };
-    }
-    
-    try {
-        const userDocRef = doc(db, 'users', userId);
-        await updateDoc(userDocRef, { name });
-
-        revalidatePath('/settings');
-        revalidatePath(`/admin/users/${userId}`); // Also revalidate admin view
-        return { success: true, message: 'Your profile has been updated.' };
-    } catch (error) {
-        console.error("Error updating user name in DB:", error);
-        const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
-    }
-}
-
 export async function updateUserApprovalStatus(userId: string, status: 'approved' | 'rejected') {
     if (!db) {
         return { success: false, message: 'Database not configured.' };
@@ -1061,8 +1043,8 @@ export async function updateLandingPageImage(field: string, imageDataUri: string
         const storageRef = ref(storage, `landing-page/${field}-${uuidv4()}.jpg`);
         
         // Manually extract the base64 data from the data URI.
-        const base64Data = imageDataUri.substring(imageDataUri.indexOf(',') + 1);
-
+        const base64Data = imageDataUri.split(',')[1];
+        
         const snapshot = await uploadString(storageRef, base64Data, 'base64', {
             contentType: 'image/jpeg'
         });
@@ -1114,5 +1096,106 @@ export async function improveLandingPageText(originalText: string, context: stri
         console.error("Error improving text with AI:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
+    }
+}
+
+export async function createCountryPartner(data: {
+    userId: string;
+    country: string;
+    depositFeePercent: number;
+    withdrawalFeePercent: number;
+}) {
+    if (!db) return { success: false, message: 'Database not configured.' };
+
+    try {
+        const userRef = doc(db, 'users', data.userId);
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+            return { success: false, message: 'Selected user does not exist.' };
+        }
+
+        const partnersCol = collection(db, 'countryPartners');
+        const qCountry = query(partnersCol, where('country', '==', data.country));
+        const existingPartnerSnap = await getDocs(qCountry);
+        if (!existingPartnerSnap.empty) {
+            return { success: false, message: `A partner for ${data.country} already exists.` };
+        }
+        
+        const qUser = query(partnersCol, where('userId', '==', data.userId));
+        const existingUserAsPartnerSnap = await getDocs(qUser);
+        if (!existingUserAsPartnerSnap.empty) {
+            return { success: false, message: `This user is already a partner for another country.` };
+        }
+
+        const userData = userDoc.data();
+
+        await runTransaction(db, async (transaction) => {
+            transaction.update(userRef, { role: 'country_partner' });
+            
+            const newPartnerRef = doc(partnersCol);
+            transaction.set(newPartnerRef, {
+                userId: data.userId,
+                name: userData.name,
+                email: userData.email,
+                country: data.country,
+                depositFeePercent: data.depositFeePercent,
+                withdrawalFeePercent: data.withdrawalFeePercent,
+                isActive: true,
+                createdAt: Timestamp.now()
+            });
+        });
+
+        revalidatePath("/admin/partners");
+        return { success: true, message: 'Country partner created successfully.' };
+
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to create partner: ${errorMessage}` };
+    }
+}
+
+export async function updateCountryPartner(partnerId: string, data: Partial<Pick<CountryPartner, 'depositFeePercent' | 'withdrawalFeePercent' | 'isActive' | 'country'>>) {
+    if (!db) return { success: false, message: 'Database not configured.' };
+
+    try {
+        const partnerRef = doc(db, 'countryPartners', partnerId);
+        await updateDoc(partnerRef, data);
+        
+        revalidatePath("/admin/partners");
+        return { success: true, message: 'Partner updated successfully.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to update partner: ${errorMessage}` };
+    }
+}
+
+export async function deleteCountryPartner(partnerId: string) {
+    if (!db) return { success: false, message: 'Database not configured.' };
+    
+    try {
+        const partnerRef = doc(db, 'countryPartners', partnerId);
+        
+        await runTransaction(db, async (transaction) => {
+            const partnerDoc = await transaction.get(partnerRef);
+            if (!partnerDoc.exists()) {
+                throw new Error("Partner not found.");
+            }
+            
+            const partnerData = partnerDoc.data() as CountryPartner;
+            const userRef = doc(db, 'users', partnerData.userId);
+
+            transaction.update(userRef, { role: 'user' });
+            transaction.delete(partnerRef);
+        });
+
+        revalidatePath("/admin/partners");
+        revalidatePath("/admin/users");
+        return { success: true, message: 'Partner deleted successfully.' };
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: `Failed to delete partner: ${errorMessage}` };
     }
 }

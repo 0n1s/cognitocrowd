@@ -1,8 +1,9 @@
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent } from './types';
+import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -542,6 +543,18 @@ export async function getPendingApprovals(): Promise<User[]> {
                 .map(doc => fromDoc<User>(doc));
         }
         console.error("Error fetching pending approvals:", error);
+        return [];
+    }
+}
+
+export async function getCountryPartners(): Promise<CountryPartner[]> {
+    if (!db) return [];
+    try {
+        const partnersCol = collection(db, 'countryPartners');
+        const snapshot = await getDocs(partnersCol);
+        return snapshot.docs.map(doc => fromDoc<CountryPartner>(doc));
+    } catch (error) {
+        console.error("Error fetching country partners:", error);
         return [];
     }
 }

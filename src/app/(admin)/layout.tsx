@@ -30,6 +30,7 @@ import {
   FileQuestion,
   UserCheck,
   GalleryHorizontal,
+  Landmark,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ const navItems = [
   { href: "/admin/tasks", icon: ClipboardList, label: "Contributions" },
   { href: "/admin/packages", icon: Package, label: "Packages" },
   { href: "/admin/users", icon: Users, label: "Users" },
+  { href: "/admin/partners", icon: Landmark, label: "Country Partners" },
   { href: "/admin/withdrawals", icon: Banknote, label: "Withdrawals" },
   { href: "/admin/qualifications", icon: FileQuestion, label: "Qualifications" },
   { href: "/admin/approvals", icon: UserCheck, label: "Approvals" },
