@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
+import NextImage from "next/image";
 import { AppSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -150,7 +150,7 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
             <div className="md:col-span-1">
                 <Label>{label}</Label>
                 <div className="relative mt-2 aspect-video rounded-md overflow-hidden border">
-                    <Image src={currentUrl || `https://placehold.co/${targetWidth}x${targetHeight}.png`} alt={label} width={targetWidth} height={targetHeight} className="object-cover w-full h-full" />
+                    <NextImage src={currentUrl || `https://placehold.co/${targetWidth}x${targetHeight}.png`} alt={label} width={targetWidth} height={targetHeight} className="object-cover w-full h-full" />
                     {isLoading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-white" /></div>}
                 </div>
             </div>
