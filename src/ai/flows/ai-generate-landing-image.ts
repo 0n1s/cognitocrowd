@@ -4,11 +4,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import { GenerateLandingImageInputSchema, GenerateLandingImageOutputSchema } from '@/ai/schemas';
-
-export type GenerateLandingImageInput = z.infer<typeof GenerateLandingImageInputSchema>;
-export type GenerateLandingImageOutput = z.infer<typeof GenerateLandingImageOutputSchema>;
+import { GenerateLandingImageInputSchema, GenerateLandingImageOutputSchema, type GenerateLandingImageInput, type GenerateLandingImageOutput } from '@/ai/schemas';
 
 export async function generateLandingImage(input: GenerateLandingImageInput): Promise<GenerateLandingImageOutput> {
   return generateLandingImageFlow(input);

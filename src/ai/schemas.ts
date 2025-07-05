@@ -38,7 +38,20 @@ export const GenerateTaskOutputSchema = z.object({
 export const GenerateLandingImageInputSchema = z.object({
   prompt: z.string().describe('A text prompt to generate an image from.'),
 });
+export type GenerateLandingImageInput = z.infer<typeof GenerateLandingImageInputSchema>;
 
 export const GenerateLandingImageOutputSchema = z.object({
     imageDataUri: z.string().describe("The generated image as a data URI. Expected format: 'data:image/png;base64,<encoded_data>'."),
 });
+export type GenerateLandingImageOutput = z.infer<typeof GenerateLandingImageOutputSchema>;
+
+export const ImproveTextSchema = z.object({
+  originalText: z.string().describe('The original text to be improved.'),
+  context: z.string().describe('The context of the text (e.g., "hero title", "feature description").'),
+});
+export type ImproveTextInput = z.infer<typeof ImproveTextSchema>;
+
+export const ImproveTextOutputSchema = z.object({
+  improvedText: z.string().describe('The AI-improved version of the text.'),
+});
+export type ImproveTextOutput = z.infer<typeof ImproveTextOutputSchema>;
