@@ -65,8 +65,8 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
   const [taskLimit, setTaskLimit] = useState("100");
   const [expiryNumber, setExpiryNumber] = useState(1);
   const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">("months");
-  const [referralBonusType, setReferralBonusType] = useState<'percentage' | 'fixed'>('percentage');
-  const [referralBonusAmount, setReferralBonusAmount] = useState("10");
+  const [referralBonusPercentage, setReferralBonusPercentage] = useState("0");
+  const [referralBonusFixed, setReferralBonusFixed] = useState("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFeatureChange = (index: number, value: string) => {
@@ -90,8 +90,8 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
     setTaskLimit("100");
     setExpiryNumber(1);
     setExpiryUnit("months");
-    setReferralBonusType('percentage');
-    setReferralBonusAmount("10");
+    setReferralBonusPercentage("0");
+    setReferralBonusFixed("0");
   };
 
   const handleSubmit = async () => {
@@ -103,8 +103,8 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
         isPrimary,
         taskLimit: parseInt(taskLimit, 10) || 0,
         expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
-        referralBonusType: referralBonusType,
-        referralBonusAmount: parseFloat(referralBonusAmount) || 0,
+        referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
+        referralBonusFixed: parseFloat(referralBonusFixed) || 0,
     });
     
     if (result.success) {
@@ -191,14 +191,14 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
            <div className="grid grid-cols-4 items-center gap-4">
              <Label className="text-right">Referral Bonus</Label>
               <div className="col-span-3 grid grid-cols-2 gap-2">
-                  <Select value={referralBonusType} onValueChange={(v) => setReferralBonusType(v as any)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="percentage">Percentage (%)</SelectItem>
-                          <SelectItem value="fixed">Fixed ($)</SelectItem>
-                      </SelectContent>
-                  </Select>
-                  <Input type="number" value={referralBonusAmount} onChange={e => setReferralBonusAmount(e.target.value)} />
+                  <div className="space-y-1">
+                     <Label htmlFor="bonus-percentage" className="text-xs text-muted-foreground">Percentage (%)</Label>
+                     <Input id="bonus-percentage" type="number" value={referralBonusPercentage} onChange={e => setReferralBonusPercentage(e.target.value)} />
+                  </div>
+                   <div className="space-y-1">
+                     <Label htmlFor="bonus-fixed" className="text-xs text-muted-foreground">Fixed Amount ($)</Label>
+                     <Input id="bonus-fixed" type="number" value={referralBonusFixed} onChange={e => setReferralBonusFixed(e.target.value)} />
+                  </div>
               </div>
            </div>
         </div>
@@ -239,8 +239,8 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
 
     const [expiryNumber, setExpiryNumber] = useState(initialExpiryNumber);
     const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">(initialExpiryUnit);
-    const [referralBonusType, setReferralBonusType] = useState(pkg.referralBonusType || 'percentage');
-    const [referralBonusAmount, setReferralBonusAmount] = useState(String(pkg.referralBonusAmount || 10));
+    const [referralBonusPercentage, setReferralBonusPercentage] = useState(String(pkg.referralBonusPercentage || 0));
+    const [referralBonusFixed, setReferralBonusFixed] = useState(String(pkg.referralBonusFixed || 0));
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleFeatureChange = (index: number, value: string) => {
@@ -265,8 +265,8 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             isPrimary,
             taskLimit: parseInt(taskLimit, 10) || 0,
             expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
-            referralBonusType: referralBonusType,
-            referralBonusAmount: parseFloat(referralBonusAmount) || 0,
+            referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
+            referralBonusFixed: parseFloat(referralBonusFixed) || 0,
         });
         
         if (result.success) {
@@ -352,14 +352,14 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
              <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right">Referral Bonus</Label>
                 <div className="col-span-3 grid grid-cols-2 gap-2">
-                    <Select value={referralBonusType} onValueChange={(v) => setReferralBonusType(v as any)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="percentage">Percentage (%)</SelectItem>
-                            <SelectItem value="fixed">Fixed ($)</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Input type="number" value={referralBonusAmount} onChange={e => setReferralBonusAmount(e.target.value)} />
+                    <div className="space-y-1">
+                        <Label htmlFor="bonus-percentage-edit" className="text-xs text-muted-foreground">Percentage (%)</Label>
+                        <Input id="bonus-percentage-edit" type="number" value={referralBonusPercentage} onChange={e => setReferralBonusPercentage(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="bonus-fixed-edit" className="text-xs text-muted-foreground">Fixed Amount ($)</Label>
+                        <Input id="bonus-fixed-edit" type="number" value={referralBonusFixed} onChange={e => setReferralBonusFixed(e.target.value)} />
+                    </div>
                 </div>
             </div>
         </div>
@@ -502,34 +502,40 @@ export function PackageList() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {packages.map((pkg) => (
-                    <TableRow key={pkg.id}>
-                        <TableCell className="font-medium">{pkg.name}</TableCell>
-                        <TableCell>{pkg.price}</TableCell>
-                        <TableCell>{pkg.taskLimit}</TableCell>
-                        <TableCell>{pkg.expiryPeriod}</TableCell>
-                        <TableCell>
-                          {pkg.referralBonusAmount ? 
-                              (pkg.referralBonusType === 'percentage' ? `${pkg.referralBonusAmount}%` : `$${pkg.referralBonusAmount.toFixed(2)}`)
-                              : 'N/A'
-                          }
-                        </TableCell>
-                        <TableCell>
-                        {pkg.isPrimary && <Badge variant="secondary">Yes</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setEditingPackage(pkg)}>
-                              Edit
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeletingPackage(pkg)}>
-                               <Trash2 className="h-4 w-4" />
-                               <span className="sr-only">Delete</span>
-                            </Button>
-                          </div>
-                        </TableCell>
-                    </TableRow>
-                    ))}
+                    {packages.map((pkg) => {
+                      const bonusParts = [];
+                      if (pkg.referralBonusPercentage) {
+                          bonusParts.push(`${pkg.referralBonusPercentage}%`);
+                      }
+                      if (pkg.referralBonusFixed) {
+                          bonusParts.push(`$${pkg.referralBonusFixed.toFixed(2)}`);
+                      }
+                      const bonusText = bonusParts.join(' + ') || 'N/A';
+
+                      return (
+                        <TableRow key={pkg.id}>
+                            <TableCell className="font-medium">{pkg.name}</TableCell>
+                            <TableCell>{pkg.price}</TableCell>
+                            <TableCell>{pkg.taskLimit}</TableCell>
+                            <TableCell>{pkg.expiryPeriod}</TableCell>
+                            <TableCell>{bonusText}</TableCell>
+                            <TableCell>
+                            {pkg.isPrimary && <Badge variant="secondary">Yes</Badge>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setEditingPackage(pkg)}>
+                                  Edit
+                                </Button>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeletingPackage(pkg)}>
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="sr-only">Delete</span>
+                                </Button>
+                              </div>
+                            </TableCell>
+                        </TableRow>
+                      );
+                    })}
                 </TableBody>
                 </Table>
                 {packages.length === 0 && (

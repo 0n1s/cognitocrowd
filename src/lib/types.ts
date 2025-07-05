@@ -1,6 +1,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -130,8 +131,8 @@ export type Package = {
   isPrimary?: boolean;
   taskLimit: number;
   expiryPeriod: string;
-  referralBonusType?: 'percentage' | 'fixed';
-  referralBonusAmount?: number;
+  referralBonusPercentage?: number;
+  referralBonusFixed?: number;
 };
 
 export type TaskResponse = {
