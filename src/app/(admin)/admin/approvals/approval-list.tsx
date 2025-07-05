@@ -59,7 +59,7 @@ export function ApprovalList() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkUpdating, setIsBulkUpdating] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-    const [confirmAction, setConfirmAction] = useState<{ action: 'approve' | 'reject', scope: 'all' } | null>(null);
+    const [confirmAction, setConfirmAction] = useState<{ action: 'approved' | 'rejected', scope: 'all' } | null>(null);
 
     const fetchApprovals = async () => {
       setLoading(true);
@@ -115,7 +115,7 @@ export function ApprovalList() {
         }
     };
     
-    const openConfirmDialog = (action: 'approve' | 'reject') => {
+    const openConfirmDialog = (action: 'approved' | 'rejected') => {
         setConfirmAction({ action, scope: 'all' });
         setIsConfirmOpen(true);
     };
@@ -154,10 +154,10 @@ export function ApprovalList() {
                   Reject Selected ({selectedIds.length})
               </Button>
               <div className="ml-auto flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => openConfirmDialog('approve')} disabled={approvals.length === 0 || isBulkUpdating || loading}>
+                  <Button size="sm" variant="outline" onClick={() => openConfirmDialog('approved')} disabled={approvals.length === 0 || isBulkUpdating || loading}>
                       Approve All
                   </Button>
-                  <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmDialog('reject')} disabled={approvals.length === 0 || isBulkUpdating || loading}>
+                  <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmDialog('rejected')} disabled={approvals.length === 0 || isBulkUpdating || loading}>
                       Reject All
                   </Button>
               </div>
@@ -234,16 +234,16 @@ export function ApprovalList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will {confirmAction?.action} ALL {approvals.length} pending applications. This action cannot be undone.
+              This will {confirmAction?.action === 'approved' ? 'approve' : 'reject'} ALL {approvals.length} pending applications. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => handleBulkAction('all', confirmAction!.action)}
-              className={buttonVariants({ variant: confirmAction?.action === 'reject' ? 'destructive' : 'default' })}
+              className={buttonVariants({ variant: confirmAction?.action === 'rejected' ? 'destructive' : 'default' })}
             >
-              Yes, {confirmAction?.action} all
+              Yes, {confirmAction?.action === 'approved' ? 'approve' : 'reject'} all
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
