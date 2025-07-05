@@ -12,11 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Loader2, Wand2, Upload, Clipboard, Trash2 } from "lucide-react";
+import { Loader2, Wand2, Upload, Clipboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateAppSettings, updateLandingPageImage, generateLandingImage as generateImageAction, improveLandingPageText } from "@/lib/actions";
 import { getAppSettings } from "@/lib/database";
-import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 
 const compressAndResizeImage = (
@@ -512,10 +512,45 @@ export function LandingPageForm() {
                             ))}
                         </AccordionContent>
                     </AccordionItem>
-                    
-                    <AccordionItem value="item-5">
-                        <AccordionTrigger className="text-lg font-semibold">Page Images</AccordionTrigger>
-                        <AccordionContent className="space-y-8 pt-6">
+
+                    <AccordionItem value="item-process">
+                        <AccordionTrigger className="text-lg font-semibold">Process Section</AccordionTrigger>
+                        <AccordionContent className="space-y-6 pt-4">
+                            <TextInputWithAI
+                                id="processTitle"
+                                label="Title"
+                                value={content.processTitle}
+                                onChange={value => handleContentChange('landingPageContent.processTitle', value)}
+                                context="Process section title"
+                            />
+                            <TextInputWithAI
+                                id="processSubtitle"
+                                label="Subtitle"
+                                value={content.processSubtitle}
+                                onChange={value => handleContentChange('landingPageContent.processSubtitle', value)}
+                                context="Process section subtitle"
+                                isTextarea
+                            />
+                            {content.processSteps.map((item, index) => (
+                                <div key={index} className="p-4 border rounded-lg space-y-4">
+                                    <TextInputWithAI
+                                        id={`process-step-${index}-title`}
+                                        label={`Step ${index + 1} Title`}
+                                        value={item.title}
+                                        onChange={value => handleContentChange(`landingPageContent.processSteps.${index}.title`, value)}
+                                        context="Process step title"
+                                    />
+                                    <TextInputWithAI
+                                        id={`process-step-${index}-desc`}
+                                        label={`Step ${index + 1} Description`}
+                                        value={item.description}
+                                        onChange={value => handleContentChange(`landingPageContent.processSteps.${index}.description`, value)}
+                                        context="Process step description"
+                                        isTextarea
+                                    />
+                                </div>
+                            ))}
+                            <Separator />
                             <ImageEditControl
                                 fieldKey="processImage1"
                                 label="Process Step 1 Image"
@@ -540,6 +575,28 @@ export function LandingPageForm() {
                                 targetHeight={600}
                                 onUrlChange={handleUrlChange}
                             />
+                        </AccordionContent>
+                    </AccordionItem>
+                    
+                    <AccordionItem value="item-hiring">
+                        <AccordionTrigger className="text-lg font-semibold">Hiring Section</AccordionTrigger>
+                        <AccordionContent className="space-y-6 pt-4">
+                            <TextInputWithAI
+                                id="hiringTitle"
+                                label="Title"
+                                value={content.hiringTitle}
+                                onChange={value => handleContentChange('landingPageContent.hiringTitle', value)}
+                                context="Hiring section title"
+                            />
+                            <TextInputWithAI
+                                id="hiringSubtitle"
+                                label="Subtitle"
+                                value={content.hiringSubtitle}
+                                onChange={value => handleContentChange('landingPageContent.hiringSubtitle', value)}
+                                context="Hiring section subtitle"
+                                isTextarea
+                            />
+                            <Separator />
                             <ImageEditControl
                                 fieldKey="hiringBackgroundImage"
                                 label="Hiring Section Background"
