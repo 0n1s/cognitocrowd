@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from 'next/link';
 import { AdminUser, CountryPartner } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -291,7 +292,12 @@ export function PartnerList() {
                     <TableBody>
                         {partners.map((p) => (
                             <TableRow key={p.id}>
-                                <TableCell className="font-medium">{p.name}<div className="text-xs text-muted-foreground">{p.email}</div></TableCell>
+                                <TableCell className="font-medium">
+                                    <Link href={`/admin/partners/${p.id}`} className="hover:underline">
+                                        {p.name}
+                                    </Link>
+                                    <div className="text-xs text-muted-foreground">{p.email}</div>
+                                </TableCell>
                                 <TableCell>{p.country}</TableCell>
                                 <TableCell>{p.depositFeePercent}%</TableCell>
                                 <TableCell>{p.withdrawalFeePercent}%</TableCell>

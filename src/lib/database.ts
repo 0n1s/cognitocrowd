@@ -1,6 +1,7 @@
 
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner } from './types';
@@ -556,5 +557,20 @@ export async function getCountryPartners(): Promise<CountryPartner[]> {
     } catch (error) {
         console.error("Error fetching country partners:", error);
         return [];
+    }
+}
+
+export async function getCountryPartnerDetail(partnerId: string): Promise<CountryPartner | null> {
+    if (!db) return null;
+    try {
+        const partnerDocRef = doc(db, 'countryPartners', partnerId);
+        const docSnap = await getDoc(partnerDocRef);
+        if (docSnap.exists()) {
+            return fromDoc<CountryPartner>(docSnap);
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error fetching partner detail for ${partnerId}:`, error);
+        return null;
     }
 }
