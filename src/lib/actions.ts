@@ -1059,7 +1059,10 @@ export async function updateLandingPageImage(field: string, imageDataUri: string
     try {
         const storageRef = ref(storage, `landing-page/${field}-${uuidv4()}.jpg`);
         
-        const snapshot = await uploadString(storageRef, imageDataUri, 'data_url', {
+        // Manually extract the base64 data from the data URI.
+        const base64Data = imageDataUri.substring(imageDataUri.indexOf(',') + 1);
+
+        const snapshot = await uploadString(storageRef, base64Data, 'base64', {
             contentType: 'image/jpeg'
         });
         const downloadURL = await getDownloadURL(snapshot.ref);
