@@ -104,8 +104,9 @@ export default {
             '50%': { transform: 'translateY(-20px)' },
         },
         'shooting-star': {
-          '0%': { transform: 'translateY(-200px)', opacity: '1' },
-          '100%': { transform: 'translateY(120vh)', opacity: '0' },
+          '0%': { transform: 'rotate(315deg) translateX(0)', opacity: '1' },
+          '70%': { opacity: '1' },
+          '100%': { transform: 'rotate(315deg) translateX(-1500px)', opacity: '0' },
         }
       },
       animation: {
@@ -114,7 +115,7 @@ export default {
         'float-1': 'float 6s ease-in-out infinite',
         'float-2': 'float 7s ease-in-out infinite [animation-delay:1s]',
         'float-3': 'float 8s ease-in-out infinite [animation-delay:2s]',
-        'shooting-star': 'shooting-star var(--duration) linear infinite',
+        'shooting-star': 'shooting-star 3s ease-in-out infinite',
       },
     },
   },
