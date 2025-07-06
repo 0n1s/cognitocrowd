@@ -71,7 +71,7 @@ function ImageGallery({ images }: { images: GeneratedImage[] }) {
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent className="max-w-4xl p-4 sm:p-6">
                     {currentImage && (
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-4 max-h-[85vh] overflow-y-auto pr-2">
                             <div className="relative aspect-square w-full">
                                 {images.length > 1 && (
                                     <>
