@@ -1,10 +1,9 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
-import { auth } from "@/lib/firebase";
-import { updateProfile } from "firebase/auth";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { generateProfileImage } from "@/ai/flows/ai-generate-profile-image";
@@ -49,8 +48,8 @@ export async function updateUserPhotoURL(userId: string, photoURL: string) {
 
 
 export async function generateAndSetAiProfilePicture(userId: string, prompt: string) {
-    if (!db || !storage || !auth?.currentUser) {
-        return { success: false, message: 'Firebase not configured or user not authenticated.' };
+    if (!db || !storage) {
+        return { success: false, message: 'Firebase not configured.' };
     }
 
     try {
@@ -81,7 +80,6 @@ export async function generateAndSetAiProfilePicture(userId: string, prompt: str
         });
         const downloadURL = await getDownloadURL(snapshot.ref);
 
-        await updateProfile(auth.currentUser, { photoURL: downloadURL });
         const dbResult = await updateUserPhotoURL(userId, downloadURL);
 
         if (!dbResult.success) {
@@ -89,7 +87,7 @@ export async function generateAndSetAiProfilePicture(userId: string, prompt: str
         }
 
         revalidatePath('/settings');
-        return { success: true, message: 'AI avatar set successfully!', url: downloadURL };
+        return { success: true, message: 'AI avatar generated successfully!', url: downloadURL };
 
     } catch (error) {
         console.error("Error generating and setting AI profile picture:", error);

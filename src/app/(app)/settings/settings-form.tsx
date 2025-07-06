@@ -111,7 +111,7 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
   };
 
   const handleGenerate = async () => {
-    if (!user) {
+    if (!user || !auth.currentUser) {
       toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
@@ -123,7 +123,8 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
     setIsGenerating(true);
     try {
       const result = await generateAndSetAiProfilePicture(user.uid, prompt);
-      if (result.success) {
+      if (result.success && result.url) {
+        await updateProfile(auth.currentUser, { photoURL: result.url });
         toast({ title: "Success!", description: "AI avatar generated and updated." });
         router.refresh();
       } else {
@@ -448,5 +449,3 @@ export function SettingsForm() {
         </div>
     );
 }
-
-    
