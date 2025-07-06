@@ -8,6 +8,7 @@ import '@/ai/flows/ai-rank-response.ts';
 import '@/ai/flows/ai-qualification-test.ts';
 import '@/ai/flows/ai-generate-landing-image.ts';
 import '@/ai/flows/ai-improve-landing-page-text.ts';
+import '@/ai/flows/ai-improve-image-prompt.ts';
 import '@/ai/flows/ai-generate-profile-image.ts';
 import '@/ai/flows/ai-generate-image.ts';
 import '@/ai/flows/ai-generate-video.ts';

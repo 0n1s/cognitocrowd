@@ -87,3 +87,13 @@ export const GenerateVideoOutputSchema = z.object({
     thumbnailUrl: z.string().url().describe("The URL of a thumbnail for the generated video."),
 });
 export type GenerateVideoOutput = z.infer<typeof GenerateVideoOutputSchema>;
+
+export const ImproveImagePromptInputSchema = z.object({
+  prompt: z.string().describe('The original image prompt to be improved.'),
+});
+export type ImproveImagePromptInput = z.infer<typeof ImproveImagePromptInputSchema>;
+
+export const ImproveImagePromptOutputSchema = z.object({
+  improvedPrompt: z.string().describe('The AI-improved version of the image prompt.'),
+});
+export type ImproveImagePromptOutput = z.infer<typeof ImproveImagePromptOutputSchema>;

@@ -11,6 +11,7 @@ import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
 import { improveLandingPageText as improveLandingPageTextFlow } from "@/ai/flows/ai-improve-landing-page-text";
+import { improveImagePrompt as improveImagePromptFlow } from "@/ai/flows/ai-improve-image-prompt";
 import { v4 as uuidv4 } from "uuid";
 import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks, getPendingApprovals, getPackage } from './database';
 import { headers } from "next/headers";
@@ -1195,5 +1196,19 @@ export async function deleteCountryPartner(partnerId: string) {
         console.error(error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message: `Failed to delete partner: ${errorMessage}` };
+    }
+}
+
+export async function improveImagePrompt(prompt: string) {
+    try {
+        const result = await improveImagePromptFlow({ prompt });
+        if (!result || !result.improvedPrompt) {
+             throw new Error("AI did not return an improved prompt.");
+        }
+        return { success: true, improvedPrompt: result.improvedPrompt };
+    } catch (error) {
+        console.error("Error improving image prompt with AI:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
     }
 }

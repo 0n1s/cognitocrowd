@@ -12,9 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Loader2, Wand2, Upload, Clipboard } from "lucide-react";
+import { Loader2, Wand2, Upload, Clipboard, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateAppSettings, updateLandingPageImage, generateLandingImage as generateImageAction, improveLandingPageText } from "@/lib/actions";
+import { updateAppSettings, updateLandingPageImage, generateLandingImage as generateImageAction, improveLandingPageText, improveImagePrompt } from "@/lib/actions";
 import { getAppSettings } from "@/lib/database";
 import { Separator } from "@/components/ui/separator";
 
@@ -59,13 +59,20 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
     const { toast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [prompt, setPrompt] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isImproving, setIsImproving] = useState(false);
+    const [generatedPreviewUri, setGeneratedPreviewUri] = useState<string | null>(null);
+
+    const isLoading = isUploading || isGenerating || isSaving || isImproving;
 
     const handleFileSelectAndUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        setIsLoading(true);
+        setIsUploading(true);
+        setGeneratedPreviewUri(null);
         try {
             const compressedUri = await compressAndResizeImage(file, targetWidth, targetHeight);
             const result = await updateLandingPageImage(String(fieldKey), compressedUri);
@@ -78,7 +85,7 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
         } catch (error) {
             toast({ title: "Error", description: error instanceof Error ? error.message : "Could not process image.", variant: "destructive" });
         } finally {
-            setIsLoading(false);
+            setIsUploading(false);
         }
     };
     
@@ -100,28 +107,52 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
             }
         );
     };
+
+    const handleImprovePrompt = async () => {
+        if (!prompt) return;
+        setIsImproving(true);
+        try {
+            const result = await improveImagePrompt(prompt);
+            if (result.success && result.improvedPrompt) {
+                setPrompt(result.improvedPrompt);
+                toast({ title: "Prompt Improved!", description: "The prompt has been enhanced by AI." });
+            } else {
+                 throw new Error(result.message || "Failed to improve prompt.");
+            }
+        } catch (error) {
+             const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+            toast({
+                title: "Improvement Failed",
+                variant: "destructive",
+                duration: Infinity,
+                description: (
+                    <div className="w-full">
+                        <p>The AI model returned an error.</p>
+                        <pre className="mt-1 w-full rounded-md bg-destructive/20 p-2 font-mono text-sm text-destructive-foreground whitespace-pre-wrap">
+                            {errorMessage}
+                        </pre>
+                    </div>
+                )
+            });
+        } finally {
+            setIsImproving(false);
+        }
+    }
     
     const handleGenerate = async () => {
         if (!prompt) {
             toast({ title: "Missing Prompt", description: "Please enter a prompt to generate an image.", variant: "destructive" });
             return;
         }
-        setIsLoading(true);
+        setIsGenerating(true);
+        setGeneratedPreviewUri(null);
         try {
             const genResult = await generateImageAction(prompt);
              if (!genResult.success || !genResult.imageDataUri) {
                 throw new Error(genResult.message || "AI generation failed.");
             }
-            
-            const compressedUri = await compressAndResizeImage(genResult.imageDataUri, targetWidth, targetHeight);
-            const uploadResult = await updateLandingPageImage(String(fieldKey), compressedUri);
-            
-            if (uploadResult.success && uploadResult.url) {
-                onUrlChange(fieldKey, uploadResult.url);
-                toast({ title: "Success", description: "Image generated and updated." });
-            } else {
-                 throw new Error(uploadResult.message || "Failed to save generated image.");
-            }
+            setGeneratedPreviewUri(genResult.imageDataUri);
+            toast({ title: "Image Generated", description: "Preview the image below and click 'Save' to apply it." });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
             toast({
@@ -143,16 +174,42 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
                 )
             });
         } finally {
-            setIsLoading(false);
+            setIsGenerating(false);
         }
     };
+
+    const handleSaveGenerated = async () => {
+        if (!generatedPreviewUri) return;
+        setIsSaving(true);
+        try {
+            const compressedUri = await compressAndResizeImage(generatedPreviewUri, targetWidth, targetHeight);
+            const uploadResult = await updateLandingPageImage(String(fieldKey), compressedUri);
+            
+            if (uploadResult.success && uploadResult.url) {
+                onUrlChange(fieldKey, uploadResult.url);
+                toast({ title: "Success", description: "Image generated and updated." });
+                setGeneratedPreviewUri(null);
+            } else {
+                 throw new Error(uploadResult.message || "Failed to save generated image.");
+            }
+        } catch (error) {
+             const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+            toast({
+                title: "Save Failed",
+                description: errorMessage,
+                variant: "destructive",
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    }
 
     return (
         <div className="grid md:grid-cols-3 gap-6 items-start">
             <div className="md:col-span-1">
                 <Label>{label}</Label>
                 <div className="relative mt-2 aspect-video rounded-md overflow-hidden border">
-                    <NextImage src={currentUrl || `https://placehold.co/${targetWidth}x${targetHeight}.png`} alt={label} width={targetWidth} height={targetHeight} className="object-cover w-full h-full" />
+                    <NextImage src={generatedPreviewUri || currentUrl || `https://placehold.co/${targetWidth}x${targetHeight}.png`} alt={label} width={targetWidth} height={targetHeight} className="object-cover w-full h-full" />
                     {isLoading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-white" /></div>}
                 </div>
             </div>
@@ -171,18 +228,31 @@ function ImageEditControl({ fieldKey, label, currentUrl, targetWidth, targetHeig
                         <Label>Upload Image</Label>
                         <p className="text-xs text-muted-foreground mb-2">Image will be resized to {targetWidth}x{targetHeight} and compressed.</p>
                         <Input type="file" ref={fileInputRef} onChange={handleFileSelectAndUpload} className="hidden" accept="image/*" />
-                        <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full" disabled={isLoading}>
+                        <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full" disabled={isUploading}>
                            <Upload className="mr-2 h-4 w-4" /> Choose File
                         </Button>
                     </TabsContent>
                     <TabsContent value="ai" className="mt-4">
                          <Label>Generate with AI</Label>
-                         <p className="text-xs text-muted-foreground mb-2">Describe the image you want to create.</p>
+                         <p className="text-xs text-muted-foreground mb-2">Describe the image you want to create, or improve an existing prompt.</p>
                          <div className="flex gap-2">
                              <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g., a person at a computer" disabled={isLoading} />
-                             <Button onClick={handleGenerate} disabled={isLoading}>
-                                <Wand2 className="mr-2 h-4 w-4" /> Generate
+                             <Button variant="outline" size="sm" onClick={handleImprovePrompt} disabled={isLoading || !prompt}>
+                                {isImproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                                Improve
+                             </Button>
+                         </div>
+                         <div className="flex gap-2 mt-2">
+                            <Button onClick={handleGenerate} disabled={isLoading || !prompt} className="flex-1">
+                                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                                Generate
                             </Button>
+                            {generatedPreviewUri && (
+                                <Button onClick={handleSaveGenerated} disabled={isLoading} className="flex-1">
+                                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    Save Image
+                                </Button>
+                            )}
                          </div>
                     </TabsContent>
                 </Tabs>
