@@ -61,7 +61,7 @@ const navItems = [
 
 const aiToolsNavItems = [
   { href: "/chat", icon: MessageCircle, label: "Chat Models" },
-  { href: "#", icon: Image, label: "Image Models" },
+  { href: "/image-generation", icon: Image, label: "Image Models" },
   { href: "#", icon: Video, label: "Video Models" },
 ];
 
@@ -91,7 +91,7 @@ const AppHeader = () => {
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
               <Avatar>
-                <AvatarImage src={user?.photoURL || `https://placehold.co/40x40.png`} alt={user?.displayName || "user"} />
+                <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || "user"} />
                 <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
               </Avatar>
               <span className="sr-only">Toggle user menu</span>
@@ -277,3 +277,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
