@@ -8,6 +8,7 @@ import { ref, getDownloadURL, uploadBytes } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { generateProfileImage } from "@/ai/flows/ai-generate-profile-image";
 import { getUserData, getPackage } from "./database";
+import { updateProfile } from "firebase/auth";
 
 export async function updateUserNameInDB(userId: string, name: string) {
     if (!db) {
@@ -47,7 +48,7 @@ export async function updateUserPhotoURL(userId: string, photoURL: string) {
 }
 
 
-export async function generateAndSetAiProfilePicture(userId: string, prompt: string) {
+export async function generateAndSetAiProfilePicture(userId: string, prompt: string): Promise<{ success: boolean; message: string; url?: string; }> {
     if (!db || !storage) {
         return { success: false, message: 'Firebase not configured.' };
     }
@@ -73,7 +74,8 @@ export async function generateAndSetAiProfilePicture(userId: string, prompt: str
         }
 
         const storageRef = ref(storage, `profile-pictures/${userId}-${uuidv4()}.png`);
-        const base64Data = genResult.imageDataUri.split(',')[1];
+        
+        const base64Data = genResult.imageDataUri.substring(genResult.imageDataUri.indexOf(',') + 1);
         const imageBuffer = Buffer.from(base64Data, 'base64');
         
         const snapshot = await uploadBytes(storageRef, imageBuffer, {

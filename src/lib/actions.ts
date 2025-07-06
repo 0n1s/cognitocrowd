@@ -298,7 +298,7 @@ export async function updateAdminPackage(id: string, data: UpdatePackageInput) {
 
 export async function deleteAdminPackage(id: string) {
     if (!db) {
-        return { success: false, message: 'Database not configured. Please check your environment variables.' };
+        return { success: false, message: 'Database not configured.' };
     }
     try {
         const packageDoc = doc(db, 'packages', id);
@@ -1034,7 +1034,7 @@ export async function updateLandingPageImage(field: string, imageDataUri: string
     try {
         const storageRef = ref(storage, `landing-page/${field}-${uuidv4()}.jpg`);
         
-        const base64Data = imageDataUri.split(',')[1];
+        const base64Data = imageDataUri.substring(imageDataUri.indexOf(',') + 1);
         const imageBuffer = Buffer.from(base64Data, 'base64');
         
         const snapshot = await uploadBytes(storageRef, imageBuffer, {
