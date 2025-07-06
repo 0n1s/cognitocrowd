@@ -212,7 +212,7 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
       </CardHeader>
       <CardContent className="flex items-center gap-6">
         <Avatar className="h-24 w-24">
-          <AvatarImage src={generatedPreviewUri || preview || user?.photoURL || ''} alt={user?.displayName || "user"} />
+          <AvatarImage src={generatedPreviewUri || preview || user?.photoURL || undefined} alt={user?.displayName || "user"} />
           <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
         </Avatar>
         <Tabs defaultValue="upload" className="w-full">
