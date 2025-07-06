@@ -101,18 +101,18 @@ function ImageGallery({ images }: { images: GeneratedImage[] }) {
                                 />
                             </div>
                             
-                            <div className="flex justify-center mt-2">
+                             <div>
+                                <h3 className="font-semibold text-center mb-2">Prompt</h3>
+                                <p className="text-sm text-muted-foreground italic bg-muted p-3 rounded-md text-center">"{currentImage.prompt}"</p>
+                            </div>
+
+                            <div className="flex justify-center">
                                 <Button asChild>
                                     <a href={currentImage.imageUrl} download={`trainly-image-${currentImage.id}.png`} target="_blank">
                                         <Download className="mr-2 h-4 w-4" />
                                         Download Full Resolution
                                     </a>
                                 </Button>
-                            </div>
-
-                            <div className="mt-2">
-                                <h3 className="font-semibold text-center mb-2">Prompt</h3>
-                                <p className="text-sm text-muted-foreground italic bg-muted p-3 rounded-md text-center">"{currentImage.prompt}"</p>
                             </div>
                         </div>
                     )}
