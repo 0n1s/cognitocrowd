@@ -1,8 +1,4 @@
 
-
-
-
-
 export type TaskOption =
   | string
   | { text: string }
@@ -78,6 +74,8 @@ export type User = {
   role?: 'user' | 'super_user_alpha_7' | 'country_partner';
   dailyCompletedCount?: number;
   lastCompletionReset?: any; // Firestore Timestamp
+  dailyImageGenerationCount?: number;
+  lastImageGenerationReset?: any; // Firestore Timestamp
   onboardingStatus?: 'pending' | 'approved' | 'rejected';
   accountExpiresAt?: any; // Firestore Timestamp
   country?: string;
@@ -131,6 +129,7 @@ export type Package = {
   features: string[];
   isPrimary?: boolean;
   taskLimit: number;
+  imageGenerationLimit?: number;
   expiryPeriod: string;
   referralBonusPercentage?: number;
   referralBonusFixed?: number;
@@ -255,4 +254,13 @@ export type ChatSession = {
   createdAt: any; // Firestore Timestamp or ISO String
   updatedAt: any; // Firestore Timestamp or ISO String
   messages: ChatMessage[];
+};
+
+export type GeneratedImage = {
+  id: string;
+  userId: string;
+  prompt: string;
+  imageUrl: string;
+  thumbnailUrl: string;
+  createdAt: any;
 };

@@ -1,12 +1,7 @@
 
-
-
-
-
-
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner } from './types';
+import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -235,7 +230,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
         user.earningsBalance = user.earningsBalance ?? 0;
         user.depositBalance = user.depositBalance ?? 0;
 
-        const packageName = user.packageId ? packagesMap.get(user.packageId) || 'N/A' : '(No Package)';
+        const packageName = user.packageId ? packagesMap.get(user.packageId) || '(No Package)' : '(No Package)';
         return { ...user, packageName };
     });
 
@@ -573,5 +568,18 @@ export async function getCountryPartnerDetail(partnerId: string): Promise<Countr
     } catch (error) {
         console.error(`Error fetching partner detail for ${partnerId}:`, error);
         return null;
+    }
+}
+
+export async function getUserGeneratedImages(userId: string): Promise<GeneratedImage[]> {
+    if (!db) return [];
+    try {
+        const imagesCol = collection(db, 'generated_images');
+        const q = query(imagesCol, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromDoc<GeneratedImage>(doc));
+    } catch (error) {
+        console.error("Error fetching user generated images:", error);
+        return [];
     }
 }

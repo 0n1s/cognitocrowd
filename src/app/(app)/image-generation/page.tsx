@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { generateAndSaveImage } from '@/lib/actions';
+import { generateAndSaveImage } from '@/lib/image-actions';
 import { getUserData, getUserGeneratedImages, getPackage } from '@/lib/database';
 import type { GeneratedImage, Package } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -216,5 +216,3 @@ export default function ImageGenerationPage() {
         </div>
     )
 }
-
-    

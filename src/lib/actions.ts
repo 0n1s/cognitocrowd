@@ -11,7 +11,7 @@ import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows
 import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
 import { improveLandingPageText as improveLandingPageTextFlow } from "@/ai/flows/ai-improve-landing-page-text";
 import { v4 as uuidv4 } from "uuid";
-import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks, getPendingApprovals } from './database';
+import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks, getPendingApprovals, getPackage } from './database';
 import { headers } from "next/headers";
 
 
@@ -347,6 +347,8 @@ export async function setupNewUser(userId: string, name: string, email: string, 
             createdAt: now,
             dailyCompletedCount: 0,
             lastCompletionReset: now,
+            dailyImageGenerationCount: 0,
+            lastImageGenerationReset: now,
             accountExpiresAt: expiryTimestamp,
             onboardingStatus: appSettings.onboardingCourseEnabled ? 'pending' : 'approved',
             referralCode: uuidv4().substring(0, 8).toUpperCase(),
