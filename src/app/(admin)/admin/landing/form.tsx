@@ -49,7 +49,7 @@ const compressAndResizeImage = (
 type ImageEditControlProps = {
     fieldKey: keyof LandingPageContent;
     label: string;
-    currentUrl: string;
+    currentUrl?: string;
     targetWidth: number;
     targetHeight: number;
     onUrlChange: (field: keyof LandingPageContent, value: string) => void;
@@ -624,7 +624,7 @@ export function LandingPageForm() {
                             <ImageEditControl
                                 fieldKey="processImage1"
                                 label="Process Step 1 Image"
-                                currentUrl={content.processImage1 || ''}
+                                currentUrl={content.processImage1 || undefined}
                                 targetWidth={800}
                                 targetHeight={600}
                                 onUrlChange={handleUrlChange}
@@ -632,7 +632,7 @@ export function LandingPageForm() {
                             <ImageEditControl
                                 fieldKey="processImage2"
                                 label="Process Step 2 Image"
-                                currentUrl={content.processImage2 || ''}
+                                currentUrl={content.processImage2 || undefined}
                                 targetWidth={800}
                                 targetHeight={600}
                                 onUrlChange={handleUrlChange}
@@ -640,7 +640,7 @@ export function LandingPageForm() {
                             <ImageEditControl
                                 fieldKey="processImage3"
                                 label="Process Step 3 Image"
-                                currentUrl={content.processImage3 || ''}
+                                currentUrl={content.processImage3 || undefined}
                                 targetWidth={800}
                                 targetHeight={600}
                                 onUrlChange={handleUrlChange}
@@ -670,7 +670,7 @@ export function LandingPageForm() {
                             <ImageEditControl
                                 fieldKey="hiringBackgroundImage"
                                 label="Hiring Section Background"
-                                currentUrl={content.hiringBackgroundImage || ''}
+                                currentUrl={content.hiringBackgroundImage || undefined}
                                 targetWidth={1920}
                                 targetHeight={1080}
                                 onUrlChange={handleUrlChange}
