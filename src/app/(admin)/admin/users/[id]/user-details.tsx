@@ -59,7 +59,7 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
               <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="user">User</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="super_user_alpha_7">Admin</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -68,7 +68,7 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
              <Select value={packageId} onValueChange={setPackageId}>
                 <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="null">Free Tier</SelectItem>
+                    <SelectItem value="null">(No Package)</SelectItem>
                     {packages.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
             </Select>
