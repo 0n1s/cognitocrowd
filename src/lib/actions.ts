@@ -1,16 +1,10 @@
 
-
-
-
-
-
-
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { ref, getDownloadURL, uploadBytes } from "firebase/storage";
 import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest, OnboardingStep, CountryPartner } from "@/lib/types";
 import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
@@ -1040,10 +1034,10 @@ export async function updateLandingPageImage(field: string, imageDataUri: string
     try {
         const storageRef = ref(storage, `landing-page/${field}-${uuidv4()}.jpg`);
         
-        // Manually extract the base64 data from the data URI.
         const base64Data = imageDataUri.split(',')[1];
+        const imageBuffer = Buffer.from(base64Data, 'base64');
         
-        const snapshot = await uploadString(storageRef, base64Data, 'base64', {
+        const snapshot = await uploadBytes(storageRef, imageBuffer, {
             contentType: 'image/jpeg'
         });
         const downloadURL = await getDownloadURL(snapshot.ref);

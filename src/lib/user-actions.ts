@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { ref, getDownloadURL, uploadBytes } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { generateProfileImage } from "@/ai/flows/ai-generate-profile-image";
 import { getUserData, getPackage } from "./database";
@@ -74,8 +74,9 @@ export async function generateAndSetAiProfilePicture(userId: string, prompt: str
 
         const storageRef = ref(storage, `profile-pictures/${userId}-${uuidv4()}.png`);
         const base64Data = genResult.imageDataUri.split(',')[1];
+        const imageBuffer = Buffer.from(base64Data, 'base64');
         
-        const snapshot = await uploadString(storageRef, base64Data, 'base64', {
+        const snapshot = await uploadBytes(storageRef, imageBuffer, {
             contentType: 'image/png'
         });
         const downloadURL = await getDownloadURL(snapshot.ref);
