@@ -2,6 +2,7 @@
 
 
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -317,7 +318,7 @@ export async function deleteAdminPackage(id: string) {
     }
 }
 
-export async function setupNewUser(userId: string, name: string, email: string) {
+export async function setupNewUser(userId: string, name: string, email: string, referralCode?: string) {
     if (!db) {
         console.error("Database not configured.");
         return { success: false, message: 'Database not configured.' };
@@ -338,7 +339,7 @@ export async function setupNewUser(userId: string, name: string, email: string) 
         const twoWeeksInSeconds = 14 * 24 * 60 * 60;
         const expiryTimestamp = new Timestamp(now.seconds + twoWeeksInSeconds, now.nanoseconds);
         
-        await setDoc(userDocRef, {
+        const newUserDoc: any = {
             name,
             email,
             photoURL: null,
@@ -353,7 +354,19 @@ export async function setupNewUser(userId: string, name: string, email: string) 
             accountExpiresAt: expiryTimestamp,
             onboardingStatus: appSettings.onboardingCourseEnabled ? 'pending' : 'approved',
             referralCode: uuidv4().substring(0, 8).toUpperCase(),
-        });
+        };
+
+        if (referralCode) {
+            const usersCol = collection(db, 'users');
+            const referrerQuery = query(usersCol, where('referralCode', '==', referralCode.trim().toUpperCase()), limit(1));
+            const referrerSnapshot = await getDocs(referrerQuery);
+            if (!referrerSnapshot.empty) {
+                const referrerId = referrerSnapshot.docs[0].id;
+                newUserDoc.referredBy = referrerId;
+            }
+        }
+        
+        await setDoc(userDocRef, newUserDoc);
         
         return { success: true };
 

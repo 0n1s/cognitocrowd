@@ -20,6 +20,7 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +41,7 @@ export default function SignupPage() {
             displayName: name,
             photoURL: `https://placehold.co/128x128.png?text=${name.charAt(0)}`
         });
-        await setupNewUser(userCredential.user.uid, name, email);
+        await setupNewUser(userCredential.user.uid, name, email, referralCode);
       }
       toast({
         title: "Account Created!",
@@ -107,6 +108,16 @@ export default function SignupPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="referral-code">Referral Code (Optional)</Label>
+            <Input
+              id="referral-code"
+              placeholder="ABC123DE"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value)}
               disabled={isLoading}
             />
           </div>
