@@ -76,4 +76,14 @@ export const GenerateImageOutputSchema = z.object({
 });
 export type GenerateImageOutput = z.infer<typeof GenerateImageOutputSchema>;
 
-    
+
+export const GenerateVideoInputSchema = z.object({
+  prompt: z.string().describe('A text prompt to generate a video from.'),
+});
+export type GenerateVideoInput = z.infer<typeof GenerateVideoInputSchema>;
+
+export const GenerateVideoOutputSchema = z.object({
+    videoUrl: z.string().url().describe("The URL of the generated video file."),
+    thumbnailUrl: z.string().url().describe("The URL of a thumbnail for the generated video."),
+});
+export type GenerateVideoOutput = z.infer<typeof GenerateVideoOutputSchema>;

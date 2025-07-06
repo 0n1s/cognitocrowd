@@ -78,6 +78,9 @@ export type User = {
   dailyImageGenerationCount?: number;
   lastImageGenerationReset?: any; // Firestore Timestamp
   packageImageGenerationCount?: number;
+  dailyVideoGenerationCount?: number;
+  lastVideoGenerationReset?: any; // Firestore Timestamp
+  packageVideoGenerationCount?: number;
   onboardingStatus?: 'pending' | 'approved' | 'rejected';
   accountExpiresAt?: any; // Firestore Timestamp
   country?: string;
@@ -133,6 +136,8 @@ export type Package = {
   taskLimit: number;
   imageGenerationLimit?: number;
   imageGenerationLimitType?: 'daily' | 'lifetime';
+  videoGenerationLimit?: number;
+  videoGenerationLimitType?: 'daily' | 'lifetime';
   expiryPeriod: string;
   referralBonusPercentage?: number;
   referralBonusFixed?: number;
@@ -264,6 +269,15 @@ export type GeneratedImage = {
   userId: string;
   prompt: string;
   imageUrl: string;
+  thumbnailUrl: string;
+  createdAt: any;
+};
+
+export type GeneratedVideo = {
+  id: string;
+  userId: string;
+  prompt: string;
+  videoUrl: string;
   thumbnailUrl: string;
   createdAt: any;
 };

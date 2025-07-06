@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage } from './types';
+import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -580,6 +580,19 @@ export async function getUserGeneratedImages(userId: string): Promise<GeneratedI
         return snapshot.docs.map(doc => fromDoc<GeneratedImage>(doc));
     } catch (error) {
         console.error("Error fetching user generated images:", error);
+        return [];
+    }
+}
+
+export async function getUserGeneratedVideos(userId: string): Promise<GeneratedVideo[]> {
+    if (!db) return [];
+    try {
+        const videosCol = collection(db, 'generated_videos');
+        const q = query(videosCol, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromDoc<GeneratedVideo>(doc));
+    } catch (error) {
+        console.error("Error fetching user generated videos:", error);
         return [];
     }
 }

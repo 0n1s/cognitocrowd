@@ -62,7 +62,7 @@ const navItems = [
 const aiToolsNavItems = [
   { href: "/chat", icon: MessageCircle, label: "Chat Models" },
   { href: "/image-generation", icon: Image, label: "Image Models" },
-  { href: "#", icon: Video, label: "Video Models" },
+  { href: "/video-generation", icon: Video, label: "Video Models" },
 ];
 
 
@@ -230,9 +230,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname.startsWith(item.href) && item.href !== "#"}
+                  isActive={pathname.startsWith(item.href)}
                   tooltip={item.label}
-                  disabled={item.href === "#"}
                 >
                   <Link href={item.href}>
                     <item.icon />
@@ -277,5 +276,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    

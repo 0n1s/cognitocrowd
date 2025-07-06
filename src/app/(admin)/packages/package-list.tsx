@@ -64,6 +64,9 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
   const [isPrimary, setIsPrimary] = useState(false);
   const [taskLimit, setTaskLimit] = useState("100");
   const [imageGenerationLimit, setImageGenerationLimit] = useState("0");
+  const [imageGenerationLimitType, setImageGenerationLimitType] = useState<'daily' | 'lifetime'>('daily');
+  const [videoGenerationLimit, setVideoGenerationLimit] = useState("0");
+  const [videoGenerationLimitType, setVideoGenerationLimitType] = useState<'daily' | 'lifetime'>('daily');
   const [expiryNumber, setExpiryNumber] = useState(1);
   const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">("months");
   const [referralBonusPercentage, setReferralBonusPercentage] = useState("0");
@@ -91,6 +94,9 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
     setIsPrimary(false);
     setTaskLimit("100");
     setImageGenerationLimit("0");
+    setImageGenerationLimitType('daily');
+    setVideoGenerationLimit("0");
+    setVideoGenerationLimitType('daily');
     setExpiryNumber(1);
     setExpiryUnit("months");
     setReferralBonusPercentage("0");
@@ -107,6 +113,9 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
         isPrimary,
         taskLimit: parseInt(taskLimit, 10) || 0,
         imageGenerationLimit: parseInt(imageGenerationLimit, 10) || 0,
+        imageGenerationLimitType,
+        videoGenerationLimit: parseInt(videoGenerationLimit, 10) || 0,
+        videoGenerationLimitType,
         expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
         referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
         referralBonusFixed: parseFloat(referralBonusFixed) || 0,
@@ -133,7 +142,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
             Configure the details for the new subscription package.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto pr-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Name</Label>
             <Input id="name" value={name} onChange={e => setName(e.target.value)} className="col-span-3" placeholder="e.g., Pro" />
@@ -142,13 +151,39 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
             <Label htmlFor="price" className="text-right">Price</Label>
             <Input id="price" value={price} onChange={e => setPrice(e.target.value)} className="col-span-3" placeholder="e.g., $10/mo or Free" />
           </div>
-           <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="taskLimit" className="text-right">Contribution Limit</Label>
             <Input id="taskLimit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="imageGenerationLimit" className="text-right">Image Gen. Limit</Label>
-            <Input id="imageGenerationLimit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} className="col-span-3" placeholder="e.g., 10" />
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="imageGenerationLimit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} placeholder="e.g., 10" />
+                <Select value={imageGenerationLimitType} onValueChange={(v) => setImageGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="videoGenerationLimit" className="text-right">Video Gen. Limit</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="videoGenerationLimit" type="number" value={videoGenerationLimit} onChange={e => setVideoGenerationLimit(e.target.value)} placeholder="e.g., 5" />
+                <Select value={videoGenerationLimitType} onValueChange={(v) => setVideoGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Expiry</Label>
@@ -249,6 +284,9 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
     const [isPrimary, setIsPrimary] = useState(pkg.isPrimary || false);
     const [taskLimit, setTaskLimit] = useState(String(pkg.taskLimit || 100));
     const [imageGenerationLimit, setImageGenerationLimit] = useState(String(pkg.imageGenerationLimit || 0));
+    const [imageGenerationLimitType, setImageGenerationLimitType] = useState<'daily' | 'lifetime'>(pkg.imageGenerationLimitType || 'daily');
+    const [videoGenerationLimit, setVideoGenerationLimit] = useState(String(pkg.videoGenerationLimit || 0));
+    const [videoGenerationLimitType, setVideoGenerationLimitType] = useState<'daily' | 'lifetime'>(pkg.videoGenerationLimitType || 'daily');
     
     const safeExpiryPeriod = pkg.expiryPeriod || "1 months";
     const [initialExpiryValue, initialExpiryUnitName] = safeExpiryPeriod.split(' ');
@@ -284,6 +322,9 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             isPrimary,
             taskLimit: parseInt(taskLimit, 10) || 0,
             imageGenerationLimit: parseInt(imageGenerationLimit, 10) || 0,
+            imageGenerationLimitType,
+            videoGenerationLimit: parseInt(videoGenerationLimit, 10) || 0,
+            videoGenerationLimitType,
             expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
             referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
             referralBonusFixed: parseFloat(referralBonusFixed) || 0,
@@ -309,7 +350,7 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             Update the details for the subscription package.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto pr-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name-edit" className="text-right">Name</Label>
             <Input id="name-edit" value={name} onChange={e => setName(e.target.value)} className="col-span-3" placeholder="e.g., Pro" />
@@ -322,9 +363,35 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             <Label htmlFor="taskLimit-edit" className="text-right">Contribution Limit</Label>
             <Input id="taskLimit-edit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
           </div>
-           <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="imageGenerationLimit-edit" className="text-right">Image Gen. Limit</Label>
-            <Input id="imageGenerationLimit-edit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} className="col-span-3" placeholder="e.g., 10" />
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="imageGenerationLimit-edit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} placeholder="e.g., 10" />
+                <Select value={imageGenerationLimitType} onValueChange={(v) => setImageGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="videoGenerationLimit-edit" className="text-right">Video Gen. Limit</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="videoGenerationLimit-edit" type="number" value={videoGenerationLimit} onChange={e => setVideoGenerationLimit(e.target.value)} placeholder="e.g., 5" />
+                <Select value={videoGenerationLimitType} onValueChange={(v) => setVideoGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Expiry</Label>
@@ -461,8 +528,9 @@ const LoadingSkeleton = () => (
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Price</TableHead>
-              <TableHead>Contribution Limit</TableHead>
+              <TableHead>Task Limit</TableHead>
               <TableHead>Image Limit</TableHead>
+              <TableHead>Video Limit</TableHead>
               <TableHead>Expiry</TableHead>
               <TableHead>Primary</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -472,6 +540,7 @@ const LoadingSkeleton = () => (
             {[...Array(3)].map((_, i) => (
                 <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
@@ -507,6 +576,11 @@ export function PackageList() {
     useEffect(() => {
         fetchPackages();
     }, []);
+    
+    const formatLimit = (limit: number | undefined, type: 'daily' | 'lifetime' | undefined) => {
+        if (!limit || limit === 0) return 'N/A';
+        return `${limit} / ${type === 'lifetime' ? 'pkg' : 'day'}`;
+    };
 
   return (
     <Card>
@@ -526,21 +600,22 @@ export function PackageList() {
                     <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Price</TableHead>
-                    <TableHead>Contribution Limit</TableHead>
+                    <TableHead>Task Limit</TableHead>
                     <TableHead>Image Limit</TableHead>
+                    <TableHead>Video Limit</TableHead>
                     <TableHead>Expiry</TableHead>
                     <TableHead>Primary</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {packages.map((pkg) => {
-                      return (
+                    {packages.map((pkg) => (
                         <TableRow key={pkg.id}>
                             <TableCell className="font-medium">{pkg.name}</TableCell>
                             <TableCell>{pkg.price}</TableCell>
                             <TableCell>{pkg.taskLimit}</TableCell>
-                             <TableCell>{pkg.imageGenerationLimit ?? 'N/A'}</TableCell>
+                            <TableCell>{formatLimit(pkg.imageGenerationLimit, pkg.imageGenerationLimitType)}</TableCell>
+                            <TableCell>{formatLimit(pkg.videoGenerationLimit, pkg.videoGenerationLimitType)}</TableCell>
                             <TableCell>{pkg.expiryPeriod}</TableCell>
                             <TableCell>
                             {pkg.isPrimary && <Badge variant="secondary">Yes</Badge>}
@@ -557,8 +632,7 @@ export function PackageList() {
                               </div>
                             </TableCell>
                         </TableRow>
-                      );
-                    })}
+                      ))}
                 </TableBody>
                 </Table>
                 {packages.length === 0 && (
@@ -595,5 +669,3 @@ export function PackageList() {
     </Card>
   );
 }
-
-    
