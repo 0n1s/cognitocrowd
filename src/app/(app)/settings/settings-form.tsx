@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getPackage } from "@/lib/database";
+import { getUserData, getPackage } from "@/lib/database";
 import type { Package } from "@/lib/types";
 
 const profileFormSchema = z.object({
@@ -240,9 +240,17 @@ export function SettingsForm() {
     useEffect(() => {
         if (user) {
             profileForm.reset({ name: user.displayName || "" });
-            if (user.packageId) {
-                getPackage(user.packageId).then(pkg => setUserPackage(pkg));
-            }
+            
+            // Fetch full user data to get package info
+            getUserData(user.uid).then(userData => {
+                if (userData?.packageId) {
+                    getPackage(userData.packageId).then(pkg => {
+                        setUserPackage(pkg);
+                    });
+                } else {
+                    setUserPackage(null);
+                }
+            });
         }
     }, [user, profileForm]);
 
@@ -440,3 +448,5 @@ export function SettingsForm() {
         </div>
     );
 }
+
+    
