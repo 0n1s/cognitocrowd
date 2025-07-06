@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { updateUserNameInDB, updateUserPhotoURL } from "@/lib/actions";
+import { updateUserNameInDB, updateUserPhotoURL } from "@/lib/user-actions";
 import { auth, storage } from "@/lib/firebase";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
