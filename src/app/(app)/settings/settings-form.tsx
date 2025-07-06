@@ -7,7 +7,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { generateAndSetAiProfilePicture, updateUserNameInDB, updateUserPhotoURL } from "@/lib/user-actions";
+import {
+  updateUserNameInDB,
+  generateAiProfilePicture,
+  setProfilePictureFromDataUri,
+  updateUserPhotoURL
+} from "@/lib/user-actions";
 import { auth, storage } from "@/lib/firebase";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -16,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, Wand2, Clipboard } from "lucide-react";
+import { Loader2, Upload, Wand2, Clipboard, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -44,11 +49,13 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [generatedPreviewUri, setGeneratedPreviewUri] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isLoading = isUploading || isGenerating;
+  const isLoading = isUploading || isGenerating || isSaving;
   const canGenerate = userPackage?.allowAiProfilePicture || false;
 
   useEffect(() => {
@@ -64,6 +71,7 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
+      setGeneratedPreviewUri(null); // Clear AI preview if user uploads a file
       setSelectedFile(event.target.files[0]);
     }
   };
@@ -98,6 +106,7 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
         toast({ title: "Success", description: "Profile picture updated!" });
         setSelectedFile(null);
         setPreview(null);
+        setGeneratedPreviewUri(null);
         router.refresh();
       } else {
         toast({ title: "Error", description: result.message, variant: "destructive" });
@@ -121,12 +130,13 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
     }
 
     setIsGenerating(true);
+    setGeneratedPreviewUri(null);
     try {
-      const result = await generateAndSetAiProfilePicture(user.uid, prompt);
-      if (result.success && result.url) {
-        await updateProfile(auth.currentUser, { photoURL: result.url });
-        toast({ title: "Success!", description: "AI avatar generated and updated." });
-        router.refresh();
+      const result = await generateAiProfilePicture(user.uid, prompt);
+      if (result.success && result.imageDataUri) {
+        setGeneratedPreviewUri(result.imageDataUri);
+        setSelectedFile(null);
+        toast({ title: "Image Generated!", description: "Review your new avatar and click 'Save Picture' to apply it." });
       } else {
          throw new Error(result.message || "AI generation failed.");
       }
@@ -154,6 +164,40 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
       setIsGenerating(false);
     }
   };
+
+  const handleSaveGenerated = async () => {
+    if (!user || !auth.currentUser) {
+      toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+      return;
+    }
+    if (!generatedPreviewUri) {
+      toast({ title: "No image to save", description: "Please generate an image first.", variant: "destructive" });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const result = await setProfilePictureFromDataUri(user.uid, generatedPreviewUri);
+
+      if (result.success && result.url) {
+        await updateProfile(auth.currentUser, { photoURL: result.url });
+        toast({ title: "Success!", description: "Your new avatar has been saved." });
+        setGeneratedPreviewUri(null);
+        router.refresh();
+      } else {
+        throw new Error(result.message || "Failed to save image.");
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+      toast({
+        title: "Save Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
@@ -168,7 +212,7 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
       </CardHeader>
       <CardContent className="flex items-center gap-6">
         <Avatar className="h-24 w-24">
-          <AvatarImage src={preview || user?.photoURL || ''} alt={user?.displayName || "user"} />
+          <AvatarImage src={generatedPreviewUri || preview || user?.photoURL || ''} alt={user?.displayName || "user"} />
           <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
         </Avatar>
         <Tabs defaultValue="upload" className="w-full">
@@ -208,10 +252,16 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
                     placeholder="e.g., a photorealistic astronaut" 
                     disabled={isLoading}
                 />
-                 <Button onClick={handleGenerate} disabled={isLoading} className="w-full">
-                    {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Wand2 className="mr-2 h-4 w-4" /> Generate
-                </Button>
+                 <div className="flex gap-2 mt-2">
+                    <Button onClick={handleGenerate} disabled={isLoading || !prompt} className="flex-1">
+                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        Generate
+                    </Button>
+                    <Button onClick={handleSaveGenerated} disabled={isLoading || !generatedPreviewUri} className="flex-1">
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Save Picture
+                    </Button>
+                 </div>
             </TabsContent>
         </Tabs>
       </CardContent>
