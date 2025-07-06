@@ -43,30 +43,14 @@ export async function getTasks(userId?: string): Promise<Task[]> {
         }
     }
 
-    const tasksCol = collection(db, 'tasks');
-    const queriesToRun = [];
-
-    // Query for tasks matching user's expertise
-    if (userExpertise.length > 0) {
-        queriesToRun.push(query(tasksCol, where('status', '==', 'Active'), where('expertise', 'in', userExpertise)));
-    }
-
-    // Query for general tasks (no expertise assigned)
-    queriesToRun.push(query(tasksCol, where('status', '==', 'Active'), where('expertise', '==', null)));
-
-    const querySnapshots = await Promise.all(queriesToRun.map(q => getDocs(q)));
-
-    const allTasksMap = new Map<string, Task>();
-
-    querySnapshots.forEach(snapshot => {
-        snapshot.docs.forEach(doc => {
-            if (!allTasksMap.has(doc.id)) {
-                allTasksMap.set(doc.id, fromDoc<Task>(doc));
-            }
-        });
-    });
+    const expertiseToQuery = ["General", ...userExpertise];
     
-    let allTasks = Array.from(allTasksMap.values());
+    const tasksCol = collection(db, 'tasks');
+    const q = query(tasksCol, where('status', '==', 'Active'), where('expertise', 'in', expertiseToQuery));
+
+    const snapshot = await getDocs(q);
+    
+    let allTasks = snapshot.docs.map(doc => fromDoc<Task>(doc));
 
     // Seeding logic if no tasks exist at all
     if (allTasks.length === 0 && mockTasks.length > 0) {
@@ -74,13 +58,18 @@ export async function getTasks(userId?: string): Promise<Task[]> {
         const batch = writeBatch(db);
         mockTasks.forEach((task) => {
             const { id, ...taskData } = task; // Firestore will generate its own ID
+            const taskWithExpertise = {
+                ...taskData,
+                expertise: taskData.expertise || 'General',
+                status: 'Active',
+                createdAt: Timestamp.now()
+            };
             const docRef = doc(collection(db, 'tasks'));
-            batch.set(docRef, {...taskData, status: 'Active', createdAt: Timestamp.now()});
+            batch.set(docRef, taskWithExpertise);
         });
         await batch.commit();
         console.log('Database seeded.');
-        // Re-fetch general tasks after seeding
-        const seededSnapshot = await getDocs(query(tasksCol, where('status', '==', 'Active'), where('expertise', '==', null)));
+        const seededSnapshot = await getDocs(q);
         allTasks = seededSnapshot.docs.map(d => fromDoc<Task>(d));
     }
 

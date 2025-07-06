@@ -96,7 +96,7 @@ const TASKS_PER_PAGE = 10;
 function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onTaskCreated: () => void; }) {
   const { toast } = useToast();
   const [taskType, setTaskType] = useState<TaskType>("open_text_feedback");
-  const [expertise, setExpertise] = useState<string>("general");
+  const [expertise, setExpertise] = useState<string>("General");
   const [options, setOptions] = useState<string[]>([""]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -190,7 +190,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; o
     setDescription("");
     setPoints(100);
     setTaskType("open_text_feedback");
-    setExpertise("general");
+    setExpertise("General");
     setOptions([""]);
   };
 
@@ -202,7 +202,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; o
         points,
         type: taskType,
         options: taskType === "multiple_choice_preference" || taskType === "ranking" || taskType === "classification" ? options.filter(o => o.trim() !== '') : [],
-        expertise: expertise === "general" ? undefined : expertise,
+        expertise: expertise,
     });
     
     if (result.success) {
@@ -241,7 +241,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; o
                 <SelectValue placeholder="Select an expertise" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="general">General (for all users)</SelectItem>
+                <SelectItem value="General">General (for all users)</SelectItem>
                 {EXPERTISE_AREAS.map(area => (
                     <SelectItem key={area} value={area}>{area}</SelectItem>
                 ))}

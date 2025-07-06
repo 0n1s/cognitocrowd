@@ -38,7 +38,7 @@ export async function createAdminTask(data: CreateTaskInput) {
             options: data.options,
             status: 'Active',
             difficulty: 'Medium', // Assign a default difficulty
-            expertise: data.expertise === 'general' ? undefined : data.expertise,
+            expertise: data.expertise || 'General',
             createdAt: Timestamp.now(),
         };
 
@@ -85,14 +85,11 @@ export async function bulkCreateAdminTasks(data: BulkCreateTasksInput) {
             description: task.description,
             points: task.points || 100,
             type: task.taskType,
+            expertise: task.expertise || 'General',
             status: 'Active',
             difficulty: 'Medium',
             createdAt: Timestamp.now(),
         };
-
-        if (task.expertise && task.expertise !== 'General') {
-            taskToAdd.expertise = task.expertise;
-        }
 
         if (task.options) taskToAdd.options = task.options;
         if (task.scale) taskToAdd.scale = task.scale;
