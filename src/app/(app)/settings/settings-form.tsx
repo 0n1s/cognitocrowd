@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { updateUserNameInDB, updateUserPhotoURL } from "@/lib/user-actions";
+import { generateAndSetAiProfilePicture, updateUserNameInDB, updateUserPhotoURL } from "@/lib/user-actions";
 import { auth, storage } from "@/lib/firebase";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -15,10 +15,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, Wand2, Clipboard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getPackage } from "@/lib/database";
+import type { Package } from "@/lib/types";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -34,14 +37,18 @@ const passwordFormSchema = z.object({
 });
 
 
-function ProfilePictureForm() {
+function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
   const { user } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [prompt, setPrompt] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isLoading = isUploading || isGenerating;
+  const canGenerate = userPackage?.allowAiProfilePicture || false;
 
   useEffect(() => {
     if (!selectedFile) {
@@ -51,7 +58,6 @@ function ProfilePictureForm() {
     const objectUrl = URL.createObjectURL(selectedFile);
     setPreview(objectUrl);
     
-    // free memory when ever this component is unmounted
     return () => URL.revokeObjectURL(objectUrl);
   }, [selectedFile]);
 
@@ -60,9 +66,16 @@ function ProfilePictureForm() {
       setSelectedFile(event.target.files[0]);
     }
   };
+  
+  const handleCopyError = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => toast({ title: "Copied!", description: "Error details have been copied to your clipboard." }),
+      () => toast({ title: "Copy Failed", description: "Could not copy error to clipboard.", variant: "destructive" })
+    );
+  };
 
   const handleUpload = async () => {
-    if (!user || !auth?.currentUser || !storage) {
+    if (!user || !auth?.currentUser) {
       toast({ title: "Error", description: "You must be logged in to upload.", variant: "destructive" });
       return;
     }
@@ -95,6 +108,50 @@ function ProfilePictureForm() {
       setIsUploading(false);
     }
   };
+
+  const handleGenerate = async () => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+      return;
+    }
+    if (!prompt) {
+      toast({ title: "Missing Prompt", description: "Please enter a prompt to generate an image.", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const result = await generateAndSetAiProfilePicture(user.uid, prompt);
+      if (result.success) {
+        toast({ title: "Success!", description: "AI avatar generated and updated." });
+        router.refresh();
+      } else {
+         throw new Error(result.message || "AI generation failed.");
+      }
+    } catch (error) {
+       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+            toast({
+                title: "Generation Failed",
+                variant: "destructive",
+                duration: Infinity,
+                description: (
+                    <div className="w-full">
+                        <div className="flex justify-start items-center gap-4 mb-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleCopyError(errorMessage)}>
+                                <Clipboard className="mr-2 h-4 w-4" /> Copy
+                            </Button>
+                            <p>An error occurred:</p>
+                        </div>
+                        <pre className="mt-1 w-full rounded-md bg-destructive/20 p-2 font-mono text-sm text-destructive-foreground whitespace-pre-wrap">
+                            {errorMessage}
+                        </pre>
+                    </div>
+                )
+            });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
   
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
@@ -107,37 +164,55 @@ function ProfilePictureForm() {
         <CardTitle>Profile Picture</CardTitle>
         <CardDescription>Update your avatar. This will be visible to other users.</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col sm:flex-row items-center gap-6">
+      <CardContent className="flex items-center gap-6">
         <Avatar className="h-24 w-24">
           <AvatarImage src={preview || user?.photoURL || ''} alt={user?.displayName || "user"} />
           <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
         </Avatar>
-        <div className="flex-grow w-full">
-            <Input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={handleFileChange}
-              accept="image/png, image/jpeg, image/gif"
-              disabled={isUploading}
-            />
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Choose Image
-            </Button>
-            {selectedFile && <p className="text-sm text-muted-foreground mt-2">Selected: {selectedFile.name}</p>}
-        </div>
+        <Tabs defaultValue="upload" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="upload" disabled={isLoading}>Upload</TabsTrigger>
+                <TabsTrigger value="ai" disabled={isLoading || !canGenerate}>Generate AI</TabsTrigger>
+            </TabsList>
+            <TabsContent value="upload" className="mt-4">
+                <Input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="image/png, image/jpeg, image/gif"
+                  disabled={isLoading}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Choose Image
+                </Button>
+                {selectedFile && <p className="text-sm text-muted-foreground mt-2">Selected: {selectedFile.name}</p>}
+                <Button onClick={handleUpload} disabled={!selectedFile || isLoading} className="mt-4">
+                  {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Picture
+                </Button>
+            </TabsContent>
+            <TabsContent value="ai" className="mt-4 space-y-2">
+                 <Label>Describe the avatar you want</Label>
+                 <Input 
+                    value={prompt} 
+                    onChange={(e) => setPrompt(e.target.value)} 
+                    placeholder="e.g., a photorealistic astronaut" 
+                    disabled={isLoading}
+                />
+                 <Button onClick={handleGenerate} disabled={isLoading} className="w-full">
+                    {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Wand2 className="mr-2 h-4 w-4" /> Generate
+                </Button>
+            </TabsContent>
+        </Tabs>
       </CardContent>
-      <CardFooter className="border-t px-6 py-4">
-        <Button onClick={handleUpload} disabled={!selectedFile || isUploading}>
-          {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save Picture
-        </Button>
-      </CardFooter>
     </Card>
   );
 }
@@ -147,6 +222,7 @@ export function SettingsForm() {
     const { user, loading } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const [userPackage, setUserPackage] = useState<Package | null>(null);
     const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
     const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
 
@@ -160,10 +236,12 @@ export function SettingsForm() {
         defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
     });
 
-    // Update form default value when user loads
     useEffect(() => {
         if (user) {
             profileForm.reset({ name: user.displayName || "" });
+            if (user.packageId) {
+                getPackage(user.packageId).then(pkg => setUserPackage(pkg));
+            }
         }
     }, [user, profileForm]);
 
@@ -174,18 +252,14 @@ export function SettingsForm() {
         }
         setIsProfileSubmitting(true);
         try {
-            // Step 1: Update Firebase Auth profile (client-side)
             await updateProfile(auth.currentUser, { displayName: values.name });
-
-            // Step 2: Update Firestore database (server action)
             const result = await updateUserNameInDB(user.uid, values.name);
 
             if (result.success) {
                 toast({ title: "Success", description: "Your profile has been updated." });
-                router.refresh(); // Refresh to show updated name in layout
+                router.refresh();
             } else {
                 toast({ title: "Error", description: result.message, variant: "destructive" });
-                // Note: Potentially handle rollback of auth profile update here
             }
         } catch (error) {
              toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
@@ -239,9 +313,6 @@ export function SettingsForm() {
                             <Skeleton className="h-10 w-40" />
                         </div>
                     </CardContent>
-                    <CardFooter className="border-t px-6 py-4">
-                        <Skeleton className="h-10 w-36" />
-                    </CardFooter>
                 </Card>
                 <Card>
                     <CardHeader>
@@ -275,7 +346,7 @@ export function SettingsForm() {
 
     return (
         <div className="space-y-8 max-w-2xl">
-            <ProfilePictureForm />
+            <ProfilePictureForm userPackage={userPackage} />
             <Card>
                 <CardHeader>
                     <CardTitle>Profile</CardTitle>

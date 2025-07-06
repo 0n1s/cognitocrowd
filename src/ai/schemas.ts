@@ -55,3 +55,13 @@ export const ImproveTextOutputSchema = z.object({
   improvedText: z.string().describe('The AI-improved version of the text.'),
 });
 export type ImproveTextOutput = z.infer<typeof ImproveTextOutputSchema>;
+
+export const GenerateProfileImageInputSchema = z.object({
+  prompt: z.string().describe('A text prompt to generate a user profile picture.'),
+});
+export type GenerateProfileImageInput = z.infer<typeof GenerateProfileImageInputSchema>;
+
+export const GenerateProfileImageOutputSchema = z.object({
+    imageDataUri: z.string().describe("The generated image as a data URI. Expected format: 'data:image/png;base64,<encoded_data>'."),
+});
+export type GenerateProfileImageOutput = z.infer<typeof GenerateProfileImageOutputSchema>;

@@ -2,6 +2,7 @@
 
 
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -133,6 +134,7 @@ export type Package = {
   expiryPeriod: string;
   referralBonusPercentage?: number;
   referralBonusFixed?: number;
+  allowAiProfilePicture?: boolean;
 };
 
 export type TaskResponse = {

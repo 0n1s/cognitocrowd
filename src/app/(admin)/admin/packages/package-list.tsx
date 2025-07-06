@@ -67,6 +67,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
   const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">("months");
   const [referralBonusPercentage, setReferralBonusPercentage] = useState("0");
   const [referralBonusFixed, setReferralBonusFixed] = useState("0");
+  const [allowAiProfilePicture, setAllowAiProfilePicture] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFeatureChange = (index: number, value: string) => {
@@ -92,6 +93,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
     setExpiryUnit("months");
     setReferralBonusPercentage("0");
     setReferralBonusFixed("0");
+    setAllowAiProfilePicture(false);
   };
 
   const handleSubmit = async () => {
@@ -105,6 +107,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
         expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
         referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
         referralBonusFixed: parseFloat(referralBonusFixed) || 0,
+        allowAiProfilePicture,
     });
     
     if (result.success) {
@@ -187,6 +190,13 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
                     <Label htmlFor="isPrimary" className="ml-2 font-normal text-sm text-muted-foreground">Make this the highlighted package.</Label>
                 </div>
           </div>
+           <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="allowAiProfilePicture" className="text-right">AI Avatar?</Label>
+                <div className="col-span-3 flex items-center">
+                    <Checkbox id="allowAiProfilePicture" checked={allowAiProfilePicture} onCheckedChange={checked => setAllowAiProfilePicture(checked as boolean)} />
+                    <Label htmlFor="allowAiProfilePicture" className="ml-2 font-normal text-sm text-muted-foreground">Allow AI profile picture generation.</Label>
+                </div>
+          </div>
           <Separator />
            <div className="grid grid-cols-4 items-center gap-4">
              <Label className="text-right">Referral Bonus</Label>
@@ -241,6 +251,7 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
     const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">(initialExpiryUnit);
     const [referralBonusPercentage, setReferralBonusPercentage] = useState(String(pkg.referralBonusPercentage || 0));
     const [referralBonusFixed, setReferralBonusFixed] = useState(String(pkg.referralBonusFixed || 0));
+    const [allowAiProfilePicture, setAllowAiProfilePicture] = useState(pkg.allowAiProfilePicture || false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleFeatureChange = (index: number, value: string) => {
@@ -267,6 +278,7 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
             referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
             referralBonusFixed: parseFloat(referralBonusFixed) || 0,
+            allowAiProfilePicture,
         });
         
         if (result.success) {
@@ -346,6 +358,13 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
                 <div className="col-span-3 flex items-center">
                     <Checkbox id="isPrimary-edit" checked={isPrimary} onCheckedChange={checked => setIsPrimary(checked as boolean)} />
                     <Label htmlFor="isPrimary-edit" className="ml-2 font-normal text-sm text-muted-foreground">Make this the highlighted package.</Label>
+                </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="allowAiProfilePicture-edit" className="text-right">AI Avatar?</Label>
+                <div className="col-span-3 flex items-center">
+                    <Checkbox id="allowAiProfilePicture-edit" checked={allowAiProfilePicture} onCheckedChange={checked => setAllowAiProfilePicture(checked as boolean)} />
+                    <Label htmlFor="allowAiProfilePicture-edit" className="ml-2 font-normal text-sm text-muted-foreground">Allow AI profile picture generation.</Label>
                 </div>
             </div>
              <Separator />
