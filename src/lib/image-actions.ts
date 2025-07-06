@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -17,69 +18,93 @@ export async function generateAndSaveImage(userId: string, prompt: string): Prom
     }
 
     try {
-        const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
-
-        if (!userDoc.exists()) {
-            return { success: false, message: 'User not found.' };
-        }
-        
-        const userData = userDoc.data() as User;
-        let userPackage: Package | null = null;
-        if (userData.packageId) {
-            userPackage = await getPackage(userData.packageId);
-        }
-
-        const imageLimit = userPackage?.imageGenerationLimit ?? 0;
-
-        const lastReset = userData.lastImageGenerationReset ? (userData.lastImageGenerationReset as Timestamp).toDate() : new Date(0);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        let dailyCount = lastReset < today ? 0 : userData.dailyImageGenerationCount || 0;
-
-        if (dailyCount >= imageLimit) {
-            return { success: false, message: 'You have reached your daily image generation limit. Please upgrade your package for more.' };
-        }
-        
-        const genResult = await generateImage({ prompt });
-        if (!genResult.imageDataUri) {
-            throw new Error("AI failed to generate an image.");
-        }
-
-        const imageDataUri = genResult.imageDataUri;
-        const storageRef = ref(storage, `generated-images/${userId}/${uuidv4()}.png`);
-        
-        const base64Data = imageDataUri.substring(imageDataUri.indexOf(',') + 1);
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        
-        const snapshot = await uploadBytes(storageRef, imageBuffer, {
-            contentType: 'image/png'
-        });
-        const downloadURL = await getDownloadURL(snapshot.ref);
-
-        const newImageRef = doc(collection(db, 'generated_images'));
-        const newImageData: Omit<GeneratedImage, 'id'> = {
-            userId,
-            prompt,
-            imageUrl: downloadURL,
-            thumbnailUrl: downloadURL,
-            createdAt: Timestamp.now(),
-        };
+        let newImageData: Omit<GeneratedImage, 'id'> | null = null;
+        let finalImageObject: GeneratedImage | null = null;
 
         await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, 'users', userId);
+            const userDoc = await transaction.get(userRef);
+
+            if (!userDoc.exists()) {
+                throw new Error('User not found.');
+            }
+            
+            const userData = userDoc.data() as User;
+            let userPackage: Package | null = null;
+            if (userData.packageId) {
+                // We must fetch the package inside the transaction if its properties are used for validation
+                const packageRef = doc(db, 'packages', userData.packageId);
+                const packageDoc = await transaction.get(packageRef);
+                if (packageDoc.exists()) {
+                    userPackage = packageDoc.data() as Package;
+                }
+            }
+
+            const imageLimit = userPackage?.imageGenerationLimit ?? 0;
+            if (imageLimit <= 0) {
+                 throw new Error('Your current package does not allow image generation.');
+            }
+
+            const limitType = userPackage?.imageGenerationLimitType || 'daily';
+            let updates = {};
+
+            if (limitType === 'lifetime') {
+                const lifetimeCount = userData.packageImageGenerationCount || 0;
+                if (lifetimeCount >= imageLimit) {
+                    throw new Error('You have reached your image generation limit for this package.');
+                }
+                updates = { packageImageGenerationCount: lifetimeCount + 1 };
+            } else { // Daily
+                const lastReset = userData.lastImageGenerationReset ? (userData.lastImageGenerationReset as Timestamp).toDate() : new Date(0);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dailyCount = lastReset < today ? 0 : userData.dailyImageGenerationCount || 0;
+
+                if (dailyCount >= imageLimit) {
+                    throw new Error('You have reached your daily image generation limit for today.');
+                }
+                updates = {
+                    dailyImageGenerationCount: dailyCount + 1,
+                    lastImageGenerationReset: Timestamp.now()
+                };
+            }
+
+            const genResult = await generateImage({ prompt });
+            if (!genResult.imageDataUri) {
+                throw new Error("AI failed to generate an image.");
+            }
+
+            const imageDataUri = genResult.imageDataUri;
+            const storageRef = ref(storage, `generated-images/${userId}/${uuidv4()}.png`);
+            
+            const base64Data = imageDataUri.substring(imageDataUri.indexOf(',') + 1);
+            const imageBuffer = Buffer.from(base64Data, 'base64');
+            
+            const snapshot = await uploadBytes(storageRef, imageBuffer, { contentType: 'image/png' });
+            const downloadURL = await getDownloadURL(snapshot.ref);
+
+            const newImageRef = doc(collection(db, 'generated_images'));
+            newImageData = {
+                userId,
+                prompt,
+                imageUrl: downloadURL,
+                thumbnailUrl: downloadURL,
+                createdAt: Timestamp.now(),
+            };
+
             transaction.set(newImageRef, newImageData);
-            transaction.update(userRef, {
-                dailyImageGenerationCount: dailyCount + 1,
-                lastImageGenerationReset: Timestamp.now()
-            });
+            transaction.update(userRef, updates);
+            
+            finalImageObject = {
+                ...(newImageData as Omit<GeneratedImage, 'id'>),
+                id: newImageRef.id,
+                createdAt: (newImageData as any).createdAt.toDate().toISOString(),
+            };
         });
 
-        const finalImageObject: GeneratedImage = {
-            ...newImageData,
-            id: newImageRef.id,
-            createdAt: newImageData.createdAt.toDate().toISOString(),
-        };
+        if (!finalImageObject) {
+            throw new Error("Transaction failed to complete successfully.");
+        }
 
         revalidatePath('/image-generation');
 

@@ -64,6 +64,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
   const [isPrimary, setIsPrimary] = useState(false);
   const [taskLimit, setTaskLimit] = useState("100");
   const [imageGenerationLimit, setImageGenerationLimit] = useState("0");
+  const [imageGenerationLimitType, setImageGenerationLimitType] = useState<'daily' | 'lifetime'>('daily');
   const [expiryNumber, setExpiryNumber] = useState(1);
   const [expiryUnit, setExpiryUnit] = useState<"weeks" | "months">("months");
   const [referralBonusPercentage, setReferralBonusPercentage] = useState("0");
@@ -91,6 +92,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
     setIsPrimary(false);
     setTaskLimit("100");
     setImageGenerationLimit("0");
+    setImageGenerationLimitType('daily');
     setExpiryNumber(1);
     setExpiryUnit("months");
     setReferralBonusPercentage("0");
@@ -107,6 +109,7 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
         isPrimary,
         taskLimit: parseInt(taskLimit, 10) || 0,
         imageGenerationLimit: parseInt(imageGenerationLimit, 10) || 0,
+        imageGenerationLimitType,
         expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
         referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
         referralBonusFixed: parseFloat(referralBonusFixed) || 0,
@@ -148,7 +151,18 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="imageGenerationLimit" className="text-right">Image Gen. Limit</Label>
-            <Input id="imageGenerationLimit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} className="col-span-3" placeholder="e.g., 10" />
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="imageGenerationLimit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} placeholder="e.g., 10" />
+                <Select value={imageGenerationLimitType} onValueChange={(v) => setImageGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Expiry</Label>
@@ -249,6 +263,7 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
     const [isPrimary, setIsPrimary] = useState(pkg.isPrimary || false);
     const [taskLimit, setTaskLimit] = useState(String(pkg.taskLimit || 100));
     const [imageGenerationLimit, setImageGenerationLimit] = useState(String(pkg.imageGenerationLimit || 0));
+    const [imageGenerationLimitType, setImageGenerationLimitType] = useState<'daily' | 'lifetime'>(pkg.imageGenerationLimitType || 'daily');
     
     const safeExpiryPeriod = pkg.expiryPeriod || "1 months";
     const [initialExpiryValue, initialExpiryUnitName] = safeExpiryPeriod.split(' ');
@@ -284,6 +299,7 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
             isPrimary,
             taskLimit: parseInt(taskLimit, 10) || 0,
             imageGenerationLimit: parseInt(imageGenerationLimit, 10) || 0,
+            imageGenerationLimitType,
             expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
             referralBonusPercentage: parseFloat(referralBonusPercentage) || 0,
             referralBonusFixed: parseFloat(referralBonusFixed) || 0,
@@ -324,7 +340,18 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="imageGenerationLimit-edit" className="text-right">Image Gen. Limit</Label>
-            <Input id="imageGenerationLimit-edit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} className="col-span-3" placeholder="e.g., 10" />
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="imageGenerationLimit-edit" type="number" value={imageGenerationLimit} onChange={e => setImageGenerationLimit(e.target.value)} placeholder="e.g., 10" />
+                <Select value={imageGenerationLimitType} onValueChange={(v) => setImageGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Expiry</Label>
@@ -546,13 +573,16 @@ export function PackageList() {
                           bonusParts.push(`$${pkg.referralBonusFixed.toFixed(2)}`);
                       }
                       const bonusText = bonusParts.join(' + ') || 'N/A';
+                      const limitText = (pkg.imageGenerationLimit ?? 0) > 0 
+                        ? `${pkg.imageGenerationLimit} / ${pkg.imageGenerationLimitType === 'lifetime' ? 'pkg' : 'day'}`
+                        : 'N/A';
 
                       return (
                         <TableRow key={pkg.id}>
                             <TableCell className="font-medium">{pkg.name}</TableCell>
                             <TableCell>{pkg.price}</TableCell>
                             <TableCell>{pkg.taskLimit}</TableCell>
-                            <TableCell>{pkg.imageGenerationLimit ?? 'N/A'}</TableCell>
+                            <TableCell>{limitText}</TableCell>
                             <TableCell>{pkg.expiryPeriod}</TableCell>
                             <TableCell>{bonusText}</TableCell>
                             <TableCell>

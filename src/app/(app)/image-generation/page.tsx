@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { generateAndSaveImage } from '@/lib/image-actions';
 import { getUserData, getUserGeneratedImages, getPackage } from '@/lib/database';
-import type { GeneratedImage, Package } from '@/lib/types';
+import type { GeneratedImage, Package, User } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Wand2, Loader2, Download, Eye } from 'lucide-react';
 import NextImage from 'next/image';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Timestamp } from 'firebase/firestore';
 
 function ImageGallery({ images }: { images: GeneratedImage[] }) {
     if (images.length === 0) {
@@ -105,8 +106,10 @@ export default function ImageGenerationPage() {
     const [images, setImages] = useState<GeneratedImage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isPageLoading, setIsPageLoading] = useState(true);
-    const [userPackage, setUserPackage] = useState<Package | null>(null);
-    const [dailyCount, setDailyCount] = useState(0);
+
+    const [limit, setLimit] = useState(0);
+    const [count, setCount] = useState(0);
+    const [limitType, setLimitType] = useState<'daily' | 'lifetime'>('daily');
 
     const fetchPageData = async () => {
         if (!user) return;
@@ -119,14 +122,26 @@ export default function ImageGenerationPage() {
 
             if (userData?.packageId) {
                 const pkg = await getPackage(userData.packageId);
-                setUserPackage(pkg);
+                if (pkg) {
+                    const currentLimit = pkg.imageGenerationLimit ?? 0;
+                    const currentLimitType = pkg.imageGenerationLimitType || 'daily';
+                    setLimit(currentLimit);
+                    setLimitType(currentLimitType);
+
+                    if (currentLimitType === 'lifetime') {
+                        setCount(userData.packageImageGenerationCount || 0);
+                    } else { // Daily
+                         const lastReset = userData.lastImageGenerationReset ? new Date(userData.lastImageGenerationReset) : new Date(0);
+                         const today = new Date();
+                         today.setHours(0, 0, 0, 0);
+                         setCount(lastReset < today ? 0 : userData.dailyImageGenerationCount || 0);
+                    }
+                }
+            } else {
+                setLimit(0);
+                setCount(0);
             }
             
-            const lastReset = userData?.lastImageGenerationReset ? new Date(userData.lastImageGenerationReset) : new Date(0);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            setDailyCount(lastReset < today ? 0 : userData?.dailyImageGenerationCount || 0);
             setImages(generatedImages);
 
         } catch (error) {
@@ -158,20 +173,31 @@ export default function ImageGenerationPage() {
             if (result.success && result.image) {
                 toast({ title: "Success!", description: "Your image has been generated." });
                 setImages(prev => [result.image!, ...prev]);
-                setDailyCount(prev => prev + 1);
+                setCount(prev => prev + 1);
                 setPrompt("");
             } else {
                 toast({ title: "Generation Failed", description: result.message, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            toast({ title: "Error", description: errorMessage, variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
     };
     
-    const imageLimit = userPackage?.imageGenerationLimit ?? 0;
-    const canGenerate = dailyCount < imageLimit;
+    const canGenerate = count < limit;
+
+    const limitMessage = () => {
+        if (limit === 0) {
+            return "Your current package does not allow image generation.";
+        }
+        if (!canGenerate) {
+            return `You have reached your ${limitType} generation limit. Upgrade your package for more.`;
+        }
+        return `${limit - count} of ${limit} generations remaining ${limitType === 'lifetime' ? 'for this package' : 'today'}.`;
+    };
+
 
     if (isPageLoading || authLoading) return <LoadingState />;
 
@@ -203,10 +229,7 @@ export default function ImageGenerationPage() {
                         </Button>
                     </div>
                      <p className="text-sm text-muted-foreground mt-4">
-                        {canGenerate
-                            ? `${imageLimit - dailyCount} of ${imageLimit} generations remaining today.`
-                            : "You have reached your daily generation limit. Upgrade your package for more."
-                        }
+                        {limitMessage()}
                     </p>
                 </CardContent>
             </Card>

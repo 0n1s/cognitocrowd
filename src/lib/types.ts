@@ -1,4 +1,5 @@
 
+
 export type TaskOption =
   | string
   | { text: string }
@@ -76,6 +77,7 @@ export type User = {
   lastCompletionReset?: any; // Firestore Timestamp
   dailyImageGenerationCount?: number;
   lastImageGenerationReset?: any; // Firestore Timestamp
+  packageImageGenerationCount?: number;
   onboardingStatus?: 'pending' | 'approved' | 'rejected';
   accountExpiresAt?: any; // Firestore Timestamp
   country?: string;
@@ -130,6 +132,7 @@ export type Package = {
   isPrimary?: boolean;
   taskLimit: number;
   imageGenerationLimit?: number;
+  imageGenerationLimitType?: 'daily' | 'lifetime';
   expiryPeriod: string;
   referralBonusPercentage?: number;
   referralBonusFixed?: number;

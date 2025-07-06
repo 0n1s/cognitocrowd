@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -349,6 +350,7 @@ export async function setupNewUser(userId: string, name: string, email: string, 
             lastCompletionReset: now,
             dailyImageGenerationCount: 0,
             lastImageGenerationReset: now,
+            packageImageGenerationCount: 0,
             accountExpiresAt: expiryTimestamp,
             onboardingStatus: appSettings.onboardingCourseEnabled ? 'pending' : 'approved',
             referralCode: uuidv4().substring(0, 8).toUpperCase(),
@@ -716,6 +718,7 @@ export async function purchasePackage(userId: string, packageId: string) {
                 packageId: packageId,
                 accountExpiresAt: Timestamp.fromDate(newExpiryDate),
                 depositBalance: newDepositBalance,
+                packageImageGenerationCount: 0, // Reset lifetime counter on new purchase
             };
 
             transaction.update(userRef, updates);
