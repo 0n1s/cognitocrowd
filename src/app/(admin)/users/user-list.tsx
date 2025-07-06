@@ -79,7 +79,7 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: E
              <Select value={packageId} onValueChange={setPackageId}>
                 <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="null">Free Tier</SelectItem>
+                    <SelectItem value="null">None (Free Tier)</SelectItem>
                     {packages.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
             </Select>
@@ -240,7 +240,7 @@ export function UserList() {
                             <div className="text-xs text-muted-foreground">{user.email}</div>
                         </TableCell>
                         <TableCell>
-                            <Badge variant={user.role === 'super_user_alpha_7' ? "default" : "secondary"}>{user.role === 'super_user_alpha_7' ? 'Admin' : 'User'}</Badge>
+                            <Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role === 'super_user_alpha_7' ? 'Admin' : 'User'}</Badge>
                         </TableCell>
                         <TableCell>{user.packageName}</TableCell>
                         <TableCell>${user.earningsBalance.toFixed(2)}</TableCell>

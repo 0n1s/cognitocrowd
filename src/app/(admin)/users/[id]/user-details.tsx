@@ -68,7 +68,7 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
              <Select value={packageId} onValueChange={setPackageId}>
                 <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="null">Free Tier</SelectItem>
+                    <SelectItem value="null">None (Free Tier)</SelectItem>
                     {packages.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
             </Select>

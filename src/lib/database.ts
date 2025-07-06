@@ -2,6 +2,7 @@
 
 
 
+
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner } from './types';
@@ -220,7 +221,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     packagesSnapshot.docs.forEach(doc => {
         packagesMap.set(doc.id, doc.data().name);
     });
-    packagesMap.set("null", "Free Tier"); // Handle null packageId
+    packagesMap.set("null", "None (Free Tier)"); // Handle null packageId
 
     const users = usersSnapshot.docs.map(doc => {
         const user = fromDoc<any>(doc) as any;
@@ -234,7 +235,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
         user.earningsBalance = user.earningsBalance ?? 0;
         user.depositBalance = user.depositBalance ?? 0;
 
-        const packageName = user.packageId ? packagesMap.get(user.packageId) || 'N/A' : 'Free Tier';
+        const packageName = user.packageId ? packagesMap.get(user.packageId) || 'N/A' : 'None (Free Tier)';
         return { ...user, packageName };
     });
 
