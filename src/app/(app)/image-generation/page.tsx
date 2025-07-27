@@ -13,8 +13,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wand2, Loader2, Download, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import NextImage from 'next/image';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Timestamp } from 'firebase/firestore';
+import { cn } from '@/lib/utils';
 
 function ImageGallery({ images }: { images: GeneratedImage[] }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -70,6 +71,7 @@ function ImageGallery({ images }: { images: GeneratedImage[] }) {
             
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent className="max-w-4xl p-4 sm:p-6">
+                    <DialogTitle className="sr-only">Generated Image Preview</DialogTitle>
                     {currentImage && (
                         <div className="flex flex-col gap-4 max-h-[85vh] overflow-y-auto pr-2">
                             <div className="relative aspect-square w-full">
@@ -101,7 +103,7 @@ function ImageGallery({ images }: { images: GeneratedImage[] }) {
                                 />
                             </div>
                             
-                             <div>
+                            <div>
                                 <h3 className="font-semibold text-center mb-2">Prompt</h3>
                                 <p className="text-sm text-muted-foreground italic bg-muted p-3 rounded-md text-center">"{currentImage.prompt}"</p>
                             </div>

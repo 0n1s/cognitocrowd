@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wand2, Loader2, Download, Eye, ChevronLeft, ChevronRight, Video } from 'lucide-react';
 import NextImage from 'next/image';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Timestamp } from 'firebase/firestore';
 
 function VideoGallery({ videos }: { videos: GeneratedVideo[] }) {
@@ -68,6 +68,7 @@ function VideoGallery({ videos }: { videos: GeneratedVideo[] }) {
             
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent className="max-w-4xl p-4 sm:p-6">
+                    <DialogTitle className="sr-only">Generated Video Preview</DialogTitle>
                     {currentVideo && (
                         <div className="flex flex-col gap-4 max-h-[85vh] overflow-y-auto pr-2">
                              <div className="relative aspect-video w-full bg-black rounded-md">
