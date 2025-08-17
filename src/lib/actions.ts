@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -621,6 +620,22 @@ export async function initiateDeposit(
   if (!userId) return { success: false, message: "User not authenticated." };
 
   try {
+    // For Plisio, we just record the attempt. A real integration would involve a webhook.
+    if (method.toLowerCase().includes('plisio')) {
+        const depositRef = doc(collection(db, "deposits"));
+        await setDoc(depositRef, {
+            userId,
+            amount,
+            method,
+            status: "pending", // Mark as pending until webhook confirmation
+            createdAt: Timestamp.now(),
+        });
+        revalidatePath("/wallet");
+        revalidatePath(`/admin/users/${userId}`);
+        return { success: true, message: "Please complete your payment via Plisio." };
+    }
+
+
     await runTransaction(db, async (transaction) => {
       const userRef = doc(db, "users", userId);
       const userDoc = await transaction.get(userRef);
@@ -642,7 +657,7 @@ export async function initiateDeposit(
         userId,
         amount,
         method,
-        status: "completed", // Assuming immediate completion for this simulated flow
+        status: "completed",
         createdAt: Timestamp.now(),
       });
     });
@@ -1212,3 +1227,5 @@ export async function improveImagePrompt(prompt: string) {
         return { success: false, message };
     }
 }
+
+    
