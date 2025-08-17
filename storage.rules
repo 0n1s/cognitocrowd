@@ -1,0 +1,34 @@
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if a user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is the owner of the file
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Allow public read for landing page assets
+    match /landing-page/{allPaths=**} {
+      allow read: if true;
+    }
+
+    // Profile pictures: only the owner can write, anyone can read
+    match /profile-pictures/{userId} {
+      allow read: if true;
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+    
+    // Allow any other file to be written by authenticated users, but not read publicly
+    match /{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+  }
+}

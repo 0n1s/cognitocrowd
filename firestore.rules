@@ -1,0 +1,101 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_user_alpha_7';
+    }
+    function isCountryPartner() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'country_partner';
+    }
+
+    // Settings collection: Public read for app configuration, admin-only write.
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isSignedIn() && isAdmin();
+    }
+    
+    // Packages collection: Public read for pricing page, admin-only write.
+    match /packages/{packageId} {
+      allow read: if true;
+      allow write: if isSignedIn() && isAdmin();
+    }
+
+    // Qualification tests: Public read for onboarding, admin-only write.
+    match /qualification_tests/{testId} {
+      allow read: if true;
+      allow write: if isSignedIn() && isAdmin();
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Allow create for anyone (signup)
+      allow create: if true;
+      // Allow read for owner or any admin
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      // Allow update only by owner or admin
+      allow update: if isSignedIn() && (isOwner(userId) || isAdmin());
+      // Allow delete only by admin
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // Tasks and Responses
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && isAdmin();
+    }
+
+    match /task_responses/{responseId} {
+      allow create: if isSignedIn();
+      // Only the user who created it or an admin can read it
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isSignedIn() && isAdmin();
+    }
+    
+    // Chat sessions
+    match /chats/{chatId} {
+      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+    }
+    
+    // Country Partners
+    match /countryPartners/{partnerId} {
+       allow read: if isSignedIn();
+       allow create, update, delete: if isSignedIn() && isAdmin();
+    }
+
+    // Deposits and Withdrawals
+    match /deposits/{depositId} {
+        allow create: if isSignedIn();
+        allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isCountryPartner());
+        allow update, delete: if isSignedIn() && (isAdmin() || isCountryPartner());
+    }
+    
+    match /withdrawal_requests/{reqId} {
+        allow create: if isSignedIn();
+        allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isCountryPartner());
+        allow update, delete: if isSignedIn() && (isAdmin() || isCountryPartner());
+    }
+    
+    // Generated Content
+    match /generated_images/{imageId} {
+      allow read, create: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && isAdmin();
+    }
+    
+    match /generated_videos/{videoId} {
+      allow read, create: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && isAdmin();
+    }
+
+  }
+}
