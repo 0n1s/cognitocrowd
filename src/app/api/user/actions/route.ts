@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { adminAuth, adminDb, adminStorage } from '@/lib/firebase-admin';
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import type { DepositMethod, WithdrawalMethod } from '@/lib/types';
 import { logJsonEvent } from '@/lib/json-logger';
 import { awardReferralBonusForDeposit } from '@/lib/referrals-admin';
@@ -11,6 +11,11 @@ export const runtime = 'nodejs';
 type UserActionPayload = {
   action: string;
   payload?: Record<string, any>;
+};
+
+type VerifiedUser = {
+  uid: string;
+  emailVerified: boolean;
 };
 
 const loadQualificationFlow = () => import('@/ai/flows/ai-qualification-test');
@@ -23,15 +28,38 @@ const loadImproveMusicIdeaFlow = () => import('@/ai/flows/ai-improve-music-idea'
 const loadSuggestMusicDurationFlow = () => import('@/ai/flows/ai-suggest-music-duration');
 const loadImagePromptSafetyFlow = () => import('@/ai/flows/ai-check-image-prompt-safety');
 
-async function verifyUser(request: NextRequest) {
+async function verifyUser(request: NextRequest): Promise<VerifiedUser> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     throw new Error('Unauthorized request.');
   }
 
   const idToken = authHeader.slice('Bearer '.length).trim();
-  const decoded = await adminAuth.verifyIdToken(idToken);
-  return decoded.uid;
+  const apiKey = process.env.FIREBASE_WEB_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    cache: 'no-store',
+  });
+
+  const body = (await response.json().catch(() => ({}))) as {
+    users?: Array<{ localId?: string; emailVerified?: boolean }>;
+  };
+  const user = Array.isArray(body.users) ? body.users[0] : undefined;
+
+  if (!response.ok || !user?.localId) {
+    throw new Error('Unauthorized request.');
+  }
+
+  return {
+    uid: String(user.localId),
+    emailVerified: Boolean(user.emailVerified),
+  };
 }
 
 function parsePackagePrice(priceText: string): number {
@@ -201,7 +229,8 @@ async function verifyMusicStyleProfiles(uid: string) {
   }
 }
 
-async function handleUserAction(request: NextRequest, uid: string, action: string, payload: Record<string, any>) {
+async function handleUserAction(request: NextRequest, authUser: VerifiedUser, action: string, payload: Record<string, any>) {
+  const uid = authUser.uid;
   switch (action) {
     case 'getMusicStyleProfiles': {
       await verifyMusicStyleProfiles(uid);
@@ -1256,7 +1285,6 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
       ]);
       const completedTransactions = deposits.docs.filter((doc) => doc.data().status === 'completed').length + withdrawals.docs.filter((doc) => doc.data().status === 'completed').length;
       const accountAgeDays = user.createdAt?.toDate?.() ? Math.floor((Date.now() - user.createdAt.toDate().getTime()) / 86400000) : 0;
-      const authUser = await adminAuth.getUser(uid);
       const minimumPackageId = String(settings.partnerMinimumPackageId || '').trim();
       const minimumPackage = minimumPackageId ? packagesSnap.docs.find((doc) => doc.id === minimumPackageId) : null;
       const requirements = {
@@ -1354,7 +1382,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
       ]);
       if (!userSnap.exists) throw new Error('User not found.');
       const userData = userSnap.data() || {}; const settings = settingsSnap.data() || {}; if (settings.partnerProgramEnabled === false) throw new Error('Partner applications are currently closed.');
-      const accountAgeDays = userData.createdAt?.toDate?.() ? Math.floor((Date.now() - userData.createdAt.toDate().getTime()) / 86400000) : 0; const completedCount = deposits.docs.filter((doc) => doc.data().status === 'completed').length + withdrawals.docs.filter((doc) => doc.data().status === 'completed').length; const authUser = await adminAuth.getUser(uid);
+      const accountAgeDays = userData.createdAt?.toDate?.() ? Math.floor((Date.now() - userData.createdAt.toDate().getTime()) / 86400000) : 0; const completedCount = deposits.docs.filter((doc) => doc.data().status === 'completed').length + withdrawals.docs.filter((doc) => doc.data().status === 'completed').length;
       if (accountAgeDays < Number(settings.partnerMinimumAccountAgeDays || 0)) throw new Error('Your account does not meet the minimum age requirement.');
       if (Number(userData.depositBalance || 0) < Number(settings.partnerMinimumWalletBalance || 0)) throw new Error('Your wallet balance is below the partner requirement.');
       if (completedCount < Number(settings.partnerMinimumCompletedTransactions || 0)) throw new Error('You need more completed transactions before applying.');
@@ -2332,14 +2360,14 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
 
 export async function POST(request: NextRequest) {
   try {
-    const uid = await verifyUser(request);
+    const authUser = await verifyUser(request);
 
     const body = (await request.json()) as UserActionPayload;
     if (!body?.action) {
       return NextResponse.json({ success: false, message: 'Action is required.' }, { status: 400 });
     }
 
-    const result = await handleUserAction(request, uid, body.action, body.payload || {});
+    const result = await handleUserAction(request, authUser, body.action, body.payload || {});
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';

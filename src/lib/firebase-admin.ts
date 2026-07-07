@@ -1,5 +1,4 @@
 import { App, applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 
@@ -94,7 +93,27 @@ function createLazyAdminProxy<T extends Record<string, unknown>>(factory: () => 
   });
 }
 
+function createLazyAdminAsyncProxy<T extends Record<string, unknown>>(factory: () => Promise<T>): T {
+  return new Proxy({} as T, {
+    get(_target, prop) {
+      return async (...args: unknown[]) => {
+        const resolved = await factory();
+        const value = resolved[prop as keyof T];
+        if (typeof value === 'function') {
+          return (value as Function).apply(resolved, args);
+        }
+        return value;
+      };
+    },
+  });
+}
+
+async function getAdminAuthInstance() {
+  const { getAuth } = await import('firebase-admin/auth');
+  return getAuth(getAdminApp());
+}
+
 export const adminApp = () => getAdminApp();
-export const adminAuth = createLazyAdminProxy(() => getAuth(getAdminApp()));
+export const adminAuth = createLazyAdminAsyncProxy(() => getAdminAuthInstance());
 export const adminDb = createLazyAdminProxy(() => getFirestore(getAdminApp()));
 export const adminStorage = createLazyAdminProxy(() => getStorage(getAdminApp()));
