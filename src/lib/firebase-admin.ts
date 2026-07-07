@@ -31,7 +31,16 @@ function resolveStorageBucketName() {
 function getServiceAccount() {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const rawPrivateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+
+  let privateKey = rawPrivateKey?.trim();
+  if (privateKey?.startsWith('"') && privateKey.endsWith('"')) {
+    privateKey = privateKey.slice(1, -1);
+  }
+  if (privateKey?.startsWith("'") && privateKey.endsWith("'")) {
+    privateKey = privateKey.slice(1, -1);
+  }
+  privateKey = privateKey?.replace(/\\n/g, '\n');
 
   if (projectId && clientEmail && privateKey) {
     return { projectId, clientEmail, privateKey };
@@ -40,32 +49,52 @@ function getServiceAccount() {
   return null;
 }
 
+let cachedAdminApp: App | null = null;
+
 function getAdminApp(): App {
+  if (cachedAdminApp) {
+    return cachedAdminApp;
+  }
+
   const existingApps = getApps();
   if (existingApps.length > 0) {
-    return existingApps[0];
+    cachedAdminApp = existingApps[0];
+    return cachedAdminApp;
   }
 
   const serviceAccount = getServiceAccount();
   const storageBucket = resolveStorageBucketName();
 
   if (serviceAccount) {
-    return initializeApp({
+    cachedAdminApp = initializeApp({
       credential: cert(serviceAccount),
       projectId: serviceAccount.projectId,
       storageBucket,
     });
+    return cachedAdminApp;
   }
 
-  return initializeApp({
+  cachedAdminApp = initializeApp({
     credential: applicationDefault(),
     storageBucket,
   });
+  return cachedAdminApp;
 }
 
-const adminApp = getAdminApp();
+function createLazyAdminProxy<T extends Record<string, unknown>>(factory: () => T): T {
+  return new Proxy({} as T, {
+    get(_target, prop) {
+      const resolved = factory();
+      const value = resolved[prop as keyof T];
+      if (typeof value === 'function') {
+        return (value as Function).bind(resolved);
+      }
+      return value;
+    },
+  });
+}
 
-export const adminAuth = getAuth(adminApp);
-export const adminDb = getFirestore(adminApp);
-export const adminStorage = getStorage(adminApp);
-export { adminApp };
+export const adminApp = () => getAdminApp();
+export const adminAuth = createLazyAdminProxy(() => getAuth(getAdminApp()));
+export const adminDb = createLazyAdminProxy(() => getFirestore(getAdminApp()));
+export const adminStorage = createLazyAdminProxy(() => getStorage(getAdminApp()));
