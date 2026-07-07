@@ -632,6 +632,7 @@ export async function getAppSettings(): Promise<AppSettings> {
         autoRejectionThreshold: 50,
         qualificationTestAntiCopyEnabled: true,
         qualificationTestCopyAttemptLimit: 5,
+        qualificationTestQuestionLimit: 10,
         leaderboardEnabled: true,
     };
 
@@ -709,6 +710,10 @@ export async function getAppSettings(): Promise<AppSettings> {
         mergedSettings.qualificationTestCopyAttemptLimit = Number.isFinite(configuredCopyLimit)
             ? Math.max(1, Math.floor(configuredCopyLimit))
             : defaultSettings.qualificationTestCopyAttemptLimit;
+        const configuredQuestionLimit = Number(mergedSettings.qualificationTestQuestionLimit);
+        mergedSettings.qualificationTestQuestionLimit = Number.isFinite(configuredQuestionLimit)
+            ? Math.max(1, Math.floor(configuredQuestionLimit))
+            : defaultSettings.qualificationTestQuestionLimit;
         return mergedSettings;
     } else {
         await setDoc(settingsDocRef, defaultSettings);

@@ -381,6 +381,7 @@ export type AppSettings = {
   autoRejectionThreshold?: number;
   qualificationTestAntiCopyEnabled?: boolean;
   qualificationTestCopyAttemptLimit?: number;
+  qualificationTestQuestionLimit?: number;
   leaderboardEnabled?: boolean;
   aiRankedPayoutMode?: 'off' | 'on' | 'per_package';
   earnPerScoreEnabled?: boolean;

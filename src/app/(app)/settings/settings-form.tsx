@@ -55,6 +55,24 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
   const isLoading = isUploading || isGenerating || isSaving;
   const canGenerate = userPackage?.allowAiProfilePicture || false;
 
+  const dataUriToBlob = (dataUri: string) => {
+    const [header, data] = dataUri.split(',');
+    if (!header || !data) {
+      throw new Error('Generated image could not be loaded for saving.');
+    }
+
+    const mimeMatch = header.match(/^data:(.*?);base64$/);
+    const contentType = mimeMatch?.[1] || 'image/png';
+    const binaryString = atob(data);
+    const bytes = new Uint8Array(binaryString.length);
+
+    for (let index = 0; index < binaryString.length; index += 1) {
+      bytes[index] = binaryString.charCodeAt(index);
+    }
+
+    return new Blob([bytes], { type: contentType });
+  };
+
   const patchUserProfile = async (payload: { name?: string; photoURL?: string }) => {
     if (!auth?.currentUser) {
       throw new Error("You must be logged in.");
@@ -215,14 +233,8 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
 
     setIsSaving(true);
     try {
-      const generatedResponse = await fetch(generatedPreviewUri, { cache: 'no-store' });
-      if (!generatedResponse.ok) {
-        throw new Error('Generated image could not be loaded for saving.');
-      }
-
-      const generatedBlob = await generatedResponse.blob();
-      const contentType = generatedBlob.type || 'image/png';
-      const downloadURL = await uploadProfileImage(generatedBlob, contentType);
+      const generatedBlob = dataUriToBlob(generatedPreviewUri);
+      const downloadURL = await uploadProfileImage(generatedBlob, generatedBlob.type || 'image/png');
 
       await updateProfile(auth.currentUser, { photoURL: downloadURL });
       await patchUserProfile({ photoURL: downloadURL });

@@ -46,7 +46,14 @@ export async function generateOpenAiCompatibleImage(input: OpenAiImageInput): Pr
 
   const first = payload.data?.[0];
   if (first?.url) {
-    return first.url;
+    const imageResponse = await fetch(first.url, { cache: 'no-store' });
+    if (!imageResponse.ok) {
+      throw new Error(`Image generation returned a URL that could not be fetched (${imageResponse.status}).`);
+    }
+
+    const contentType = imageResponse.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png';
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    return `data:${contentType};base64,${imageBuffer.toString('base64')}`;
   }
 
   if (first?.b64_json) {

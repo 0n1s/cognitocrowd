@@ -298,6 +298,12 @@ export function SettingsForm() {
                         ? Math.floor(Number(fetchedSettings.qualificationTestCopyAttemptLimit))
                         : 5
                 );
+                fetchedSettings.qualificationTestQuestionLimit = Math.max(
+                    1,
+                    Number.isFinite(Number(fetchedSettings.qualificationTestQuestionLimit))
+                        ? Math.floor(Number(fetchedSettings.qualificationTestQuestionLimit))
+                        : 10
+                );
 
                 const validModelIds = getValidModelIds(fetchedSettings);
                 fetchedSettings.defaultTextGenAiModel = normalizeModelId(
@@ -856,6 +862,17 @@ export function SettingsForm() {
                                 disabled={settings.qualificationTestAntiCopyEnabled === false}
                             />
                             <p className="text-xs text-muted-foreground">If attempts exceed this limit, the test is automatically failed.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="qualification-question-limit">Random Question Limit Per Test</Label>
+                            <Input
+                                id="qualification-question-limit"
+                                type="number"
+                                min="1"
+                                value={settings.qualificationTestQuestionLimit || 10}
+                                onChange={(e) => handleFieldChange('qualificationTestQuestionLimit', Math.max(1, Number(e.target.value) || 1))}
+                            />
+                            <p className="text-xs text-muted-foreground">Users receive up to this many random questions from the selected expertise question set.</p>
                         </div>
                     </div>
                 </div>

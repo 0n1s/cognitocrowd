@@ -18,6 +18,20 @@ type VerifiedUser = {
   emailVerified: boolean;
 };
 
+function pickRandomItems<T>(items: T[], limit: number): T[] {
+  if (limit >= items.length) {
+    return [...items];
+  }
+
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled.slice(0, limit);
+}
+
 const loadQualificationFlow = () => import('@/ai/flows/ai-qualification-test');
 const loadGenerateImageFlow = () => import('@/ai/flows/ai-generate-image');
 const loadImproveImagePromptFlow = () => import('@/ai/flows/ai-improve-image-prompt');
@@ -2021,7 +2035,18 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       }
 
       const testData = testSnap.data() as { questions?: unknown[] };
-      const questions = testData.questions || [];
+      const allQuestions = Array.isArray(testData.questions) ? testData.questions : [];
+      if (allQuestions.length === 0) {
+        throw new Error(`A qualification test for "${selectedExpertise}" is currently empty. Please contact support.`);
+      }
+
+      const settingsSnap = await adminDb.collection('settings').doc('main').get();
+      const settings = settingsSnap.data() as { qualificationTestQuestionLimit?: number } | undefined;
+      const configuredLimit = Number(settings?.qualificationTestQuestionLimit);
+      const questionLimit = Number.isFinite(configuredLimit)
+        ? Math.max(1, Math.floor(configuredLimit))
+        : 10;
+      const questions = pickRandomItems(allQuestions, Math.min(questionLimit, allQuestions.length));
 
       await userRef.update({
         qualificationQuestions: questions,
@@ -2036,6 +2061,7 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       const settings = settingsSnap.data() as {
         qualificationTestAntiCopyEnabled?: boolean;
         qualificationTestCopyAttemptLimit?: number;
+        qualificationTestQuestionLimit?: number;
       } | undefined;
 
       const antiCopyEnabled = settings?.qualificationTestAntiCopyEnabled !== false;
@@ -2043,11 +2069,16 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       const copyAttemptLimit = Number.isFinite(configuredLimit)
         ? Math.max(1, Math.floor(configuredLimit))
         : 5;
+      const configuredQuestionLimit = Number(settings?.qualificationTestQuestionLimit);
+      const questionLimit = Number.isFinite(configuredQuestionLimit)
+        ? Math.max(1, Math.floor(configuredQuestionLimit))
+        : 10;
 
       return {
         success: true,
         antiCopyEnabled,
         copyAttemptLimit,
+        questionLimit,
       };
     }
 

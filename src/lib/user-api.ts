@@ -103,6 +103,7 @@ export async function getQualificationTestSecuritySettings(_userId: string) {
   return runUserAction<{
     antiCopyEnabled?: boolean;
     copyAttemptLimit?: number;
+    questionLimit?: number;
   }>('getQualificationTestSecuritySettings', {});
 }
 
