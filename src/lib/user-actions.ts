@@ -48,24 +48,7 @@ export async function updateUserPhotoURL(userId: string, photoURL: string) {
 
 
 export async function generateAiProfilePicture(userId: string, prompt: string): Promise<{ success: boolean; message: string; imageDataUri?: string; }> {
-    if (!db) {
-        return { success: false, message: 'Firebase not configured.' };
-    }
     try {
-        const userData = await getUserData(userId);
-        if (!userData) {
-            return { success: false, message: 'User not found.' };
-        }
-        
-        let userPackage = null;
-        if (userData.packageId) {
-            userPackage = await getPackage(userData.packageId);
-        }
-
-        if (!userPackage?.allowAiProfilePicture) {
-            return { success: false, message: 'Your current plan does not allow AI profile picture generation.' };
-        }
-
         const genResult = await generateProfileImage({ prompt });
         if (!genResult.imageDataUri) {
             throw new Error("AI failed to generate an image.");

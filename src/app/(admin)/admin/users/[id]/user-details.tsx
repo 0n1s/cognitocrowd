@@ -10,10 +10,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { updateAdminUser } from "@/lib/actions";
+import { adjustReferralBalance, updateAdminUser } from "@/lib/admin-api";
 import { ArrowLeft, Edit, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+
+const BASE_EXPERTISE_OPTIONS = [
+  'General Knowledge',
+  'Mathematics',
+  'Science (Physics, Chemistry, Biology)',
+  'Software Development & Code',
+  'History & Humanities',
+  'Creative Writing & Literature',
+  'Art & Design',
+  'Business & Finance',
+  'Health & Medicine',
+];
 
 
 function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: { user: AdminUser; packages: TPackage[]; open: boolean; onOpenChange: (open: boolean) => void; onUserUpdated: () => void; }) {
@@ -23,15 +36,43 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
     const [packageId, setPackageId] = useState(user.packageId || 'null');
     const [earningsBalance, setEarningsBalance] = useState(user.earningsBalance);
     const [depositBalance, setDepositBalance] = useState(user.depositBalance);
+    const [selectedExpertise, setSelectedExpertise] = useState<string[]>(user.expertise || []);
+    const [referralEligible, setReferralEligible] = useState(user.referralEligible !== false);
+    const [referralAdjustment, setReferralAdjustment] = useState(0);
+    const [referralAdjustmentReason, setReferralAdjustmentReason] = useState('');
+    const expertiseOptions = Array.from(new Set([...BASE_EXPERTISE_OPTIONS, ...(user.expertise || [])]));
+
+    const toggleExpertise = (expertise: string) => {
+      setSelectedExpertise((prev) =>
+        prev.includes(expertise)
+          ? prev.filter((item) => item !== expertise)
+          : [...prev, expertise]
+      );
+    };
 
     const handleSubmit = async () => {
+        if (referralAdjustment !== 0 && !referralAdjustmentReason.trim()) {
+          toast({ title: "Reason required", description: "Explain the referral balance adjustment.", variant: "destructive" });
+          return;
+        }
         setIsSubmitting(true);
         const result = await updateAdminUser(user.id, {
             role,
             packageId: packageId === 'null' ? null : packageId,
             earningsBalance,
             depositBalance,
+          expertise: selectedExpertise,
+          referralEligible,
         });
+
+        if (result.success && referralAdjustment !== 0) {
+          const adjustmentResult = await adjustReferralBalance(user.id, referralAdjustment, referralAdjustmentReason);
+          if (!adjustmentResult.success) {
+            toast({ title: "Referral adjustment failed", description: adjustmentResult.message, variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+          }
+        }
         
         if (result.success) {
             toast({ title: "Success", description: result.message });
@@ -79,8 +120,32 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
           </div>
            <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="deposits" className="text-right">Deposits</Label>
-            <Input id="deposits" type="number" value={depositBalance} onChange={e => setDepositBalance(Number(e.target.value))} className="col-span-3" />
+           <Input id="deposits" type="number" value={depositBalance} onChange={e => setDepositBalance(Number(e.target.value))} className="col-span-3" />
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="referral-eligible" className="text-right">Referrals</Label>
+            <div className="col-span-3 flex items-center gap-2"><Checkbox id="referral-eligible" checked={referralEligible} onCheckedChange={(checked) => setReferralEligible(Boolean(checked))} /><Label htmlFor="referral-eligible" className="font-normal">Eligible to earn referral bonuses</Label></div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="referral-adjustment" className="text-right">Adjustment</Label>
+            <Input id="referral-adjustment" type="number" step="0.01" value={referralAdjustment} onChange={e => setReferralAdjustment(Number(e.target.value))} className="col-span-3" placeholder="Positive or negative amount" />
+          </div>
+          {referralAdjustment !== 0 && <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="referral-reason" className="text-right">Reason</Label><Input id="referral-reason" value={referralAdjustmentReason} onChange={e => setReferralAdjustmentReason(e.target.value)} className="col-span-3" required /></div>}
+              <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-1">Expertise</Label>
+              <div className="col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {expertiseOptions.map((option) => (
+                  <div key={option} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`detail-expertise-${option}`}
+                      checked={selectedExpertise.includes(option)}
+                      onCheckedChange={() => toggleExpertise(option)}
+                    />
+                    <Label htmlFor={`detail-expertise-${option}`} className="font-normal text-sm">{option}</Label>
+                  </div>
+                ))}
+              </div>
+              </div>
         </div>
         <DialogFooter>
           <DialogClose asChild>

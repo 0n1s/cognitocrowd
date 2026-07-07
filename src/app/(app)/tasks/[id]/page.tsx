@@ -2,16 +2,25 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { getTask, getUserData } from "@/lib/database";
-import { notFound, useParams, useRouter } from "next/navigation";
+import { getPackage, getTask, getUserData, getUserTaskResponses } from "@/lib/database";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TaskForms } from "./task-forms";
-import type { Task } from '@/lib/types';
+import type { Package, Task } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+const FREE_TIER_DAILY_LIMIT = 50;
+
+function toDate(value: unknown): Date {
+  if (!value) return new Date(0);
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value);
+  return new Date(0);
+}
 
 function LoadingSkeleton() {
     return (
@@ -53,7 +62,41 @@ export default function TaskPage() {
       
       try {
         const userData = await getUserData(user.uid);
+        if (!userData) {
+          toast({ title: "Contribution unavailable", description: "User profile not found." });
+          router.push('/dashboard');
+          return;
+        }
+
+        let packageLimit = FREE_TIER_DAILY_LIMIT;
+        if (userData.packageId) {
+          const pkg: Package | null = await getPackage(userData.packageId);
+          if (pkg && typeof pkg.taskLimit === 'number') {
+            packageLimit = pkg.taskLimit;
+          }
+        }
+
+        let dailyCount = userData.dailyCompletedCount || 0;
+        const lastReset = toDate(userData.lastCompletionReset);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (lastReset < today) {
+          dailyCount = 0;
+        }
+
+        if (dailyCount >= packageLimit) {
+          router.push('/dashboard?dailyLimitReached=1');
+          return;
+        }
+
         if (userData?.completedTasks?.includes(params.id)) {
+            toast({ title: "Contribution unavailable", description: "You have already completed this contribution." });
+            router.push('/dashboard');
+            return;
+        }
+
+        const priorResponses = await getUserTaskResponses(user.uid);
+        if (priorResponses.some((response) => response.taskId === params.id)) {
             toast({ title: "Contribution unavailable", description: "You have already completed this contribution." });
             router.push('/dashboard');
             return;
@@ -61,13 +104,15 @@ export default function TaskPage() {
 
         const fetchedTask = await getTask(params.id);
         if (!fetchedTask) {
-          notFound();
+          toast({ title: "Contribution unavailable", description: "This contribution no longer exists." });
+          router.push('/dashboard');
         } else {
           setTask(fetchedTask);
         }
       } catch (error) {
         console.error("Failed to fetch task:", error);
-        notFound();
+        toast({ title: "Error", description: "Failed to load contribution.", variant: "destructive" });
+        router.push('/dashboard');
       } finally {
         setLoading(false);
       }
@@ -83,7 +128,7 @@ export default function TaskPage() {
   }
   
   if (!task) {
-      return notFound();
+      return null;
   }
 
   return (

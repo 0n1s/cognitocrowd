@@ -69,7 +69,7 @@ export async function generateAndSaveImage(userId: string, prompt: string): Prom
                 };
             }
 
-            const genResult = await generateImage({ prompt });
+            const genResult = await generateImage({ prompt, imageModel: 'normal' });
             if (!genResult.imageDataUri) {
                 throw new Error("AI failed to generate an image.");
             }

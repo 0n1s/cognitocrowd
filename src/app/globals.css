@@ -1,3 +1,5 @@
+@import "tom-select/dist/css/tom-select.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -31,14 +33,14 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 260 100% 80%;
+    --sidebar-background: 220 29% 97%;
+    --sidebar-foreground: 224 71% 12%;
+    --sidebar-primary: 142 71% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 260 100% 80%;
+    --sidebar-accent: 220 21% 92%;
+    --sidebar-accent-foreground: 224 71% 12%;
+    --sidebar-border: 220 18% 86%;
+    --sidebar-ring: 142 71% 45%;
   }
   .dark {
     --background: 224 71% 4%;
@@ -67,14 +69,14 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 260 100% 80%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 260 100% 80%;
+    --sidebar-background: 224 71% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 142 71% 45%;
+    --sidebar-primary-foreground: 142 84% 95%;
+    --sidebar-accent: 215 28% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 28% 11%;
+    --sidebar-ring: 142 71% 45%;
   }
 }
 
@@ -84,5 +86,23 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .ts-wrapper.single .ts-control {
+    @apply bg-background border border-input rounded-md min-h-10 text-sm;
+  }
+
+  .ts-wrapper.single .ts-control input {
+    @apply text-foreground;
+  }
+
+  .ts-dropdown {
+    @apply bg-popover border border-border rounded-md text-sm;
+  }
+
+  .ts-dropdown .active {
+    @apply bg-muted text-foreground;
   }
 }

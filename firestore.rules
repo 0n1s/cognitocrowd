@@ -17,6 +17,10 @@ service cloud.firestore {
     function isCountryPartner() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'country_partner';
     }
+    function isOwnerProfileUpdate(userId) {
+      return isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoURL']);
+    }
 
     // Settings collection: Public read for app configuration, admin-only write.
     match /settings/{settingId} {
@@ -38,12 +42,12 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      // Allow create for anyone (signup)
-      allow create: if true;
+      // User profiles are created by the authenticated server signup action.
+      allow create: if false;
       // Allow read for owner or any admin
       allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-      // Allow update only by owner or admin
-      allow update: if isSignedIn() && (isOwner(userId) || isAdmin());
+      // Owners can only update safe profile fields. Sensitive fields are admin-only.
+      allow update: if isSignedIn() && (isAdmin() || isOwnerProfileUpdate(userId));
       // Allow delete only by admin
       allow delete: if isSignedIn() && isAdmin();
     }
@@ -55,7 +59,7 @@ service cloud.firestore {
     }
 
     match /task_responses/{responseId} {
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // Only the user who created it or an admin can read it
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow update, delete: if isSignedIn() && isAdmin();
@@ -69,32 +73,68 @@ service cloud.firestore {
     
     // Country Partners
     match /countryPartners/{partnerId} {
-       allow read: if isSignedIn();
+       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
        allow create, update, delete: if isSignedIn() && isAdmin();
+    }
+
+    match /partner_applications/{applicationId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /partner_transactions/{transactionId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid || resource.data.partnerUserId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /partner_wallet_funding_requests/{requestId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.partnerUserId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /partner_wallet_logs/{logId} {
+      allow read: if isSignedIn() && isAdmin();
+      allow create, update, delete: if false;
     }
 
     // Deposits and Withdrawals
     match /deposits/{depositId} {
         allow create: if isSignedIn();
-        allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isCountryPartner());
-        allow update, delete: if isSignedIn() && (isAdmin() || isCountryPartner());
+        allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+        allow update, delete: if isSignedIn() && isAdmin();
     }
     
     match /withdrawal_requests/{reqId} {
         allow create: if isSignedIn();
-        allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isCountryPartner());
-        allow update, delete: if isSignedIn() && (isAdmin() || isCountryPartner());
+        allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+        allow update, delete: if isSignedIn() && isAdmin();
+    }
+
+    match /referral_transactions/{transactionId} {
+      allow read: if isSignedIn() && (
+        resource.data.referrerUserId == request.auth.uid ||
+        resource.data.referredUserId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create, update, delete: if false;
     }
     
     // Generated Content
     match /generated_images/{imageId} {
-      allow read, create: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isSignedIn() && isAdmin();
     }
     
     match /generated_videos/{videoId} {
-      allow read, create: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isSignedIn() && isAdmin();
+    }
+
+    match /generated_music/{musicId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if isSignedIn() && isAdmin();
     }
 
   }

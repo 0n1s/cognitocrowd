@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, ArrowRight } from "lucide-react";
-import { updateUserExpertise } from "@/lib/actions";
+import { updateUserExpertise } from "@/lib/user-api";
 import { getEnabledExpertiseAreas } from "@/lib/database";
 import { Skeleton } from "@/components/ui/skeleton";
 

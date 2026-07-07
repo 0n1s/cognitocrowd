@@ -1,5 +1,6 @@
 
 import { PartnerList } from "./partner-list";
+import { PartnerAdminConsole } from "./partner-admin-console";
 
 export default function AdminPartnersPage() {
     return (
@@ -11,6 +12,7 @@ export default function AdminPartnersPage() {
                 </div>
             </div>
             <div className="mt-8">
+                <PartnerAdminConsole />
                 <PartnerList />
             </div>
         </div>

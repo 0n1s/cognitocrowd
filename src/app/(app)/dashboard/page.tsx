@@ -1,36 +1,54 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getTasks, getUserData, getPackage } from '@/lib/database';
-import { ArrowRight, Award, CheckCircle, Repeat } from 'lucide-react';
+import { ArrowRight, Award, CheckCircle, Repeat, Sparkles, Wallet, Target } from 'lucide-react';
 import { Task, Package, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
+import { DailyLimitPopup } from '@/components/daily-limit-popup';
+import { Progress } from '@/components/ui/progress';
 
-const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => (
-    <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-            <Icon className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-            <div className="text-2xl font-bold text-primary">{value}</div>
-            <p className="text-xs text-muted-foreground">{description}</p>
-        </CardContent>
+const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => {
+  return (
+    <Card className="border-border/60 bg-card/80 backdrop-blur-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <div className="rounded-md border border-primary/20 bg-primary/10 p-1.5">
+          <Icon className="h-4 w-4 text-primary" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-primary">{value}</div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
     </Card>
-);
+  );
+};
 
 type UserStatsData = {
     earningsBalance: number;
     completed: number;
     dailyCount: number;
     dailyLimit: number;
+  expertise: string[];
+};
+
+type ServerTimeResponse = {
+  serverTimeIso: string;
+  processingTimeZone?: string;
+};
+
+type ServerClockState = {
+  serverEpochMs: number;
+  syncedAtMs: number;
+  processingTimeZone: string;
 };
 
 function UserStats({ stats, loading }: { stats: UserStatsData | null, loading: boolean}) {
@@ -71,11 +89,16 @@ function UserStats({ stats, loading }: { stats: UserStatsData | null, loading: b
 }
 
 function TaskGrid({ tasks }: { tasks: Task[] }) {
+  
   if (tasks.length === 0) {
     return (
       <Card className="mt-8">
-        <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">No available contributions at the moment. Check back later!</p>
+        <CardContent className="pt-8 pb-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Target className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <p className="text-base font-medium">No available contributions at the moment.</p>
+          <p className="text-sm text-muted-foreground mt-1">Check back later for fresh opportunities.</p>
         </CardContent>
       </Card>
     );
@@ -84,10 +107,11 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
   return (
     <div className="grid gap-6 mt-8 sm:grid-cols-2 lg:grid-cols-3">
       {tasks.map((task) => (
-        <Card key={task.id} className="flex flex-col">
-          <CardHeader className="flex-grow">
-            <div className="flex justify-between items-start">
-              <CardTitle className="text-lg">
+        <Card key={task.id} className="group flex flex-col overflow-hidden border-border/60 transition-all hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="h-1 w-full bg-gradient-to-r from-primary/80 to-primary/20" />
+          <CardHeader className="flex-grow space-y-3">
+            <div className="flex justify-between items-start gap-2">
+              <CardTitle className="text-lg leading-tight">
                 {task.title.length > 25
                   ? `${task.title.substring(0, 25)}...`
                   : task.title}
@@ -101,10 +125,17 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
                 {task.difficulty}
               </Badge>
             </div>
+            <p className="text-sm text-muted-foreground line-clamp-3 min-h-[60px]">
+              {task.description || 'No description provided for this contribution.'}
+            </p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Reward</span>
+              <span className="font-semibold text-primary">${(task.points / 100).toFixed(2)}</span>
+            </div>
           </CardHeader>
           <CardFooter>
-            <Button asChild size="sm" variant="outline" className="w-full">
-              <Link href={`/tasks/${task.id}`}>Contribute <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            <Button asChild size="sm" className="w-full">
+              <Link href={`/tasks/${task.id}`}>Open Contribution <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
             </Button>
           </CardFooter>
         </Card>
@@ -138,8 +169,66 @@ const FREE_TIER_DAILY_LIMIT = 50;
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userStats, setUserStats] = useState<UserStatsData | null>(null);
+  const [serverClock, setServerClock] = useState<ServerClockState | null>(null);
+  const [clockTick, setClockTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+
+  const progressPercent = useMemo(() => {
+    if (!userStats || userStats.dailyLimit <= 0) return 0;
+    return Math.min(100, Math.round((userStats.dailyCount / userStats.dailyLimit) * 100));
+  }, [userStats]);
+
+  const liveServerTimeLabel = useMemo(() => {
+    if (!serverClock) return 'Loading...';
+    const elapsedMs = Date.now() - serverClock.syncedAtMs;
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'short',
+      timeStyle: 'medium',
+      timeZone: serverClock.processingTimeZone,
+    }).format(new Date(serverClock.serverEpochMs + elapsedMs));
+  }, [serverClock, clockTick]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setClockTick((value) => value + 1);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const fetchServerTime = async () => {
+      try {
+        const response = await fetch('/api/server-time', { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = (await response.json()) as ServerTimeResponse;
+        if (isMounted && payload?.serverTimeIso) {
+          const parsedServerMs = Date.parse(payload.serverTimeIso);
+          if (!Number.isNaN(parsedServerMs)) {
+            setServerClock({
+              serverEpochMs: parsedServerMs,
+              syncedAtMs: Date.now(),
+              processingTimeZone: String(payload.processingTimeZone || 'UTC').trim() || 'UTC',
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch server time:', error);
+      }
+    };
+
+    fetchServerTime();
+    intervalId = setInterval(fetchServerTime, 30000);
+
+    return () => {
+      isMounted = false;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -150,14 +239,16 @@ export default function DashboardPage() {
             getTasks(user.uid),
             getUserData(user.uid),
         ]);
-        
-        setTasks(fetchedTasks);
+
+        let packageTaskLimit = FREE_TIER_DAILY_LIMIT;
 
         if (fetchedUserData) {
             let userPackage: Package | null = null;
             if (fetchedUserData.packageId) {
                 userPackage = await getPackage(fetchedUserData.packageId);
             }
+
+          packageTaskLimit = userPackage?.taskLimit || FREE_TIER_DAILY_LIMIT;
             
             const lastReset = fetchedUserData.lastCompletionReset ? new Date(fetchedUserData.lastCompletionReset) : new Date(0);
             const today = new Date();
@@ -169,9 +260,12 @@ export default function DashboardPage() {
                 earningsBalance: fetchedUserData.earningsBalance || 0,
                 completed: fetchedUserData.completedTasks?.length || 0,
                 dailyCount: dailyCount,
-                dailyLimit: userPackage?.taskLimit || FREE_TIER_DAILY_LIMIT,
+                dailyLimit: packageTaskLimit,
+              expertise: fetchedUserData.expertise || [],
             });
         }
+
+        setTasks(fetchedTasks.slice(0, packageTaskLimit));
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -185,16 +279,83 @@ export default function DashboardPage() {
   }, [user]);
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
-      <p className="text-muted-foreground mt-1">An overview of your contributions and available tasks.</p>
+    <div className="space-y-8">
+      <DailyLimitPopup />
+      <section className="rounded-2xl border border-border/60 bg-gradient-to-br from-primary/10 via-background to-background p-6 md:p-8">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              Contributor Hub
+            </div>
+            <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Track your progress, monitor rewards, and jump into high-value tasks.</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Server time: {liveServerTimeLabel}{serverClock ? ` (${serverClock.processingTimeZone})` : ''}
+            </p>
+          </div>
+
+          <div className="w-full max-w-sm rounded-xl border border-border/60 bg-card/80 p-4">
+            <p className="text-sm uppercase tracking-wide text-muted-foreground">Daily contribution usage</p>
+            <p className="mt-1 text-lg font-semibold">{userStats ? `${userStats.dailyCount} / ${userStats.dailyLimit}` : '0 / 0'}</p>
+            <Progress value={progressPercent} className="mt-3 h-2" />
+            <p className="mt-2 text-sm text-muted-foreground">{progressPercent}% used today</p>
+          </div>
+        </div>
+      </section>
       
-      <div className="mt-8">
+      <div>
         <h2 className="text-2xl font-bold font-headline mb-4">Your Stats</h2>
         <UserStats stats={userStats} loading={loading} />
       </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-border/60 bg-card/80">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Wallet Overview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <div className="rounded-md border border-primary/20 bg-primary/10 p-2">
+                <Wallet className="h-4 w-4 text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground">Your current earnings are shown above and update after each approved contribution.</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60 bg-card/80">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Fast Action</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">Browse the full task board and start contributing right away.</p>
+            <Button asChild>
+              <Link href="/tasks">Go to Tasks <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60 bg-card/80">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">My Skills / Specialty</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {userStats?.expertise && userStats.expertise.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {userStats.expertise.slice(0, 4).map((skill) => (
+                  <Badge key={skill} variant="secondary" className="text-xs">{skill}</Badge>
+                ))}
+                {userStats.expertise.length > 4 ? (
+                  <Badge variant="outline" className="text-xs">+{userStats.expertise.length - 4} more</Badge>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No specialty selected yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
       
-      <div className="mt-12">
+      <div>
         <div className="flex justify-between items-center">
             <div>
                 <h2 className="text-2xl font-bold font-headline">Available Contributions</h2>

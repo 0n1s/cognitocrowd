@@ -13,6 +13,31 @@ To run the application locally and connect to Firebase services, you'll need to 
     *   Copy the contents from `.env.example` into your new `.env` file.
     *   Paste your Firebase credentials into the corresponding variables in the `.env` file.
 
+### Firebase Admin Credentials (Required for secure server endpoints)
+
+This project uses secure server-side endpoints that verify Firebase ID tokens and perform trusted Firestore writes. For that, you must also configure Firebase Admin SDK credentials.
+
+1. In Firebase Console, open your project.
+2. Go to **Project Settings** > **Service accounts**.
+3. Click **Generate new private key** and download the JSON file.
+4. Map values from that JSON to your `.env` file:
+   * `FIREBASE_ADMIN_PROJECT_ID` = `project_id`
+   * `FIREBASE_ADMIN_CLIENT_EMAIL` = `client_email`
+   * `FIREBASE_ADMIN_PRIVATE_KEY` = `private_key`
+
+Use this format in `.env`:
+
+```dotenv
+FIREBASE_ADMIN_PROJECT_ID=your-project-id
+FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Important:
+* Do not use `NEXT_PUBLIC_` for admin credentials.
+* Keep admin credentials server-only.
+* In `.env` files, preserve newlines in `FIREBASE_ADMIN_PRIVATE_KEY` as `\n`.
+
 Now you can run the app:
 
 ```bash

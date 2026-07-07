@@ -10,10 +10,11 @@
  * - GenerateTaskOutput - The return type for the generateTask function.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai, getAiClient} from '@/ai/genkit';
 import {z} from 'genkit';
 import { GenerateTaskOutputSchema } from '@/ai/schemas';
 import { getAppSettings } from '@/lib/database';
+import { resolveConfiguredModel, validateModelAvailability } from '@/ai/model-resolver';
 
 const TASK_TYPES = [
   'multiple_choice_preference',
@@ -31,6 +32,7 @@ const GenerateTaskInputSchema = z.object({
   topic: z.string().describe('The topic or subject of the contribution.'),
   taskType: z.enum(TASK_TYPES).describe('The type of contribution to generate.'),
   expertise: z.string().optional().describe('The expertise area for the contribution.'),
+  model: z.string().optional().describe('Optional provider-prefixed text model override.'),
 });
 export type GenerateTaskInput = z.infer<typeof GenerateTaskInputSchema>;
 
@@ -40,11 +42,7 @@ export async function generateTask(input: GenerateTaskInput): Promise<GenerateTa
   return generateTaskFlow(input);
 }
 
-const taskGeneratorPrompt = ai.definePrompt({
-  name: 'taskGeneratorPrompt',
-  input: {schema: GenerateTaskInputSchema},
-  output: {schema: GenerateTaskOutputSchema},
-  prompt: `You are an AI contribution generator that helps admins create engaging contributions for users.
+const promptTemplate = `You are an AI contribution generator that helps admins create engaging contributions for users.
 
   Your task is to generate a single contribution based on the following inputs:
   - Topic: "{{topic}}"
@@ -58,8 +56,7 @@ const taskGeneratorPrompt = ai.definePrompt({
   - "options": This field is REQUIRED if the task type is 'multiple_choice_preference', 'ranking', or 'classification'. You MUST generate a relevant array of string options for these types. For all other task types, this field MUST be omitted.
 
   Ensure the final output is a single JSON object that strictly adheres to the output schema.
-  `,
-});
+  `;
 
 const generateTaskFlow = ai.defineFlow(
   {
@@ -69,8 +66,18 @@ const generateTaskFlow = ai.defineFlow(
   },
   async input => {
     const settings = await getAppSettings();
-    const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
-    const {output} = await taskGeneratorPrompt(input, { model });
+    const runtimeAi = getAiClient({
+      providers: settings.aiProviders,
+    });
+    const runtimePrompt = runtimeAi.definePrompt({
+      name: 'taskGeneratorPromptRuntime',
+      input: {schema: GenerateTaskInputSchema},
+      output: {schema: GenerateTaskOutputSchema},
+      prompt: promptTemplate,
+    });
+    const configuredModel = resolveConfiguredModel(input.model || settings.defaultTextGenAiModel || settings.defaultGenAiModel, 'text');
+    const model = validateModelAvailability(configuredModel, 'text', settings.aiProviders);
+    const {output} = await runtimePrompt(input, { model });
     return output!;
   }
 );

@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Loader2, Trash2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAdminUsers, getCountryPartners } from "@/lib/database";
-import { createCountryPartner, updateCountryPartner, deleteCountryPartner } from "@/lib/actions";
+import { createCountryPartner, updateCountryPartner, deleteCountryPartner } from "@/lib/admin-api";
 import { COUNTRIES } from "@/lib/countries";
 
 function AddPartnerDialog({ open, onOpenChange, onPartnerCreated, users }: { open: boolean; onOpenChange: (open: boolean) => void; onPartnerCreated: () => void; users: AdminUser[] }) {
@@ -109,6 +109,10 @@ function EditPartnerDialog({ partner, open, onOpenChange, onPartnerUpdated }: { 
     const [depositFee, setDepositFee] = useState(String(partner.depositFeePercent));
     const [withdrawalFee, setWithdrawalFee] = useState(String(partner.withdrawalFeePercent));
     const [isActive, setIsActive] = useState(partner.isActive);
+    const [paymentMethods, setPaymentMethods] = useState((partner.paymentMethods || []).join(', '));
+    const [depositLimit, setDepositLimit] = useState(String(partner.depositLimit || 0));
+    const [withdrawalLimit, setWithdrawalLimit] = useState(String(partner.withdrawalLimit || 0));
+    const [minimumWalletBalance, setMinimumWalletBalance] = useState(String(partner.minimumWalletBalance || 0));
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async () => {
@@ -118,6 +122,10 @@ function EditPartnerDialog({ partner, open, onOpenChange, onPartnerUpdated }: { 
             depositFeePercent: parseFloat(depositFee),
             withdrawalFeePercent: parseFloat(withdrawalFee),
             isActive,
+            paymentMethods: paymentMethods.split(',').map((item) => item.trim()).filter(Boolean),
+            depositLimit: Number(depositLimit) || 0,
+            withdrawalLimit: Number(withdrawalLimit) || 0,
+            minimumWalletBalance: Number(minimumWalletBalance) || 0,
         });
         
         if (result.success) {
@@ -159,6 +167,8 @@ function EditPartnerDialog({ partner, open, onOpenChange, onPartnerUpdated }: { 
             <Switch id="active-status" checked={isActive} onCheckedChange={setIsActive} />
             <Label htmlFor="active-status">Active</Label>
           </div>
+          <div className="space-y-2"><Label>Payment Methods</Label><Input value={paymentMethods} onChange={(e) => setPaymentMethods(e.target.value)} placeholder="Bank transfer,etc" /></div>
+          <div className="grid grid-cols-3 gap-2"><div><Label>Deposit Limit</Label><Input type="number" value={depositLimit} onChange={(e) => setDepositLimit(e.target.value)} /></div><div><Label>Withdrawal Limit</Label><Input type="number" value={withdrawalLimit} onChange={(e) => setWithdrawalLimit(e.target.value)} /></div><div><Label>Minimum Wallet</Label><Input type="number" value={minimumWalletBalance} onChange={(e) => setMinimumWalletBalance(e.target.value)} /></div></div>
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>

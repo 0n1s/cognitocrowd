@@ -11,13 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateAppSettings } from "@/lib/actions";
+import { updateAppSettings } from "@/lib/admin-api";
 import { getAppSettings } from "@/lib/database";
 import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { AVAILABLE_MODELS } from "@/ai/models";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DepositMethodsManager } from "@/components/admin/deposit-methods-manager";
 
 
 const LoadingSkeleton = () => (
@@ -51,6 +52,8 @@ export function SettingsForm() {
             setLoading(true);
             try {
                 const fetchedSettings = await getAppSettings();
+                fetchedSettings.withdrawalMinimumAmount = Number(fetchedSettings.withdrawalMinimumAmount || 0);
+                fetchedSettings.withdrawalMaximumAmount = Number(fetchedSettings.withdrawalMaximumAmount || 0);
                 setSettings(fetchedSettings);
             } catch (error) {
                 toast({ title: "Error", description: "Failed to load settings.", variant: "destructive" });
@@ -60,7 +63,7 @@ export function SettingsForm() {
         };
         fetchSettings();
     }, [toast]);
-    
+
     const handleFieldChange = (field: keyof AppSettings, value: any) => {
         if (!settings) return;
         setSettings({ ...settings, [field]: value });
@@ -152,61 +155,6 @@ export function SettingsForm() {
                 
                 <div>
                     <h3 className="text-lg font-semibold">AI Model Settings</h3>
-                    <p className="text-sm text-muted-foreground">Configure the default generative model for AI features.</p>
-                </div>
-                <div className="space-y-4">
-                    <Label className="text-base font-semibold">Default Generative AI Model</Label>
-                    <p className="text-sm text-muted-foreground">
-                        Select the default model to use for features like the AI Assistant and contribution generation.
-                        Note: For Groq, add `GROQ_API_KEY` to your .env file. For Ollama, ensure it's running locally.
-                    </p>
-                    <Select
-                        value={settings.defaultGenAiModel}
-                        onValueChange={(value) => handleFieldChange('defaultGenAiModel', value)}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {AVAILABLE_MODELS.map((model) => (
-                                <SelectItem key={model.id} value={model.id}>
-                                    {model.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <Separator />
-
-                <div>
-                    <h3 className="text-lg font-semibold">Deposit Settings</h3>
-                    <p className="text-sm text-muted-foreground">Manage accepted deposit methods.</p>
-                </div>
-                <div className="space-y-4">
-                    <Label className="text-base font-semibold">Deposit Methods</Label>
-                    <div className="space-y-2">
-                        {(settings.depositMethods || []).map((method) => (
-                            <div key={method.id} className="flex items-center gap-2">
-                                <Input
-                                    value={method.name}
-                                    onChange={(e) => handleMethodNameChange(method.id, e.target.value, 'deposit')}
-                                    placeholder="e.g., Plisio (Crypto)"
-                                />
-                                <Button variant="ghost" size="icon" onClick={() => handleRemoveMethod(method.id, 'deposit')}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => handleAddMethod('deposit')}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add Method
-                    </Button>
-                </div>
-                
-                <Separator />
-                
-                <div>
                     <h3 className="text-lg font-semibold">Withdrawal Settings</h3>
                     <p className="text-sm text-muted-foreground">Manage payment methods and the withdrawal schedule for users.</p>
                 </div>
@@ -229,6 +177,34 @@ export function SettingsForm() {
                     <Button variant="outline" size="sm" onClick={() => handleAddMethod('withdrawal')}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Add Method
                     </Button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="withdrawal-min-amount" className="text-base font-semibold">Global Minimum Withdrawal (USD)</Label>
+                        <Input
+                            id="withdrawal-min-amount"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={settings.withdrawalMinimumAmount ?? 0}
+                            onChange={(e) => handleFieldChange('withdrawalMinimumAmount', Number(e.target.value) || 0)}
+                            placeholder="0"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="withdrawal-max-amount" className="text-base font-semibold">Global Maximum Withdrawal (USD)</Label>
+                        <Input
+                            id="withdrawal-max-amount"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={settings.withdrawalMaximumAmount ?? 0}
+                            onChange={(e) => handleFieldChange('withdrawalMaximumAmount', Number(e.target.value) || 0)}
+                            placeholder="0"
+                        />
+                        <p className="text-xs text-muted-foreground">Set to 0 for no maximum.</p>
+                    </div>
                 </div>
                 
                 <div className="space-y-4">

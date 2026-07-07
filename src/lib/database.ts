@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, runTransaction, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo } from './types';
+import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, arrayUnion, updateDoc } from 'firebase/firestore';
+import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, Expense, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo, GeneratedMusic, DepositMethod, WithdrawalMethod } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -28,6 +28,48 @@ function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     return { ...data, id: doc.id } as T;
 }
 
+function normalizeDepositMethod(method: DepositMethod | (Partial<DepositMethod> & { id: string; name: string })): DepositMethod {
+    const provider = method.provider || (method.name.toLowerCase().includes('plisio') ? 'plisio' : 'custom');
+    const allowedInputTypes = new Set(['text', 'email', 'number', 'textarea', 'password', 'url', 'tel', 'image']);
+    return {
+        id: method.id,
+        name: method.name,
+        provider,
+        enabled: method.enabled !== false,
+        processingMode: method.processingMode || (provider === 'plisio' ? 'automatic' : 'admin_verified'),
+        minimumAmount: Number.isFinite(Number(method.minimumAmount)) ? Number(method.minimumAmount) : undefined,
+        maximumAmount: Number.isFinite(Number(method.maximumAmount)) ? Number(method.maximumAmount) : undefined,
+        description: method.description || '',
+        credentials: method.credentials || {},
+        customFields: Array.isArray(method.customFields)
+            ? method.customFields.map((field) => ({
+                ...field,
+                inputType: allowedInputTypes.has(field.inputType || 'text') ? (field.inputType || 'text') : 'text',
+            }))
+            : [],
+    };
+}
+
+function normalizeWithdrawalMethod(method: WithdrawalMethod | (Partial<WithdrawalMethod> & { id: string; name: string })): WithdrawalMethod {
+    const allowedInputTypes = new Set(['text', 'email', 'number', 'textarea', 'password', 'url', 'tel', 'image']);
+    return {
+        id: method.id,
+        name: method.name,
+        provider: 'custom',
+        enabled: method.enabled !== false,
+        processingMode: 'admin_verified',
+        minimumAmount: Number.isFinite(Number(method.minimumAmount)) ? Number(method.minimumAmount) : undefined,
+        maximumAmount: Number.isFinite(Number(method.maximumAmount)) ? Number(method.maximumAmount) : undefined,
+        description: method.description || '',
+        customFields: Array.isArray(method.customFields)
+            ? method.customFields.map((field) => ({
+                ...field,
+                inputType: allowedInputTypes.has(field.inputType || 'text') ? (field.inputType || 'text') : 'text',
+            }))
+            : [],
+    };
+}
+
 
 export async function getTasks(userId?: string): Promise<Task[]> {
     if (!db) return Promise.resolve([]);
@@ -36,11 +78,18 @@ export async function getTasks(userId?: string): Promise<Task[]> {
     let userExpertise: string[] = [];
 
     if (userId) {
-        const userDoc = await getUserData(userId);
+        const [userDoc, responseSnapshot] = await Promise.all([
+            getUserData(userId),
+            getDocs(query(collection(db, 'task_responses'), where('userId', '==', userId))),
+        ]);
         if (userDoc) {
             completedTaskIds = userDoc.completedTasks || [];
             userExpertise = userDoc.expertise || [];
         }
+        responseSnapshot.docs.forEach((responseDoc) => {
+            const taskId = String(responseDoc.data().taskId || '');
+            if (taskId && !completedTaskIds.includes(taskId)) completedTaskIds.push(taskId);
+        });
     }
 
     const expertiseToQuery = ["General", ...userExpertise];
@@ -92,6 +141,14 @@ export async function getTaskResponses(taskId: string): Promise<TaskResponse[]> 
     if (!db) return [];
     const responsesCol = collection(db, 'task_responses');
     const q = query(responsesCol, where('taskId', '==', taskId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => fromDoc<TaskResponse>(d));
+}
+
+export async function getUserTaskResponses(userId: string): Promise<TaskResponse[]> {
+    if (!db || !userId) return [];
+    const responsesCol = collection(db, 'task_responses');
+    const q = query(responsesCol, where('userId', '==', userId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => fromDoc<TaskResponse>(d));
 }
@@ -254,13 +311,259 @@ export async function getDashboardStats() {
     }
 }
 
+type FinanceGranularity = 'day' | 'week' | 'month';
+
+type FinancialFlowPoint = {
+    key: string;
+    label: string;
+    deposits: number;
+    withdrawals: number;
+    expenses: number;
+    net: number;
+};
+
+type FinancialFlowAnalytics = {
+    totalDeposits: number;
+    totalWithdrawals: number;
+    totalExpenses: number;
+    netFlow: number;
+    series: FinancialFlowPoint[];
+    startDateIso: string;
+    endDateIso: string;
+    granularity: FinanceGranularity;
+};
+
+function toDateValue(value: any): Date | null {
+    if (!value) return null;
+    if (value instanceof Timestamp) return value.toDate();
+    if (typeof value?.toDate === 'function') {
+        const converted = value.toDate();
+        return converted instanceof Date && !Number.isNaN(converted.getTime()) ? converted : null;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+    return null;
+}
+
+function getStartOfUtcDay(date: Date): Date {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function getStartOfUtcWeek(date: Date): Date {
+    const day = date.getUTCDay();
+    const mondayOffset = (day + 6) % 7;
+    const startOfDay = getStartOfUtcDay(date);
+    startOfDay.setUTCDate(startOfDay.getUTCDate() - mondayOffset);
+    return startOfDay;
+}
+
+function getStartOfUtcMonth(date: Date): Date {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function getBucketStart(date: Date, granularity: FinanceGranularity): Date {
+    if (granularity === 'week') return getStartOfUtcWeek(date);
+    if (granularity === 'month') return getStartOfUtcMonth(date);
+    return getStartOfUtcDay(date);
+}
+
+function addBucketStep(date: Date, granularity: FinanceGranularity): Date {
+    const next = new Date(date);
+    if (granularity === 'week') {
+        next.setUTCDate(next.getUTCDate() + 7);
+        return next;
+    }
+    if (granularity === 'month') {
+        next.setUTCMonth(next.getUTCMonth() + 1);
+        return next;
+    }
+    next.setUTCDate(next.getUTCDate() + 1);
+    return next;
+}
+
+function formatBucketLabel(date: Date, granularity: FinanceGranularity): string {
+    if (granularity === 'month') {
+        return new Intl.DateTimeFormat(undefined, { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(date);
+    }
+    if (granularity === 'week') {
+        return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
+    }
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
+}
+
+function getGranularityForRange(days: number): FinanceGranularity {
+    if (days <= 31) return 'day';
+    if (days <= 120) return 'week';
+    return 'month';
+}
+
+export async function getFinancialFlowAnalytics(rangeDays: number): Promise<FinancialFlowAnalytics> {
+    const now = new Date();
+    const endDate = getStartOfUtcDay(now);
+    endDate.setUTCDate(endDate.getUTCDate() + 1);
+    const startDate = new Date(endDate);
+    startDate.setUTCDate(startDate.getUTCDate() - Math.max(1, rangeDays));
+    const granularity = getGranularityForRange(rangeDays);
+
+    const empty: FinancialFlowAnalytics = {
+        totalDeposits: 0,
+        totalWithdrawals: 0,
+        totalExpenses: 0,
+        netFlow: 0,
+        series: [],
+        startDateIso: startDate.toISOString(),
+        endDateIso: endDate.toISOString(),
+        granularity,
+    };
+
+    if (!db) return empty;
+
+    const points = new Map<string, FinancialFlowPoint>();
+    for (let cursor = getBucketStart(startDate, granularity); cursor < endDate; cursor = addBucketStep(cursor, granularity)) {
+        const key = cursor.toISOString();
+        points.set(key, {
+            key,
+            label: formatBucketLabel(cursor, granularity),
+            deposits: 0,
+            withdrawals: 0,
+            expenses: 0,
+            net: 0,
+        });
+    }
+
+    const startTimestamp = Timestamp.fromDate(startDate);
+    let depositDocs: DocumentData[] = [];
+    let withdrawalDocs: DocumentData[] = [];
+    let expenseDocs: DocumentData[] = [];
+
+    try {
+        const [depositsSnapshot, withdrawalsSnapshot, expensesSnapshot] = await Promise.all([
+            getDocs(query(collection(db, 'deposits'), where('createdAt', '>=', startTimestamp))),
+            getDocs(query(collection(db, 'withdrawal_requests'), where('requestedAt', '>=', startTimestamp))),
+            getDocs(query(collection(db, 'expenses'), where('createdAt', '>=', startTimestamp))),
+        ]);
+        depositDocs = depositsSnapshot.docs;
+        withdrawalDocs = withdrawalsSnapshot.docs;
+        expenseDocs = expensesSnapshot.docs;
+    } catch (error) {
+        console.warn('Falling back to full finance fetch for analytics:', error);
+        const [depositsSnapshot, withdrawalsSnapshot, expensesSnapshot] = await Promise.all([
+            getDocs(collection(db, 'deposits')),
+            getDocs(collection(db, 'withdrawal_requests')),
+            getDocs(collection(db, 'expenses')),
+        ]);
+        depositDocs = depositsSnapshot.docs;
+        withdrawalDocs = withdrawalsSnapshot.docs;
+        expenseDocs = expensesSnapshot.docs;
+    }
+
+    let totalDeposits = 0;
+    let totalWithdrawals = 0;
+    let totalExpenses = 0;
+
+    for (const depositDoc of depositDocs) {
+        const deposit = depositDoc.data() as Deposit;
+        if (deposit.status !== 'completed') continue;
+
+        const eventDate = toDateValue(deposit.createdAt || deposit.processedAt);
+        if (!eventDate || eventDate < startDate || eventDate >= endDate) continue;
+
+        const bucketStart = getBucketStart(eventDate, granularity).toISOString();
+        const point = points.get(bucketStart);
+        if (!point) continue;
+
+        const amount = Number(deposit.amount || 0);
+        if (!Number.isFinite(amount) || amount <= 0) continue;
+
+        point.deposits += amount;
+        totalDeposits += amount;
+    }
+
+    for (const withdrawalDoc of withdrawalDocs) {
+        const withdrawal = withdrawalDoc.data() as WithdrawalRequest;
+        if (withdrawal.status !== 'completed') continue;
+
+        const eventDate = toDateValue(withdrawal.requestedAt || withdrawal.processedAt);
+        if (!eventDate || eventDate < startDate || eventDate >= endDate) continue;
+
+        const bucketStart = getBucketStart(eventDate, granularity).toISOString();
+        const point = points.get(bucketStart);
+        if (!point) continue;
+
+        const amount = Number(withdrawal.amount || 0);
+        if (!Number.isFinite(amount) || amount <= 0) continue;
+
+        point.withdrawals += amount;
+        totalWithdrawals += amount;
+    }
+
+    for (const expenseDoc of expenseDocs) {
+        const expense = expenseDoc.data() as Expense;
+
+        const eventDate = toDateValue(expense.createdAt);
+        if (!eventDate || eventDate < startDate || eventDate >= endDate) continue;
+
+        const bucketStart = getBucketStart(eventDate, granularity).toISOString();
+        const point = points.get(bucketStart);
+        if (!point) continue;
+
+        const amount = Number(expense.amount || 0);
+        if (!Number.isFinite(amount) || amount <= 0) continue;
+
+        point.expenses += amount;
+        totalExpenses += amount;
+    }
+
+    const series = Array.from(points.values()).map((point) => ({
+        ...point,
+        deposits: Number(point.deposits.toFixed(2)),
+        withdrawals: Number(point.withdrawals.toFixed(2)),
+        expenses: Number(point.expenses.toFixed(2)),
+        net: Number((point.deposits - point.withdrawals - point.expenses).toFixed(2)),
+    }));
+
+    return {
+        totalDeposits: Number(totalDeposits.toFixed(2)),
+        totalWithdrawals: Number(totalWithdrawals.toFixed(2)),
+        totalExpenses: Number(totalExpenses.toFixed(2)),
+        netFlow: Number((totalDeposits - totalWithdrawals - totalExpenses).toFixed(2)),
+        series,
+        startDateIso: startDate.toISOString(),
+        endDateIso: endDate.toISOString(),
+        granularity,
+    };
+}
+
 export async function getAppSettings(): Promise<AppSettings> {
     const defaultSettings: AppSettings = {
-        paymentMethods: [{ id: uuidv4(), name: 'PayPal' }],
-        depositMethods: [{ id: uuidv4(), name: 'Plisio (Crypto)' }],
+        paymentMethods: [{ id: uuidv4(), name: 'Manual Withdrawal' }],
+        depositMethods: [{ id: uuidv4(), name: 'Plisio', provider: 'plisio', enabled: true, processingMode: 'automatic', description: 'Crypto deposits via Plisio', credentials: {}, customFields: [] }],
+        withdrawalMethods: [{ id: uuidv4(), name: 'Manual Withdrawal', provider: 'custom', enabled: true, processingMode: 'admin_verified', description: 'Withdrawal requests are reviewed by admin.', customFields: [] }],
+        plisioApiKey: '',
+        plisioPublicBaseUrl: '',
         withdrawalScheduleInfo: 'Withdrawals are processed on the 1st and 15th of each month.',
+        processingTimeZone: 'UTC',
         withdrawalDays: [],
-        defaultGenAiModel: 'googleai/gemini-2.0-flash',
+        withdrawalMinimumAmount: 0,
+        withdrawalMaximumAmount: 0,
+        defaultTextGenAiModel: '',
+        defaultImageGenAiModel: '',
+        defaultVideoGenAiModel: '',
+        defaultAudioGenAiModel: '',
+        defaultUncensoredAiModel: '',
+        defaultVisionAiModel: '',
+        defaultHackingAiModel: '',
+        defaultCodingAiModel: '',
+        defaultGenAiModel: '',
+        aiProviders: [],
+        openAiCompatibleProviderName: '',
+        openAiCompatibleBaseUrl: '',
+        openAiCompatibleApiKey: '',
+        openAiCompatibleDiscoveredModels: [],
+        aiRankedPayoutMode: 'on',
+        earnPerScoreEnabled: true,
         landingPageContent: {
             processImage1: "https://placehold.co/800x600.png",
             processImage2: "https://placehold.co/800x600.png",
@@ -292,6 +595,15 @@ export async function getAppSettings(): Promise<AppSettings> {
                 { title: "Image Generation", description: "Generate stunning, high-quality images from text prompts and help refine the AI's creative and descriptive capabilities." },
                 { title: "Video Generation", description: "Create and modify video clips using simple text commands, pushing the boundaries of AI-powered multimedia generation. (Coming Soon)" }
             ],
+            workspaceTitle: "Explore the AI Workspace",
+            workspaceSubtitle: "One creative workspace for conversations, visuals, video, and music—with access tailored to the plan you choose.",
+            workspaceItems: [
+                { title: "AI Chat", description: "Ask questions, develop ideas, write content, and get focused help through normal, coding, uncensored, or specialist chat modes available on your plan." },
+                { title: "Image Generation", description: "Turn written prompts into original images, refine prompts with AI, and keep your generated artwork organized in a personal gallery." },
+                { title: "Video Generation", description: "Create short AI-generated videos from a scene description and preserve the results in your workspace for later access." },
+                { title: "Music Generation", description: "Compose complete tracks from lyrics and production guidance, then play, download, and revisit them from your music gallery." },
+                { title: "Music AI Assist", description: "Develop song concepts, generate random ideas, write structured lyrics, and create genre, mood, and instrumentation captions automatically." }
+            ],
             processTitle: "Simple Process, Powerful Impact",
             processSubtitle: "From sign-up to earning, our streamlined process makes it easy to make a difference.",
             processSteps: [
@@ -318,6 +630,9 @@ export async function getAppSettings(): Promise<AppSettings> {
         autoApprovalThreshold: 90,
         autoRejectionEnabled: false,
         autoRejectionThreshold: 50,
+        qualificationTestAntiCopyEnabled: true,
+        qualificationTestCopyAttemptLimit: 5,
+        leaderboardEnabled: true,
     };
 
     if (!db) return defaultSettings;
@@ -335,7 +650,65 @@ export async function getAppSettings(): Promise<AppSettings> {
                 ...defaultSettings.landingPageContent,
                 ...data.landingPageContent,
             }
+        } as AppSettings;
+        if (!mergedSettings.aiProviders) {
+            mergedSettings.aiProviders = [];
+        }
+        const isProviderPrefixedModel = (model?: string) => {
+            const normalized = (model || '').trim();
+            if (!normalized) return false;
+            const slashIndex = normalized.indexOf('/');
+            return slashIndex > 0 && slashIndex < normalized.length - 1;
         };
+        const normalizeTextModel = (model?: string) => {
+            if (!model) return model;
+            const normalized = model.trim();
+            if (!isProviderPrefixedModel(normalized)) return defaultSettings.defaultTextGenAiModel;
+            return normalized;
+        };
+        const normalizeImageModel = (model?: string) => {
+            if (!model) return model;
+            const normalized = model.trim();
+            if (!isProviderPrefixedModel(normalized)) return defaultSettings.defaultImageGenAiModel;
+            return normalized;
+        };
+        const normalizeVideoModel = (model?: string) => {
+            if (!model) return model;
+            const normalized = model.trim();
+            if (!isProviderPrefixedModel(normalized)) return defaultSettings.defaultVideoGenAiModel;
+            return normalized;
+        };
+
+        mergedSettings.defaultGenAiModel = normalizeTextModel(mergedSettings.defaultGenAiModel) || defaultSettings.defaultGenAiModel;
+        mergedSettings.defaultTextGenAiModel = normalizeTextModel(mergedSettings.defaultTextGenAiModel) || mergedSettings.defaultGenAiModel || defaultSettings.defaultTextGenAiModel;
+        mergedSettings.defaultImageGenAiModel = normalizeImageModel(mergedSettings.defaultImageGenAiModel) || defaultSettings.defaultImageGenAiModel;
+        mergedSettings.defaultVideoGenAiModel = normalizeVideoModel(mergedSettings.defaultVideoGenAiModel) || defaultSettings.defaultVideoGenAiModel;
+        mergedSettings.plisioApiKey = String(mergedSettings.plisioApiKey || '').trim();
+        mergedSettings.plisioPublicBaseUrl = String(mergedSettings.plisioPublicBaseUrl || '').trim();
+        mergedSettings.processingTimeZone = String(mergedSettings.processingTimeZone || defaultSettings.processingTimeZone || 'UTC').trim() || 'UTC';
+        mergedSettings.depositMethods = (mergedSettings.depositMethods || []).map((method) => normalizeDepositMethod(method as DepositMethod)).filter((method) => method.name.trim() !== '');
+        const fallbackWithdrawalMethods = (mergedSettings.paymentMethods || []).map((method) => ({
+            id: method.id,
+            name: method.name,
+            provider: 'custom' as const,
+            enabled: true,
+            processingMode: 'admin_verified' as const,
+            description: '',
+            customFields: [],
+        }));
+        const configuredWithdrawalMethods = (mergedSettings.withdrawalMethods && mergedSettings.withdrawalMethods.length > 0)
+            ? mergedSettings.withdrawalMethods
+            : fallbackWithdrawalMethods;
+        mergedSettings.withdrawalMethods = (configuredWithdrawalMethods || [])
+            .map((method) => normalizeWithdrawalMethod(method as WithdrawalMethod))
+            .filter((method) => method.name.trim() !== '');
+        mergedSettings.paymentMethods = (mergedSettings.withdrawalMethods || []).map((method) => ({ id: method.id, name: method.name }));
+        mergedSettings.qualificationTestAntiCopyEnabled = mergedSettings.qualificationTestAntiCopyEnabled !== false;
+        mergedSettings.leaderboardEnabled = mergedSettings.leaderboardEnabled !== false;
+        const configuredCopyLimit = Number(mergedSettings.qualificationTestCopyAttemptLimit);
+        mergedSettings.qualificationTestCopyAttemptLimit = Number.isFinite(configuredCopyLimit)
+            ? Math.max(1, Math.floor(configuredCopyLimit))
+            : defaultSettings.qualificationTestCopyAttemptLimit;
         return mergedSettings;
     } else {
         await setDoc(settingsDocRef, defaultSettings);
@@ -354,9 +727,26 @@ export async function getWithdrawalRequests(): Promise<WithdrawalRequest[]> {
 export async function getUserWithdrawalRequests(userId: string): Promise<WithdrawalRequest[]> {
     if (!db) return [];
     const requestsCol = collection(db, 'withdrawal_requests');
-    const q = query(requestsCol, where('userId', '==', userId), orderBy('requestedAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => fromDoc<WithdrawalRequest>(d));
+    try {
+        const q = query(requestsCol, where('userId', '==', userId), orderBy('requestedAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => fromDoc<WithdrawalRequest>(d));
+    } catch (error) {
+        console.warn('Primary withdrawal query failed. Falling back to unordered query.', error);
+        try {
+            const fallbackQuery = query(requestsCol, where('userId', '==', userId));
+            const snapshot = await getDocs(fallbackQuery);
+            const rows = snapshot.docs.map(d => fromDoc<WithdrawalRequest>(d));
+            return rows.sort((a, b) => {
+                const timeA = typeof a.requestedAt?.toDate === 'function' ? a.requestedAt.toDate().getTime() : new Date(a.requestedAt || 0).getTime();
+                const timeB = typeof b.requestedAt?.toDate === 'function' ? b.requestedAt.toDate().getTime() : new Date(b.requestedAt || 0).getTime();
+                return timeB - timeA;
+            });
+        } catch (fallbackError) {
+            console.error('Error fetching user withdrawal requests (fallback failed):', fallbackError);
+            return [];
+        }
+    }
 }
 
 export async function getLeaderboardData(): Promise<LeaderboardEntry[]> {
@@ -421,6 +811,37 @@ export async function getDepositHistory(userId: string): Promise<Deposit[]> {
     const q = query(depositsCol, where('userId', '==', userId), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => fromDoc<Deposit>(d));
+}
+
+export async function getAllDeposits(): Promise<Deposit[]> {
+    if (!db) return [];
+    try {
+        const [depositsSnapshot, usersSnapshot] = await Promise.all([
+            getDocs(query(collection(db, 'deposits'), orderBy('createdAt', 'desc'))),
+            getDocs(collection(db, 'users')),
+        ]);
+
+        const usersById = new Map<string, { name?: string; email?: string }>();
+        usersSnapshot.docs.forEach((userDoc) => {
+            usersById.set(userDoc.id, {
+                name: String(userDoc.data()?.name || ''),
+                email: String(userDoc.data()?.email || ''),
+            });
+        });
+
+        return depositsSnapshot.docs.map((doc) => {
+            const deposit = fromDoc<Deposit>(doc);
+            const userMeta = usersById.get(deposit.userId);
+            return {
+                ...deposit,
+                userName: deposit.userName || userMeta?.name || 'Unknown User',
+                userEmail: deposit.userEmail || userMeta?.email || '',
+            };
+        });
+    } catch (error) {
+        console.error('Error fetching all deposits:', error);
+        return [];
+    }
 }
 
 export async function getAdminUserDetail(userId: string) {
@@ -582,6 +1003,19 @@ export async function getUserGeneratedVideos(userId: string): Promise<GeneratedV
         return snapshot.docs.map(doc => fromDoc<GeneratedVideo>(doc));
     } catch (error) {
         console.error("Error fetching user generated videos:", error);
+        return [];
+    }
+}
+
+export async function getUserGeneratedMusic(userId: string): Promise<GeneratedMusic[]> {
+    if (!db) return [];
+    try {
+        const musicCol = collection(db, 'generated_music');
+        const q = query(musicCol, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromDoc<GeneratedMusic>(doc));
+    } catch (error) {
+        console.error("Error fetching user generated music:", error);
         return [];
     }
 }

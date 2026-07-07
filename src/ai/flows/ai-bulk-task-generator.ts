@@ -8,10 +8,11 @@
  * - BulkGenerateTasksOutput - The return type for the bulkGenerateTasks function.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai, getAiClient} from '@/ai/genkit';
 import {z} from 'genkit';
 import {GenerateTaskOutputSchema} from '@/ai/schemas';
 import { getAppSettings } from '@/lib/database';
+import { resolveConfiguredModel, validateModelAvailability } from '@/ai/model-resolver';
 
 const TASK_TYPES = [
   'multiple_choice_preference',
@@ -28,7 +29,8 @@ const TASK_TYPES = [
 const BulkGenerateTasksInputSchema = z.object({
   count: z.number().int().min(1).max(10).describe('The number of contributions to generate.'),
   expertise: z.array(z.string()).min(1).describe('The expertise areas for which to generate contributions.'),
-  taskTypes: z.array(z.enum(TASK_TYPES)).describe("The types of contributions to generate.")
+  taskTypes: z.array(z.enum(TASK_TYPES)).describe("The types of contributions to generate."),
+  model: z.string().optional().describe('Optional provider-prefixed text model override.'),
 });
 export type BulkGenerateTasksInput = z.infer<typeof BulkGenerateTasksInputSchema>;
 
@@ -46,11 +48,7 @@ export async function bulkGenerateTasks(input: BulkGenerateTasksInput): Promise<
   return bulkGenerateTasksFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'bulkTaskGeneratorPrompt',
-  input: {schema: BulkGenerateTasksInputSchema},
-  output: {schema: BulkGenerateTasksOutputSchema},
-  prompt: `You are an AI contribution generator that helps admins create a batch of engaging and diverse contributions for users.
+const promptTemplate = `You are an AI contribution generator that helps admins create a batch of engaging and diverse contributions for users.
 
 Generate {{count}} contributions. For each contribution, you MUST perform the following steps:
 1. Randomly select an expertise area from this list:
@@ -78,8 +76,7 @@ Here are the requirements for each field:
 - "award_criteria": (Optional) An object with an "explanation" string describing why the contribution is useful.
 
 Please output a JSON object with a single key "tasks", which is an array of the generated contribution objects.
-`,
-});
+`;
 
 const bulkGenerateTasksFlow = ai.defineFlow(
   {
@@ -89,8 +86,18 @@ const bulkGenerateTasksFlow = ai.defineFlow(
   },
   async (input) => {
     const settings = await getAppSettings();
-    const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
-    const {output} = await prompt(input, { model });
+    const runtimeAi = getAiClient({
+      providers: settings.aiProviders,
+    });
+    const runtimePrompt = runtimeAi.definePrompt({
+      name: 'bulkTaskGeneratorPromptRuntime',
+      input: {schema: BulkGenerateTasksInputSchema},
+      output: {schema: BulkGenerateTasksOutputSchema},
+      prompt: promptTemplate,
+    });
+    const configuredModel = resolveConfiguredModel(input.model || settings.defaultTextGenAiModel || settings.defaultGenAiModel, 'text');
+    const model = validateModelAvailability(configuredModel, 'text', settings.aiProviders);
+    const {output} = await runtimePrompt(input, { model });
     return output!;
   }
 );

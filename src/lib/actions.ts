@@ -2,9 +2,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, writeBatch, updateDoc, deleteDoc, setDoc, query, where, getDocs, limit, getDoc, Timestamp, runTransaction, arrayUnion } from "firebase/firestore";
-import { ref, getDownloadURL, uploadBytes } from "firebase/storage";
 import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, ChatMessage, ChatSession, Deposit, QualificationQuestion, QualificationTest, OnboardingStep, CountryPartner } from "@/lib/types";
 import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
@@ -14,6 +13,7 @@ import { improveImagePrompt as improveImagePromptFlow } from "@/ai/flows/ai-impr
 import { v4 as uuidv4 } from "uuid";
 import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks, getPendingApprovals, getPackage } from './database';
 import { headers } from "next/headers";
+import { adminDb, adminStorage } from "@/lib/firebase-admin";
 
 
 export type CreateTaskInput = {
@@ -136,125 +136,6 @@ export async function updateAdminTaskStatus(taskId: string, status: 'Active' | '
 }
 
 
-export async function submitTaskResponse(taskId: string, points: number, formData: FormData, userId: string, taskType: TaskType) {
-    if (!db) {
-        return { success: false, message: 'Database not configured.' };
-    }
-    if (!userId) {
-        return { success: false, message: 'User not authenticated.' };
-    }
-
-    const earningsToAdd = points / 100; // 100 points = $1
-
-    try {
-        await runTransaction(db, async (transaction) => {
-            const userRef = doc(db, 'users', userId);
-            const userDoc = await transaction.get(userRef);
-
-            if (!userDoc.exists()) {
-                throw new Error('User not found.');
-            }
-
-            const userData = userDoc.data() as User;
-            const completedTasks = userData.completedTasks || [];
-
-            // 1. Check if task was ever completed to prevent re-dos
-            if (completedTasks.includes(taskId)) {
-                throw new Error('You have already completed this contribution.');
-            }
-            
-            // 2. Check daily limit
-            const FREE_TIER_DAILY_LIMIT = 50;
-            let packageLimit = FREE_TIER_DAILY_LIMIT;
-
-            if (userData.packageId) {
-                const packageDocRef = doc(db, 'packages', userData.packageId);
-                const packageDoc = await transaction.get(packageDocRef);
-                if (packageDoc.exists()) {
-                    packageLimit = (packageDoc.data() as Package).taskLimit;
-                }
-            }
-
-            let dailyCount = userData.dailyCompletedCount || 0;
-            const lastResetString = userData.lastCompletionReset;
-            const lastReset = lastResetString ? new Date(lastResetString) : new Date(0);
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            if (lastReset < today) {
-                dailyCount = 0; // Reset for the new day
-            }
-            
-            if (dailyCount >= packageLimit) {
-                throw new Error('You have reached your daily contribution limit. Please try again tomorrow.');
-            }
-
-            // 3. Prepare response data
-            const responseData: Record<string, any> = {};
-            if (taskType === 'ranking') {
-                formData.forEach((value, key) => {
-                    if (key !== 'ranking') responseData[key] = value;
-                });
-                responseData.ranking = formData.getAll('ranking');
-            } else if (taskType === 'label_multiple') {
-                const labels: string[] = [];
-                formData.forEach((value, key) => {
-                    if (key.startsWith('label-')) {
-                        if (value === 'on') labels.push(key.replace('label-', ''));
-                    } else {
-                        responseData[key] = value;
-                    }
-                });
-                responseData.labels = labels;
-            } else {
-                formData.forEach((value, key) => {
-                    responseData[key] = value;
-                });
-            }
-
-            // 4. Update user stats and create response document in transaction
-            const currentEarnings = userData.earningsBalance || 0;
-            const newEarnings = currentEarnings + earningsToAdd;
-            const newCompletedTasks = [...completedTasks, taskId];
-            const newDailyCount = dailyCount + 1;
-
-            transaction.update(userRef, {
-                earningsBalance: newEarnings,
-                completedTasks: newCompletedTasks,
-                dailyCompletedCount: newDailyCount,
-                lastCompletionReset: Timestamp.now()
-            });
-
-            const newResponseRef = doc(collection(db, "task_responses"));
-
-            transaction.set(newResponseRef, {
-                userId,
-                taskId,
-                pointsEarned: points, // Keep storing points in the response doc
-                submittedAt: Timestamp.now(),
-                responseData,
-            });
-        });
-
-        // Find the next available task for the user
-        const availableTasks = await getTasks(userId);
-        const nextTask = availableTasks.length > 0 ? availableTasks[0] : null;
-
-        revalidatePath('/dashboard');
-        revalidatePath(`/tasks/${taskId}`);
-        revalidatePath('/rewards');
-        revalidatePath('/wallet');
-        
-        return { success: true, earnings: earningsToAdd, nextTaskId: nextTask?.id || null };
-
-    } catch (error) {
-        console.error("Error submitting task response:", error);
-        const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
-    }
-}
-
 export type CreatePackageInput = Omit<Package, 'id'>;
 
 export async function createAdminPackage(data: CreatePackageInput) {
@@ -351,6 +232,9 @@ export async function setupNewUser(userId: string, name: string, email: string, 
             dailyVideoGenerationCount: 0,
             lastVideoGenerationReset: now,
             packageVideoGenerationCount: 0,
+            dailyMusicGenerationCount: 0,
+            lastMusicGenerationReset: now,
+            packageMusicGenerationCount: 0,
             accountExpiresAt: expiryTimestamp,
             onboardingStatus: appSettings.onboardingCourseEnabled ? 'pending' : 'approved',
             referralCode: uuidv4().substring(0, 8).toUpperCase(),
@@ -411,25 +295,96 @@ export async function deleteAdminUser(userId: string) {
 }
 
 export async function updateAppSettings(data: AppSettings) {
-  if (!db) return { success: false, message: "Database not configured." };
   try {
+        const toProviderId = (name: string, fallbackId: string) => {
+            const slug = name
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-');
+            return slug || fallbackId;
+        };
+
     const dataToSave = { ...data };
     // Ensure arrays are filtered for empty entries before saving
     dataToSave.paymentMethods = (data.paymentMethods || []).filter(m => m.name.trim() !== '');
     dataToSave.depositMethods = (data.depositMethods || []).filter(m => m.name.trim() !== '');
     dataToSave.onboardingCourseSteps = (data.onboardingCourseSteps || []).filter(s => s.title.trim() !== '' && s.content.trim() !== '');
+        dataToSave.aiProviders = (data.aiProviders || [])
+            .map((provider) => ({
+                ...provider,
+                name: provider.name.trim(),
+                id: toProviderId(provider.name || '', (provider.id || '').trim() || 'provider'),
+                baseUrl: provider.baseUrl.trim(),
+                apiKey: (provider.apiKey || '').trim(),
+                discoveredModels: (provider.discoveredModels || []).filter(Boolean),
+            }))
+            .filter((provider) => provider.id && provider.name && provider.baseUrl);
     
-    await setDoc(doc(db, "settings", "main"), dataToSave, { merge: true });
+    await adminDb.collection("settings").doc("main").set(dataToSave, { merge: true });
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/landing");
-    revalidatePath("/redeem");
     revalidatePath("/");
     return { success: true, message: "Settings updated successfully." };
   } catch (error) {
     console.error("Error updating settings:", error);
     return { success: false, message: "Failed to update settings." };
   }
+}
+
+export async function discoverOpenAiCompatibleModels(input: {
+    baseUrl: string;
+    apiKey?: string;
+}): Promise<{ success: boolean; message: string; models: Array<{ id: string; modalities?: string[] }> }> {
+    const normalizedBaseUrl = input.baseUrl.trim().replace(/\/+$/, '');
+    const apiKey = (input.apiKey || '').trim();
+
+    if (!normalizedBaseUrl) {
+        return { success: false, message: 'Base URL is required.', models: [] };
+    }
+
+    try {
+        const response = await fetch(`${normalizedBaseUrl}/models`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+            },
+            cache: 'no-store',
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            return {
+                success: false,
+                message: `Model discovery failed (${response.status}): ${errorText || response.statusText}`,
+                models: [],
+            };
+        }
+
+        const payload = await response.json() as { data?: Array<{ id?: string; modalities?: string[] }> };
+        const models = Array.from(
+            new Map(
+                (payload.data || [])
+                    .map((model) => [model.id, model] as const)
+                    .filter(([id]) => Boolean(id))
+            ).values()
+        ).map((model) => ({
+            id: model.id || '',
+            modalities: model.modalities,
+        })).filter((model) => Boolean(model.id)).sort((a, b) => a.id.localeCompare(b.id));
+
+        return {
+            success: true,
+            message: models.length > 0 ? 'Models loaded successfully.' : 'No models were returned by the provider.',
+            models,
+        };
+    } catch (error) {
+        console.error('Error discovering OpenAI-compatible models:', error);
+        return { success: false, message: 'Failed to query provider models.', models: [] };
+    }
 }
 
 export async function requestWithdrawal(
@@ -483,7 +438,6 @@ export async function requestWithdrawal(
             });
         });
 
-        revalidatePath("/redeem");
         revalidatePath("/wallet");
         revalidatePath("/admin/withdrawals");
         return { success: true, message: "Withdrawal request submitted." };
@@ -531,7 +485,6 @@ export async function updateWithdrawalRequestStatus(
       });
 
       revalidatePath("/admin/withdrawals");
-      revalidatePath("/redeem"); // For user's withdrawal history
       revalidatePath("/wallet");
       return { success: true, message: `Request status updated to ${newStatus}.` };
   } catch (error) {
@@ -736,6 +689,7 @@ export async function purchasePackage(userId: string, packageId: string) {
                 depositBalance: newDepositBalance,
                 packageImageGenerationCount: 0,
                 packageVideoGenerationCount: 0,
+                packageMusicGenerationCount: 0,
             };
 
             transaction.update(userRef, updates);
@@ -1051,18 +1005,28 @@ export async function deleteAllAdminTasks() {
 }
 
 export async function updateLandingPageImage(field: string, imageDataUri: string) {
-    if (!db || !storage) return { success: false, message: "Firebase not configured." };
+    if (!db) return { success: false, message: "Firebase not configured." };
 
     try {
-        const storageRef = ref(storage, `landing-page/${field}-${uuidv4()}.jpg`);
+        const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
+        const bucket = bucketName ? adminStorage.bucket(bucketName) : adminStorage.bucket();
+        const objectPath = `landing-page/${field}-${uuidv4()}.jpg`;
+        const file = bucket.file(objectPath);
         
         const base64Data = imageDataUri.substring(imageDataUri.indexOf(',') + 1);
         const imageBuffer = Buffer.from(base64Data, 'base64');
         
-        const snapshot = await uploadBytes(storageRef, imageBuffer, {
-            contentType: 'image/jpeg'
+        await file.save(imageBuffer, {
+            resumable: false,
+            contentType: 'image/jpeg',
+            metadata: {
+                cacheControl: 'public, max-age=31536000',
+            },
         });
-        const downloadURL = await getDownloadURL(snapshot.ref);
+        const [downloadURL] = await file.getSignedUrl({
+            action: 'read',
+            expires: '2100-01-01',
+        });
 
         const settings = await getAppSettings();
         const newLandingPageContent = {

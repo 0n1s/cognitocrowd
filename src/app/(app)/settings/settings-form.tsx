@@ -8,14 +8,10 @@ import * as z from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import {
-  updateUserNameInDB,
   generateAiProfilePicture,
-  setProfilePictureFromDataUri,
-  updateUserPhotoURL
 } from "@/lib/user-actions";
-import { auth, storage } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getUserData, getPackage } from "@/lib/database";
+import { v4 as uuidv4 } from "uuid";
 import type { Package } from "@/lib/types";
 
 const profileFormSchema = z.object({
@@ -57,6 +54,53 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoading = isUploading || isGenerating || isSaving;
   const canGenerate = userPackage?.allowAiProfilePicture || false;
+
+  const patchUserProfile = async (payload: { name?: string; photoURL?: string }) => {
+    if (!auth?.currentUser) {
+      throw new Error("You must be logged in.");
+    }
+
+    const idToken = await auth.currentUser.getIdToken();
+    const response = await fetch('/api/user/profile', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result?.message || 'Failed to update profile.');
+    }
+  };
+
+  const uploadProfileImage = async (file: Blob, contentType: string) => {
+    if (!auth?.currentUser) {
+      throw new Error("You must be logged in.");
+    }
+
+    const idToken = await auth.currentUser.getIdToken();
+    const formData = new FormData();
+    formData.append('purpose', 'profile-picture');
+    formData.append('file', file, 'profile.png');
+
+    const uploadResponse = await fetch('/api/storage/upload', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: formData,
+    });
+
+    const uploadResult = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok || !uploadResult?.downloadUrl) {
+      throw new Error(uploadResult?.message || 'Upload failed.');
+    }
+
+    return uploadResult.downloadUrl as string;
+  };
 
   useEffect(() => {
     if (!selectedFile) {
@@ -95,22 +139,16 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `profile-pictures/${user.uid}`);
-      await uploadBytes(storageRef, selectedFile);
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await uploadProfileImage(selectedFile, selectedFile.type || 'image/jpeg');
       
       await updateProfile(auth.currentUser, { photoURL: downloadURL });
-      const result = await updateUserPhotoURL(user.uid, downloadURL);
+      await patchUserProfile({ photoURL: downloadURL });
       
-      if (result.success) {
-        toast({ title: "Success", description: "Profile picture updated!" });
-        setSelectedFile(null);
-        setPreview(null);
-        setGeneratedPreviewUri(null);
-        router.refresh();
-      } else {
-        toast({ title: "Error", description: result.message, variant: "destructive" });
-      }
+      toast({ title: "Success", description: "Profile picture updated!" });
+      setSelectedFile(null);
+      setPreview(null);
+      setGeneratedPreviewUri(null);
+      router.refresh();
     } catch (error) {
       toast({ title: "Upload Failed", description: "There was an error uploading your image.", variant: "destructive" });
       console.error(error);
@@ -120,7 +158,7 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
   };
 
   const handleGenerate = async () => {
-    if (!user || !auth.currentUser) {
+    if (!user || !auth?.currentUser) {
       toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
@@ -166,7 +204,7 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
   };
 
   const handleSaveGenerated = async () => {
-    if (!user || !auth.currentUser) {
+    if (!user || !auth?.currentUser) {
       toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
@@ -177,16 +215,21 @@ function ProfilePictureForm({ userPackage }: { userPackage: Package | null }) {
 
     setIsSaving(true);
     try {
-      const result = await setProfilePictureFromDataUri(user.uid, generatedPreviewUri);
-
-      if (result.success && result.url) {
-        await updateProfile(auth.currentUser, { photoURL: result.url });
-        toast({ title: "Success!", description: "Your new avatar has been saved." });
-        setGeneratedPreviewUri(null);
-        router.refresh();
-      } else {
-        throw new Error(result.message || "Failed to save image.");
+      const generatedResponse = await fetch(generatedPreviewUri, { cache: 'no-store' });
+      if (!generatedResponse.ok) {
+        throw new Error('Generated image could not be loaded for saving.');
       }
+
+      const generatedBlob = await generatedResponse.blob();
+      const contentType = generatedBlob.type || 'image/png';
+      const downloadURL = await uploadProfileImage(generatedBlob, contentType);
+
+      await updateProfile(auth.currentUser, { photoURL: downloadURL });
+      await patchUserProfile({ photoURL: downloadURL });
+
+      toast({ title: "Success!", description: "Your new avatar has been saved." });
+      setGeneratedPreviewUri(null);
+      router.refresh();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
       toast({
@@ -306,21 +349,28 @@ export function SettingsForm() {
     }, [user, profileForm]);
 
     const onProfileSubmit = async (values: z.infer<typeof profileFormSchema>) => {
-        if (!user || !auth?.currentUser) {
+      if (!user || !auth?.currentUser) {
              toast({ title: "Error", description: "You are not logged in.", variant: "destructive" });
              return;
         }
         setIsProfileSubmitting(true);
         try {
             await updateProfile(auth.currentUser, { displayName: values.name });
-            const result = await updateUserNameInDB(user.uid, values.name);
-
-            if (result.success) {
-                toast({ title: "Success", description: "Your profile has been updated." });
-                router.refresh();
-            } else {
-                toast({ title: "Error", description: result.message, variant: "destructive" });
-            }
+        const idToken = await auth.currentUser.getIdToken();
+        const response = await fetch('/api/user/profile', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ name: values.name }),
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result?.message || 'Failed to update profile.');
+        }
+        toast({ title: "Success", description: "Your profile has been updated." });
+        router.refresh();
         } catch (error) {
              toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
         } finally {

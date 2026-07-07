@@ -147,12 +147,25 @@ const ResultsDisplay = ({ task, responses, userId }: { task: Task; responses: Ta
                         <h4 className="font-semibold mb-2">Your Response:</h4>
                         <p className="text-muted-foreground whitespace-pre-wrap">{formatResponseData(currentUserResponse.responseData, task.type)}</p>
                         {currentUserResponse.rank && (
-                            <div className="mt-4 flex items-center gap-2">
-                                <Badge variant="default" className="flex items-center gap-1">
-                                    <Star className="h-4 w-4" />
-                                    AI Rank: {currentUserResponse.rank} / 10
-                                </Badge>
-                                <p className="text-sm text-muted-foreground italic">"{currentUserResponse.rankExplanation}"</p>
+                            <div className="mt-4 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="default" className="flex items-center gap-1">
+                                        <Star className="h-4 w-4" />
+                                        AI Rank: {currentUserResponse.rank} / 10
+                                    </Badge>
+                                    {typeof currentUserResponse.scorePercent === 'number' ? (
+                                        <Badge variant="secondary">Score: {currentUserResponse.scorePercent}%</Badge>
+                                    ) : null}
+                                    <p className="text-sm text-muted-foreground italic">"{currentUserResponse.rankExplanation}"</p>
+                                </div>
+                                {typeof currentUserResponse.scorePercent === 'number' ? (
+                                    <p className="text-xs text-muted-foreground">
+                                        Accuracy: {currentUserResponse.scorePercent}% | Amount earned: ${((currentUserResponse.pointsEarned || 0) / 100).toFixed(2)}
+                                    </p>
+                                ) : null}
+                                {currentUserResponse.verificationExplanation ? (
+                                    <p className="text-xs text-muted-foreground">Verification: {currentUserResponse.verificationExplanation}</p>
+                                ) : null}
                             </div>
                         )}
                     </CardContent>

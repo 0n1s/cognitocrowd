@@ -16,8 +16,9 @@ const StatCard = ({ title, value }: { title: string, value: string | number }) =
     </Card>
 );
 
-export default async function PartnerDetailPage({ params }: { params: { id: string } }) {
-    const partner = await getCountryPartnerDetail(params.id);
+export default async function PartnerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const partner = await getCountryPartnerDetail(id);
 
     if (!partner) {
         notFound();

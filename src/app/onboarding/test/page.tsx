@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Clock, AlertTriangle } from "lucide-react";
-import { submitQualificationTest, startUserQualificationTest } from "@/lib/actions";
+import { getQualificationTestSecuritySettings, logQualificationCopyAttempt, submitQualificationTest, startUserQualificationTest } from "@/lib/user-api";
 import { QualificationQuestion } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
@@ -30,8 +30,28 @@ function TestGenerator() {
     const [fingerprint, setFingerprint] = useState<string>('');
     const [timeLeft, setTimeLeft] = useState(TEST_DURATION_SECONDS);
     const [error, setError] = useState<string | null>(null);
+    const [copyAttempts, setCopyAttempts] = useState(0);
+    const [antiCopyEnabled, setAntiCopyEnabled] = useState(true);
+    const [copyAttemptLimit, setCopyAttemptLimit] = useState(5);
+    const [autoFailTriggered, setAutoFailTriggered] = useState(false);
+    const lastHandledCopyAttemptRef = useRef(0);
 
     const expertise = useMemo(() => searchParams.getAll("expertise"), [searchParams]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        getQualificationTestSecuritySettings(user.uid)
+            .then((result) => {
+                if (!result.success) return;
+                setAntiCopyEnabled(result.antiCopyEnabled !== false);
+                const configuredLimit = Number(result.copyAttemptLimit);
+                setCopyAttemptLimit(Number.isFinite(configuredLimit) ? Math.max(1, Math.floor(configuredLimit)) : 5);
+            })
+            .catch(() => {
+                // Keep secure defaults if settings cannot be loaded.
+            });
+    }, [user]);
 
     // Get browser fingerprint
     useEffect(() => {
@@ -94,6 +114,105 @@ function TestGenerator() {
     const handleAnswerChange = (questionIndex: number, value: string) => {
         setUserAnswers(prev => ({...prev, [questionIndex]: value}));
     };
+
+    const submitForcedFailure = async (reason: string, attempts: number) => {
+        if (!user) return;
+        if (!fingerprint) {
+            setError("Copy policy violation detected. Could not verify browser fingerprint for auto-fail submission.");
+            return;
+        }
+
+        setIsSubmitting(true);
+        const result = await submitQualificationTest(user.uid, questions, userAnswers, expertise, fingerprint, {
+            forcedFailureReason: reason,
+            copyAttempts: attempts,
+        });
+
+        if (result.success) {
+            toast({ title: "Test Failed", description: "Your test was automatically failed due to repeated copy attempts.", variant: "destructive" });
+            router.push('/onboarding/pending');
+            return;
+        }
+
+        toast({ title: "Error", description: result.message || "Failed to auto-submit test result.", variant: "destructive" });
+        setIsSubmitting(false);
+    };
+
+    const registerCopyAttempt = useCallback(() => {
+        if (!antiCopyEnabled || isSubmitting || error) return;
+        setCopyAttempts((prev) => prev + 1);
+    }, [antiCopyEnabled, isSubmitting, error]);
+
+    useEffect(() => {
+        if (!antiCopyEnabled || copyAttempts <= 0) return;
+        if (lastHandledCopyAttemptRef.current >= copyAttempts) return;
+
+        lastHandledCopyAttemptRef.current = copyAttempts;
+
+        if (user) {
+            void logQualificationCopyAttempt(user.uid, {
+                attemptCount: copyAttempts,
+                copyAttemptLimit,
+                expertise,
+                browserFingerprint: fingerprint || 'unknown',
+            });
+        }
+
+        if (copyAttempts > copyAttemptLimit) {
+            if (!autoFailTriggered) {
+                setAutoFailTriggered(true);
+                void submitForcedFailure('Automatic failure triggered: repeated copy attempts detected.', copyAttempts);
+            }
+            return;
+        }
+
+        const remaining = Math.max(0, copyAttemptLimit - copyAttempts);
+        toast({
+            title: "Copy Blocked",
+            description: `Copying is disabled during the qualification test. Attempts: ${copyAttempts}. Remaining before auto-fail: ${remaining}.`,
+            variant: "destructive",
+        });
+    }, [
+        antiCopyEnabled,
+        autoFailTriggered,
+        copyAttemptLimit,
+        copyAttempts,
+        expertise,
+        fingerprint,
+        toast,
+        user,
+    ]);
+
+    useEffect(() => {
+        if (!antiCopyEnabled) return;
+
+        const handleCopy = (event: ClipboardEvent) => {
+            event.preventDefault();
+            registerCopyAttempt();
+        };
+
+        const handleCut = (event: ClipboardEvent) => {
+            event.preventDefault();
+            registerCopyAttempt();
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            const isCopyShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c';
+            if (!isCopyShortcut) return;
+            event.preventDefault();
+            registerCopyAttempt();
+        };
+
+        document.addEventListener('copy', handleCopy);
+        document.addEventListener('cut', handleCut);
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('copy', handleCopy);
+            document.removeEventListener('cut', handleCut);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [antiCopyEnabled, registerCopyAttempt]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -160,6 +279,11 @@ function TestGenerator() {
                         <div>
                             <CardTitle className="font-headline text-2xl">Qualification Test</CardTitle>
                             <CardDescription>Please complete this timed test to demonstrate your skills. Your response will be reviewed by our team.</CardDescription>
+                            {antiCopyEnabled && (
+                                <p className="mt-2 text-xs text-destructive">
+                                    Copying is disabled. More than {copyAttemptLimit} copy attempts will automatically fail this test.
+                                </p>
+                            )}
                         </div>
                         <div className="flex items-center gap-2 font-mono text-lg font-semibold rounded-md border px-3 py-1.5">
                             <Clock className="h-5 w-5" />

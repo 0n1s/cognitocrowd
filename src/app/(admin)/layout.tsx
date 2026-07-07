@@ -16,6 +16,7 @@ import {
   SidebarTrigger,
   SidebarInset,
   useSidebar,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   LayoutGrid,
@@ -27,6 +28,7 @@ import {
   Users,
   Settings,
   Banknote,
+  HandCoins,
   FileQuestion,
   UserCheck,
   GalleryHorizontal,
@@ -53,6 +55,7 @@ const navItems = [
   { href: "/admin/users", icon: Users, label: "Users" },
   { href: "/admin/partners", icon: Landmark, label: "Country Partners" },
   { href: "/admin/withdrawals", icon: Banknote, label: "Withdrawals" },
+  { href: "/admin/deposits", icon: HandCoins, label: "Deposits" },
   { href: "/admin/qualifications", icon: FileQuestion, label: "Qualifications" },
   { href: "/admin/approvals", icon: UserCheck, label: "Approvals" },
   { href: "/admin/landing", icon: GalleryHorizontal, label: "Landing Page" },
@@ -138,16 +141,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar className="border-r border-sidebar-border/60">
         <SidebarHeader>
-          <Link href="/admin/dashboard" className="flex items-center gap-2">
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-            <span className="font-headline font-semibold text-lg text-sidebar-foreground">
-              Trainly
-            </span>
+          <Link href="/admin/dashboard" className="group rounded-xl border border-sidebar-border/60 bg-sidebar-accent/30 px-3 py-2 transition-colors hover:bg-sidebar-accent/60">
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              <span className="font-headline font-semibold text-lg text-sidebar-foreground">Trainly</span>
+            </div>
+            <p className="mt-1 text-xs text-sidebar-foreground/70">Admin Control Center</p>
           </Link>
         </SidebarHeader>
         <SidebarContent>
+          <div className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">Management</div>
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.href}>
@@ -155,6 +160,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   asChild
                   isActive={pathname.startsWith(item.href)}
                   tooltip={item.label}
+                  className="h-9 rounded-lg border border-transparent px-3 data-[active=true]:border-sidebar-border data-[active=true]:bg-sidebar-accent/80 data-[active=true]:shadow-sm"
                 >
                   <Link href={item.href}>
                     <item.icon />
@@ -166,6 +172,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
+          <SidebarSeparator className="mb-2" />
           <SidebarMenu>
             <SidebarMenuButton asChild tooltip="Back to App">
               <Link href="/dashboard">

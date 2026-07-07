@@ -3,15 +3,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
-import { setupNewUser } from '@/lib/actions';
+import { setupNewUser } from '@/lib/user-api';
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -29,6 +29,11 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('ref');
+    if (code) setReferralCode(code.trim().toUpperCase());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +53,14 @@ export default function SignupPage() {
             displayName: name,
             photoURL: `https://placehold.co/128x128.png?text=${name.charAt(0)}`
         });
-        await setupNewUser(userCredential.user.uid, name, email, referralCode);
+        const setupResult = await setupNewUser(userCredential.user.uid, name, email, referralCode);
+        if (!setupResult.success) {
+          await deleteUser(userCredential.user).catch(() => undefined);
+          throw new Error(setupResult.message || 'Could not finish account setup.');
+        }
+        if (referralCode.trim() && !setupResult.referredBy) {
+          throw new Error('The account was created, but the referral was not linked. Please contact support before making a deposit.');
+        }
       }
       toast({
         title: "Account Created!",
@@ -58,7 +70,7 @@ export default function SignupPage() {
       // No router.push() needed here.
     } catch (error: any) {
       console.error('Signup error:', error);
-      let description = "An unexpected error occurred. Please try again.";
+      let description = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
         description = "This email is already in use. Please try another one or log in.";
       } else if (error.code === 'auth/weak-password') {

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Task, TaskType, TaskOption } from "@/lib/types";
+import { Task, TaskType, TaskOption, AppSettings } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -44,25 +44,32 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Loader2, Wand2, Clipboard, Eye, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
+import { PlusCircle, Loader2, Wand2, Clipboard, Eye, PauseCircle, PlayCircle, Trash2, ListChecks, Check, ChevronsUpDown } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { generateTask } from "@/ai/flows/ai-task-generator";
 import { useToast } from "@/hooks/use-toast";
-import { createAdminTask, bulkCreateAdminTasks, deleteAdminTask, updateAdminTaskStatus, deleteAllAdminTasks } from "@/lib/actions";
-import { getAdminTasks } from "@/lib/database";
+import { createAdminTask, bulkCreateAdminTasks, deleteAdminTask, updateAdminTaskStatus, deleteAllAdminTasks } from "@/lib/admin-api";
+import { getAdminTasks, getAppSettings } from "@/lib/database";
+import { getFallbackModel } from "@/ai/model-resolver";
 import { format } from "date-fns";
 
 const EXPERTISE_AREAS = [
@@ -91,9 +98,203 @@ const TASK_TYPE_OPTIONS: { id: TaskType; label: string }[] = [
 
 const TASKS_PER_PAGE = 10;
 
+const LAST_USED_CONTRIBUTION_MODEL_KEY = "admin-contribution-last-model";
+
+type ModelOption = {
+  id: string;
+  name: string;
+  modalities: string[];
+};
+
+function getContributionTextModelOptions(settings: AppSettings): ModelOption[] {
+  const options = new Map<string, ModelOption>();
+
+  const addOption = (id: string, name?: string, modalities: string[] = ["text"]) => {
+    const normalizedId = String(id || "").trim();
+    if (!normalizedId || options.has(normalizedId)) {
+      return;
+    }
+
+    options.set(normalizedId, {
+      id: normalizedId,
+      name: name?.trim() || normalizedId,
+      modalities: modalities.length > 0 ? modalities : ["text"],
+    });
+  };
+
+  (settings.aiProviders || []).forEach((provider) => {
+    if (!provider.baseUrl?.trim() || provider.supportsText === false) {
+      return;
+    }
+
+    (provider.discoveredModels || []).forEach((modelId) => {
+      const normalizedModelId = String(modelId || "").trim();
+      if (!normalizedModelId) {
+        return;
+      }
+
+      const modalities = provider.discoveredModelModalities?.[normalizedModelId];
+      if (Array.isArray(modalities) && modalities.length > 0 && !modalities.includes("text")) {
+        return;
+      }
+
+      addOption(
+        `${provider.id}/${normalizedModelId}`,
+        `${provider.name} - ${normalizedModelId}`,
+        Array.isArray(modalities) && modalities.length > 0 ? modalities : ["text"]
+      );
+    });
+  });
+
+  [settings.defaultTextGenAiModel, settings.defaultGenAiModel, getFallbackModel("text")].forEach((modelId) => {
+    const normalizedModelId = String(modelId || "").trim();
+    if (!normalizedModelId) {
+      return;
+    }
+
+    addOption(
+      normalizedModelId,
+      options.has(normalizedModelId) ? options.get(normalizedModelId)?.name : `Default - ${normalizedModelId}`,
+      options.get(normalizedModelId)?.modalities || ["text"]
+    );
+  });
+
+  return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function ModelSelectField({
+  id,
+  modelOptions,
+  selectedModel,
+  onSelectedModelChange,
+  disabled,
+  placeholder,
+  searchPlaceholder,
+}: {
+  id: string;
+  modelOptions: ModelOption[];
+  selectedModel: string;
+  onSelectedModelChange: (value: string) => void;
+  disabled: boolean;
+  placeholder: string;
+  searchPlaceholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selectedOption = useMemo(
+    () => modelOptions.find((option) => option.id === selectedModel),
+    [modelOptions, selectedModel]
+  );
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return modelOptions;
+    }
+
+    return modelOptions.filter((option) => {
+      const haystack = `${option.name} ${option.id}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [modelOptions, query]);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+    }
+  }, [open]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className="w-full justify-between"
+        >
+          <div className="min-w-0 text-left">
+            <div className="truncate">{selectedOption?.name || placeholder}</div>
+            {selectedOption?.modalities?.length ? (
+              <div className="truncate text-xs text-muted-foreground">
+                {selectedOption.modalities.map((modality) => modality.toUpperCase()).join(" • ")}
+              </div>
+            ) : null}
+          </div>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-3" align="start">
+        <div className="space-y-3">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={searchPlaceholder}
+            autoComplete="off"
+          />
+          <ScrollArea className="h-64 pr-3">
+            <div className="space-y-1">
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((option) => {
+                  const isSelected = option.id === selectedModel;
+                  return (
+                    <Button
+                      key={option.id}
+                      type="button"
+                      variant="ghost"
+                      className="h-auto w-full justify-start gap-2 px-2 py-2 text-left"
+                      onClick={() => {
+                        onSelectedModelChange(option.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check className={`h-4 w-4 shrink-0 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{option.name}</div>
+                        {option.modalities.length > 0 ? (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {option.modalities.map((modality) => modality.toUpperCase()).join(" • ")}
+                          </div>
+                        ) : null}
+                        <div className="truncate text-xs text-muted-foreground">{option.id}</div>
+                      </div>
+                    </Button>
+                  );
+                })
+              ) : (
+                <p className="px-2 py-3 text-sm text-muted-foreground">No models match your filter.</p>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Add/Edit Task Dialogs (no changes needed here, keeping them for context)
 
-function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onTaskCreated: () => void; }) {
+function AddTaskDialog({
+  open,
+  onOpenChange,
+  onTaskCreated,
+  modelOptions,
+  selectedModel,
+  onSelectedModelChange,
+  modelsLoading,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTaskCreated: () => void;
+  modelOptions: ModelOption[];
+  selectedModel: string;
+  onSelectedModelChange: (value: string) => void;
+  modelsLoading: boolean;
+}) {
   const { toast } = useToast();
   const [taskType, setTaskType] = useState<TaskType>("open_text_feedback");
   const [expertise, setExpertise] = useState<string>("General");
@@ -143,7 +344,7 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; o
     }
     setIsGenerating(true);
     try {
-        const result = await generateTask({ topic: title, taskType, expertise });
+        const result = await generateTask({ topic: title, taskType, expertise, model: selectedModel || undefined });
         setTitle(result.prompt);
         setDescription(result.description);
         if (result.points) {
@@ -248,13 +449,30 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; o
               </SelectContent>
             </Select>
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="contribution-model-add" className="text-right">
+              AI Model
+            </Label>
+            <div className="col-span-3 space-y-2">
+              <ModelSelectField
+                id="contribution-model-add"
+                modelOptions={modelOptions}
+                selectedModel={selectedModel}
+                onSelectedModelChange={onSelectedModelChange}
+                disabled={modelsLoading || modelOptions.length === 0}
+                placeholder={modelsLoading ? "Loading models..." : "Select a text model"}
+                searchPlaceholder="Filter models..."
+              />
+              <p className="text-xs text-muted-foreground">The last selected model is remembered for future AI contribution generation.</p>
+            </div>
+          </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="description" className="text-right pt-2">
               Description
             </Label>
             <div className="col-span-3 space-y-2">
                 <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder="A detailed prompt for the user." />
-                 <Button onClick={handleGenerate} disabled={isGenerating || !title || !expertise} variant="outline" size="sm">
+                 <Button onClick={handleGenerate} disabled={isGenerating || modelsLoading || !selectedModel || !title || !expertise} variant="outline" size="sm">
                     {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                     Generate with AI
                 </Button>
@@ -327,9 +545,27 @@ function AddTaskDialog({ open, onOpenChange, onTaskCreated }: { open: boolean; o
   );
 }
 
-function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: { open: boolean; onOpenChange: (open: boolean) => void; onTasksGenerated: () => void; }) {
+function AutoGenerateDialog({
+  open,
+  onOpenChange,
+  onTasksGenerated,
+  modelOptions,
+  selectedModel,
+  onSelectedModelChange,
+  modelsLoading,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTasksGenerated: () => void;
+  modelOptions: ModelOption[];
+  selectedModel: string;
+  onSelectedModelChange: (value: string) => void;
+  modelsLoading: boolean;
+}) {
   const { toast } = useToast();
   const [count, setCount] = useState(5);
+  const [minPoints, setMinPoints] = useState(50);
+  const [maxPoints, setMaxPoints] = useState(300);
   const [expertise, setExpertise] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<TaskType[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -386,12 +622,24 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: { open: bo
       });
       return;
     }
+
+    if (minPoints <= 0 || maxPoints <= 0 || minPoints > maxPoints) {
+      toast({
+        title: "Invalid Points Range",
+        description: "Please provide a valid points range where min is less than or equal to max.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsGenerating(true);
     try {
       const result = await bulkCreateAdminTasks({
         count,
         expertise,
         taskTypes: selectedTypes,
+        minPoints,
+        maxPoints,
+        model: selectedModel || undefined,
       });
 
       if (result.success) {
@@ -450,6 +698,45 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: { open: bo
               className="mt-2"
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="min-points">Min Points</Label>
+              <Input
+                id="min-points"
+                type="number"
+                value={minPoints}
+                onChange={(e) => setMinPoints(Number(e.target.value))}
+                min="1"
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <Label htmlFor="max-points">Max Points</Label>
+              <Input
+                id="max-points"
+                type="number"
+                value={maxPoints}
+                onChange={(e) => setMaxPoints(Number(e.target.value))}
+                min="1"
+                className="mt-2"
+              />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="bulk-contribution-model">AI Model</Label>
+            <div className="mt-2">
+              <ModelSelectField
+                id="bulk-contribution-model"
+                modelOptions={modelOptions}
+                selectedModel={selectedModel}
+                onSelectedModelChange={onSelectedModelChange}
+                disabled={modelsLoading || modelOptions.length === 0}
+                placeholder={modelsLoading ? "Loading models..." : "Select a text model"}
+                searchPlaceholder="Filter models..."
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">The last selected model is reused the next time you generate contributions.</p>
+          </div>
            <div>
             <Label>Expertise Areas</Label>
             <div className="mt-2 space-y-2 p-3 border rounded-md max-h-40 overflow-y-auto">
@@ -493,7 +780,7 @@ function AutoGenerateDialog({ open, onOpenChange, onTasksGenerated }: { open: bo
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleGenerate} disabled={isGenerating || count <= 0 || expertise.length === 0 || selectedTypes.length === 0}>
+          <Button onClick={handleGenerate} disabled={isGenerating || modelsLoading || !selectedModel || count <= 0 || expertise.length === 0 || selectedTypes.length === 0}>
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
             Generate
           </Button>
@@ -753,6 +1040,9 @@ const LoadingSkeleton = () => (
 
 export function TaskList() {
     const [tasks, setTasks] = useState<Task[]>([]);
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isAutoGenerateDialogOpen, setIsAutoGenerateDialogOpen] = useState(false);
@@ -779,6 +1069,61 @@ export function TaskList() {
         fetchTasks();
     }, []);
 
+    useEffect(() => {
+      let isMounted = true;
+
+      const loadContributionModels = async () => {
+        setModelsLoading(true);
+        try {
+          const settings = await getAppSettings();
+          const options = getContributionTextModelOptions(settings);
+          const savedModel = typeof window === "undefined"
+            ? ""
+            : String(window.localStorage.getItem(LAST_USED_CONTRIBUTION_MODEL_KEY) || "").trim();
+          const preferredModel = [savedModel, settings.defaultTextGenAiModel, settings.defaultGenAiModel, options[0]?.id]
+            .map((value) => String(value || "").trim())
+            .find(Boolean) || "";
+          const normalizedSelection = options.some((option) => option.id === preferredModel)
+            ? preferredModel
+            : options[0]?.id || preferredModel;
+
+          if (!isMounted) {
+            return;
+          }
+
+          setModelOptions(options);
+          setSelectedModel(normalizedSelection);
+        } catch (error) {
+          console.error("Failed to load contribution models:", error);
+          if (!isMounted) {
+            return;
+          }
+
+          const fallbackModel = getFallbackModel("text");
+                setModelOptions([{ id: fallbackModel, name: `Default - ${fallbackModel}`, modalities: ["text"] }]);
+          setSelectedModel(fallbackModel);
+        } finally {
+          if (isMounted) {
+            setModelsLoading(false);
+          }
+        }
+      };
+
+      loadContributionModels();
+
+      return () => {
+        isMounted = false;
+      };
+    }, []);
+
+    useEffect(() => {
+      if (!selectedModel || typeof window === "undefined") {
+        return;
+      }
+
+      window.localStorage.setItem(LAST_USED_CONTRIBUTION_MODEL_KEY, selectedModel);
+    }, [selectedModel]);
+
     const handleStatusToggle = async (taskId: string, currentStatus: string) => {
         setUpdatingTaskId(taskId);
         const newStatus = currentStatus === 'Active' ? 'Paused' : 'Active';
@@ -796,6 +1141,19 @@ export function TaskList() {
         const startIndex = (currentPage - 1) * TASKS_PER_PAGE;
         return tasks.slice(startIndex, startIndex + TASKS_PER_PAGE);
     }, [tasks, currentPage]);
+
+    const taskSummary = useMemo(() => {
+        const byExpertise = new Map<string, number>();
+
+        tasks.forEach((task) => {
+            const expertise = task.expertise?.trim() || 'General';
+            byExpertise.set(expertise, (byExpertise.get(expertise) || 0) + 1);
+        });
+
+        return Array.from(byExpertise.entries())
+            .map(([expertise, count]) => ({ expertise, count }))
+            .sort((a, b) => b.count - a.count || a.expertise.localeCompare(b.expertise));
+    }, [tasks]);
     
     const totalPages = Math.ceil(tasks.length / TASKS_PER_PAGE);
 
@@ -818,6 +1176,34 @@ export function TaskList() {
       <CardContent>
         {loading ? <LoadingSkeleton /> : (
             <>
+                <div className="mb-6 grid gap-4 lg:grid-cols-[220px_1fr]">
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                <ListChecks className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total contributions</p>
+                                <p className="text-2xl font-semibold">{tasks.length}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="rounded-xl border p-4">
+                        <p className="mb-3 text-sm font-medium">Contributions by expertise</p>
+                        {taskSummary.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {taskSummary.map(({ expertise, count }) => (
+                                    <Badge key={expertise} variant="secondary" className="gap-2 px-3 py-1">
+                                        <span>{expertise}</span>
+                                        <span className="rounded-full bg-background/80 px-1.5 text-xs tabular-nums">{count}</span>
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No expertise data available.</p>
+                        )}
+                    </div>
+                </div>
                 <Table>
                 <TableHeader>
                     <TableRow>
@@ -899,8 +1285,8 @@ export function TaskList() {
             </div>
         </CardFooter>
       )}
-       <AddTaskDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onTaskCreated={fetchTasks} />
-       <AutoGenerateDialog open={isAutoGenerateDialogOpen} onOpenChange={setIsAutoGenerateDialogOpen} onTasksGenerated={fetchTasks} />
+      <AddTaskDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onTaskCreated={fetchTasks} modelOptions={modelOptions} selectedModel={selectedModel} onSelectedModelChange={setSelectedModel} modelsLoading={modelsLoading} />
+      <AutoGenerateDialog open={isAutoGenerateDialogOpen} onOpenChange={setIsAutoGenerateDialogOpen} onTasksGenerated={fetchTasks} modelOptions={modelOptions} selectedModel={selectedModel} onSelectedModelChange={setSelectedModel} modelsLoading={modelsLoading} />
        <ViewTaskDialog task={viewingTask} open={!!viewingTask} onOpenChange={(open) => !open && setViewingTask(null)} />
        <DeleteTaskDialog task={deletingTask} open={!!deletingTask} onOpenChange={(open) => !open && setDeletingTask(null)} onTaskDeleted={fetchTasks} />
        <DeleteAllTasksDialog open={isDeleteAllDialogOpen} onOpenChange={setIsDeleteAllDialogOpen} onTasksDeleted={fetchTasks} />

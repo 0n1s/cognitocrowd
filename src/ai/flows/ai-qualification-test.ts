@@ -3,15 +3,16 @@
  * @fileOverview AI flows for generating and evaluating qualification tests.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai, getAiClient} from '@/ai/genkit';
 import {z} from 'genkit';
 import { getAppSettings } from '@/lib/database';
+import { resolveConfiguredModel, validateModelAvailability } from '@/ai/model-resolver';
 
 // Schema for a single generated question
 const QuestionSchema = z.object({
-  question: z.string().describe('The question text.'),
-  options: z.array(z.string()).min(4).max(4).describe('An array of 4 possible answers.'),
-  answer: z.string().describe('The correct answer from the options.'),
+  question: z.string().min(1).describe('The question text.'),
+  options: z.array(z.string().min(1)).length(4).describe('An array of 4 possible answers.'),
+  answer: z.string().min(1).describe('The correct answer from the options.'),
 });
 
 // Schema for generating the test
@@ -29,17 +30,63 @@ export async function generateQualificationTest(input: GenerateTestInput): Promi
   return generateTestFlow(input);
 }
 
-const generateTestPrompt = ai.definePrompt({
-  name: 'generateQualificationTestPrompt',
-  input: {schema: GenerateTestInputSchema},
-  output: {schema: GenerateTestOutputSchema},
-  prompt: `You are an expert curriculum designer. Generate a qualification test with 10 multiple-choice questions based on the following user-selected areas of expertise: {{#each expertise}}{{{this}}}{{/each}}.
+function normalizeText(value: unknown): string {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeQuestions(questions: unknown[]): GenerateTestOutput['questions'] {
+  const sanitized = questions.slice(0, 10).map((rawQuestion, index) => {
+    const questionObj = (rawQuestion && typeof rawQuestion === 'object') ? (rawQuestion as Record<string, unknown>) : {};
+    const rawOptions = Array.isArray(questionObj.options) ? questionObj.options : [];
+
+    const cleanedOptions: string[] = [];
+    for (const option of rawOptions) {
+      const text = normalizeText(option);
+      if (!text) continue;
+      if (cleanedOptions.some(existing => existing.toLowerCase() === text.toLowerCase())) continue;
+      cleanedOptions.push(text);
+      if (cleanedOptions.length === 4) break;
+    }
+
+    while (cleanedOptions.length < 4) {
+      cleanedOptions.push(`Option ${String.fromCharCode(65 + cleanedOptions.length)}`);
+    }
+
+    const questionText = normalizeText(questionObj.question) || `Question ${index + 1}`;
+    const answerText = normalizeText(questionObj.answer);
+    const matchedOption = cleanedOptions.find(option => option.toLowerCase() === answerText.toLowerCase());
+    const finalAnswer = matchedOption || cleanedOptions[0];
+
+    return {
+      question: questionText,
+      options: cleanedOptions,
+      answer: finalAnswer,
+    };
+  });
+
+  if (sanitized.length >= 10) {
+    return sanitized;
+  }
+
+  const fallbackQuestions: GenerateTestOutput['questions'] = [...sanitized];
+  while (fallbackQuestions.length < 10) {
+    const idx = fallbackQuestions.length + 1;
+    fallbackQuestions.push({
+      question: `Question ${idx}`,
+      options: ['Option A', 'Option B', 'Option C', 'Option D'],
+      answer: 'Option A',
+    });
+  }
+  return fallbackQuestions;
+}
+
+const generateTestPromptTemplate = `You are an expert curriculum designer. Generate a qualification test with 10 multiple-choice questions based on the following user-selected areas of expertise: {{#each expertise}}{{{this}}}{{/each}}.
 
   The questions should be challenging enough to verify a user's knowledge in these fields. For each question, provide the question text, four distinct options, and specify the correct answer.
+  The answer must be non-empty and MUST match one of the four options exactly.
 
   The output MUST be a JSON object that strictly adheres to the provided schema.
-  `,
-});
+  `;
 
 const generateTestFlow = ai.defineFlow(
   {
@@ -49,9 +96,22 @@ const generateTestFlow = ai.defineFlow(
   },
   async input => {
     const settings = await getAppSettings();
-    const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
-    const {output} = await generateTestPrompt(input, { model });
-    return output!;
+    const runtimeAi = getAiClient({
+      providers: settings.aiProviders,
+    });
+    const runtimePrompt = runtimeAi.definePrompt({
+      name: 'generateQualificationTestPromptRuntime',
+      input: {schema: GenerateTestInputSchema},
+      output: {schema: GenerateTestOutputSchema},
+      prompt: generateTestPromptTemplate,
+    });
+    const configuredModel = resolveConfiguredModel(settings.defaultTextGenAiModel || settings.defaultGenAiModel, 'text');
+    const model = validateModelAvailability(configuredModel, 'text', settings.aiProviders);
+    const {output} = await runtimePrompt(input, { model });
+
+    return {
+      questions: normalizeQuestions(output?.questions || []),
+    };
   }
 );
 
@@ -79,11 +139,7 @@ export async function evaluateQualificationTest(input: EvaluationInput): Promise
     return evaluateTestFlow(input);
 }
 
-const evaluateTestPrompt = ai.definePrompt({
-    name: 'evaluateQualificationTestPrompt',
-    input: {schema: EvaluationInputSchema},
-    output: {schema: EvaluationOutputSchema},
-    prompt: `You are an expert evaluator. A user has submitted a qualification test based on the expertise areas: {{#each expertise}}{{{this}}}{{/each}}.
+const evaluateTestPromptTemplate = `You are an expert evaluator. A user has submitted a qualification test based on the expertise areas: {{#each expertise}}{{{this}}}{{/each}}.
 
     Here is their submission:
     {{#each submissions}}
@@ -95,8 +151,7 @@ const evaluateTestPrompt = ai.definePrompt({
     Please evaluate their submission. Calculate the number of correct answers.
     Based on their performance, provide a final score from 0 to 100 and write a brief, constructive feedback summary for the user.
     The output must be a JSON object adhering to the schema.
-    `,
-});
+    `;
 
 const evaluateTestFlow = ai.defineFlow(
     {
@@ -105,9 +160,42 @@ const evaluateTestFlow = ai.defineFlow(
         outputSchema: EvaluationOutputSchema,
     },
     async input => {
-        const settings = await getAppSettings();
-        const model = settings.defaultGenAiModel || 'googleai/gemini-2.0-flash';
-        const {output} = await evaluateTestPrompt(input, { model });
-        return output!;
+        const normalizeAnswer = (value: unknown) =>
+          String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ');
+
+        const totalCount = input.submissions.length;
+        const correctCount = input.submissions.reduce((count, submission) => {
+          const isCorrect = normalizeAnswer(submission.userAnswer) === normalizeAnswer(submission.correctAnswer);
+          return isCorrect ? count + 1 : count;
+        }, 0);
+
+        const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+
+        const expertiseLabel = input.expertise.length > 0
+          ? input.expertise.join(', ')
+          : 'the selected expertise area';
+
+        let feedback = '';
+        if (totalCount === 0) {
+          feedback = 'No answers were submitted. Please retake the test with complete responses.';
+        } else if (score >= 90) {
+          feedback = `Excellent work in ${expertiseLabel}. Your answers show strong subject mastery.`;
+        } else if (score >= 70) {
+          feedback = `Good progress in ${expertiseLabel}. Review the missed concepts to strengthen consistency.`;
+        } else if (score >= 50) {
+          feedback = `Fair attempt in ${expertiseLabel}. Focus on fundamentals and practice before retrying.`;
+        } else {
+          feedback = `Your current result in ${expertiseLabel} is below the expected level. Revisit core concepts and try again.`;
+        }
+
+        return {
+          score,
+          feedback,
+          correctCount,
+          totalCount,
+        };
     }
 );

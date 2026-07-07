@@ -3,16 +3,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { QualificationQuestion } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { getQualificationTestsSummary } from "@/lib/database";
-import { generateAndSaveQualificationTest, toggleQualificationTestStatus } from "@/lib/actions";
-import { Wand2, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { getQualificationTest, getQualificationTestsSummary } from "@/lib/database";
+import { deleteQualificationQuestion, generateAndSaveQualificationTest, toggleQualificationTestStatus } from "@/lib/admin-api";
+import { Wand2, Loader2, CheckCircle, XCircle, Eye, Trash2 } from "lucide-react";
 
 const EXPERTISE_AREAS = [
   "General Knowledge",
@@ -60,6 +62,11 @@ export function TestList() {
     const [loading, setLoading] = useState(true);
     const [generatingExpertise, setGeneratingExpertise] = useState<string | null>(null);
     const [togglingExpertise, setTogglingExpertise] = useState<string | null>(null);
+    const [questionsDialogOpen, setQuestionsDialogOpen] = useState(false);
+    const [viewingExpertise, setViewingExpertise] = useState<string | null>(null);
+    const [viewingQuestions, setViewingQuestions] = useState<QualificationQuestion[]>([]);
+    const [viewingQuestionsLoading, setViewingQuestionsLoading] = useState(false);
+    const [deletingQuestionIndex, setDeletingQuestionIndex] = useState<number | null>(null);
 
     const fetchSummaries = async () => {
         setLoading(true);
@@ -77,6 +84,57 @@ export function TestList() {
     useEffect(() => {
         fetchSummaries();
     }, []);
+
+    const handleViewQuestions = async (expertise: string) => {
+        setQuestionsDialogOpen(true);
+        setViewingExpertise(expertise);
+        setViewingQuestions([]);
+        setViewingQuestionsLoading(true);
+
+        try {
+            const test = await getQualificationTest(expertise);
+            setViewingQuestions(test?.questions || []);
+        } catch (error) {
+            console.error("Failed to load qualification questions:", error);
+            toast({ title: "Error", description: "Could not load qualification questions.", variant: "destructive" });
+        } finally {
+            setViewingQuestionsLoading(false);
+        }
+    };
+
+    const handleDeleteQuestion = async (questionIndex: number) => {
+        if (!viewingExpertise) return;
+        const confirmed = window.confirm('Delete this question from the qualification test?');
+        if (!confirmed) return;
+
+        setDeletingQuestionIndex(questionIndex);
+        try {
+            const result = await deleteQualificationQuestion(viewingExpertise, questionIndex);
+            if (result.success) {
+                setViewingQuestions((prev) => prev.filter((_, idx) => idx !== questionIndex));
+                setSummaries((prev) => {
+                    const existing = prev[viewingExpertise];
+                    if (!existing) return prev;
+                    return {
+                        ...prev,
+                        [viewingExpertise]: {
+                            ...existing,
+                            questionCount: Math.max(0, existing.questionCount - 1),
+                        },
+                    };
+                });
+                toast({ title: 'Question deleted', description: 'The question was removed from this test bank.' });
+            } else {
+                toast({ title: 'Error', description: result.message || 'Failed to delete question.', variant: 'destructive' });
+            }
+        } catch (error) {
+            console.error('Failed to delete qualification question:', error);
+            toast({ title: 'Error', description: 'Failed to delete question.', variant: 'destructive' });
+        } finally {
+            setDeletingQuestionIndex(null);
+            fetchSummaries();
+        }
+    };
 
     const handleGenerate = async (expertise: string) => {
         setGeneratingExpertise(expertise);
@@ -167,25 +225,96 @@ export function TestList() {
                                         />
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button 
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleGenerate(expertise)}
-                                            disabled={!!generatingExpertise || !!togglingExpertise}
-                                        >
-                                            {generatingExpertise === expertise ? (
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            ) : (
-                                                <Wand2 className="mr-2 h-4 w-4" />
-                                            )}
-                                            {hasQuestions ? 'Add 10 Questions' : 'Generate Test'}
-                                        </Button>
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => handleViewQuestions(expertise)}
+                                                disabled={!hasQuestions || !!generatingExpertise || !!togglingExpertise}
+                                            >
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                View Questions
+                                            </Button>
+                                            <Button 
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleGenerate(expertise)}
+                                                disabled={!!generatingExpertise || !!togglingExpertise}
+                                            >
+                                                {generatingExpertise === expertise ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Wand2 className="mr-2 h-4 w-4" />
+                                                )}
+                                                {hasQuestions ? 'Add 10 Questions' : 'Generate Test'}
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             )})}
                         </TableBody>
                     </Table>
                 )}
+
+                <Dialog open={questionsDialogOpen} onOpenChange={setQuestionsDialogOpen}>
+                    <DialogContent className="max-w-3xl">
+                        <DialogHeader>
+                            <DialogTitle>Qualification Questions</DialogTitle>
+                            <DialogDescription>
+                                {viewingExpertise ? `Viewing test bank for ${viewingExpertise}.` : 'Viewing test bank.'}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        {viewingQuestionsLoading ? (
+                            <div className="space-y-3 py-2">
+                                <Skeleton className="h-16 w-full" />
+                                <Skeleton className="h-16 w-full" />
+                                <Skeleton className="h-16 w-full" />
+                            </div>
+                        ) : viewingQuestions.length === 0 ? (
+                            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                                No questions found for this expertise area yet.
+                            </div>
+                        ) : (
+                            <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
+                                {viewingQuestions.map((question, index) => (
+                                    <div key={`${question.question}-${index}`} className="rounded-md border p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <p className="text-sm font-semibold">{index + 1}. {question.question}</p>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDeleteQuestion(index)}
+                                                disabled={deletingQuestionIndex !== null}
+                                                className="text-destructive hover:text-destructive"
+                                            >
+                                                {deletingQuestionIndex === index ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-4 w-4" />
+                                                )}
+                                            </Button>
+                                        </div>
+                                        <ul className="mt-3 space-y-2">
+                                            {question.options.map((option, optionIndex) => {
+                                                const isCorrect = option === question.answer;
+                                                return (
+                                                    <li
+                                                        key={`${option}-${optionIndex}`}
+                                                        className={`flex items-center justify-between rounded-sm px-2 py-1 text-sm ${isCorrect ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+                                                    >
+                                                        <span>{option}</span>
+                                                        {isCorrect ? <Badge variant="secondary">Correct</Badge> : null}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </CardContent>
         </Card>
     );

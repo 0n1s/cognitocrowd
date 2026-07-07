@@ -4,19 +4,20 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getPackages } from '@/lib/database';
+import { getPackage, getPackages, getUserData } from '@/lib/database';
 import { Package } from '@/lib/types';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { purchasePackage } from '@/lib/actions';
+import { purchasePackage } from '@/lib/user-api';
 import { useRouter } from 'next/navigation';
+import { getAiWorkspaceFeatures } from '@/lib/package-workspace';
 
 function PackagesLoadingSkeleton() {
     return (
-        <div className="grid gap-8 mt-12 md:grid-cols-3 items-start">
+        <div className="grid gap-8 mt-12 md:grid-cols-3 items-stretch">
             {[...Array(3)].map((_, i) => (
                 <Card key={i}>
                     <CardHeader className="items-center text-center">
@@ -40,10 +41,20 @@ function PackagesLoadingSkeleton() {
     )
 }
 
+function parsePackagePrice(priceText: string): number {
+    const normalized = (priceText || '').trim().toLowerCase();
+    if (!normalized || normalized === 'free') return 0;
+    const match = normalized.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+    const numeric = match ? Number(match[0]) : Number.NaN;
+    return Number.isFinite(numeric) ? numeric : Number.POSITIVE_INFINITY;
+}
+
 export default function PackagesPage() {
     const [packages, setPackages] = useState<Package[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
+    const [currentPackageId, setCurrentPackageId] = useState<string | null>(null);
+    const [currentPackagePrice, setCurrentPackagePrice] = useState<number | null>(null);
     const { user } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
@@ -52,7 +63,26 @@ export default function PackagesPage() {
         async function fetchPackages() {
             try {
                 const fetchedPackages = await getPackages();
-                setPackages(fetchedPackages);
+                setPackages([...fetchedPackages].sort((a, b) => {
+                    const priceDifference = parsePackagePrice(a.price) - parsePackagePrice(b.price);
+                    return priceDifference || a.name.localeCompare(b.name);
+                }));
+
+                if (user) {
+                    const userData = await getUserData(user.uid);
+                    const activePackageId = userData?.packageId || null;
+                    setCurrentPackageId(activePackageId);
+
+                    if (activePackageId) {
+                        const activePackage = await getPackage(activePackageId);
+                        setCurrentPackagePrice(activePackage ? parsePackagePrice(activePackage.price) : null);
+                    } else {
+                        setCurrentPackagePrice(null);
+                    }
+                } else {
+                    setCurrentPackageId(null);
+                    setCurrentPackagePrice(null);
+                }
             } catch (error) {
                 console.error("Failed to fetch packages:", error);
             } finally {
@@ -60,7 +90,7 @@ export default function PackagesPage() {
             }
         }
         fetchPackages();
-    }, []);
+    }, [user]);
 
     const handlePurchase = async (packageId: string) => {
         if (!user) {
@@ -92,9 +122,22 @@ export default function PackagesPage() {
             {loading ? <PackagesLoadingSkeleton /> : (
                  <>
                     {packages.length > 0 ? (
-                        <div className="grid gap-8 mt-12 md:grid-cols-3 items-start">
-                            {packages.sort((a, b) => a.price.localeCompare(b.price)).map((pkg) => (
-                                <Card key={pkg.id} className={cn("flex flex-col", pkg.isPrimary && "border-primary shadow-lg")}>
+                        <div className="grid gap-8 mt-12 md:grid-cols-3 items-stretch">
+                            {packages.map((pkg) => {
+                                const workspaceFeatures = getAiWorkspaceFeatures(pkg);
+                                const isCurrentPlan = currentPackageId === pkg.id;
+                                const packagePrice = parsePackagePrice(pkg.price);
+                                const isDowngrade = currentPackagePrice !== null && packagePrice < currentPackagePrice;
+                                const isDisabled = !!isSubmitting || isCurrentPlan || isDowngrade;
+                                const buttonLabel = isCurrentPlan
+                                    ? 'On this Plan'
+                                    : isDowngrade
+                                        ? 'Lower Plan Unavailable'
+                                        : pkg.isPrimary
+                                            ? 'Choose Plan'
+                                            : 'Get Started';
+                                return (
+                                <Card key={pkg.id} className={cn("flex h-full flex-col", pkg.isPrimary && "border-primary shadow-lg")}>
                                     <CardHeader className="items-center text-center">
                                         <CardTitle className="text-2xl font-headline">{pkg.name}</CardTitle>
                                         <div className="text-4xl font-bold">
@@ -109,15 +152,40 @@ export default function PackagesPage() {
                                         </div>
                                     </CardHeader>
                                     <CardContent className="flex-grow">
+                                        <p className="mb-3 text-sm font-semibold">Package features</p>
                                         <ul className="space-y-3">
                                             <li className="flex items-center gap-2">
                                                 <Check className="h-5 w-5 text-green-500" />
                                                 <span className="text-muted-foreground">{`${pkg.taskLimit} tasks / ${pkg.expiryPeriod.replace('1 ', '')}`}</span>
                                             </li>
-                                            {pkg.features.map((feature, i) => (
+                                            {(pkg.features || []).map((feature, i) => (
                                                 <li key={i} className="flex items-center gap-2">
                                                     <Check className="h-5 w-5 text-green-500" />
                                                     <span className="text-muted-foreground">{feature}</span>
+                                                </li>
+                                            ))}
+                                            {(pkg.features || []).length === 0 && (
+                                                <li className="text-sm text-muted-foreground">No additional features listed.</li>
+                                            )}
+                                        </ul>
+                                        <div className="my-5 border-t" />
+                                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                                            <Sparkles className="h-4 w-4 text-primary" />
+                                            AI Workspace
+                                        </div>
+                                        <ul className="space-y-2.5">
+                                            {workspaceFeatures.map((feature) => (
+                                                <li key={feature.label} className="flex items-start gap-2 text-sm">
+                                                    {feature.enabled ? (
+                                                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                                                    ) : (
+                                                        <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/50" />
+                                                    )}
+                                                    <span className={cn(
+                                                        feature.enabled ? 'text-muted-foreground' : 'text-muted-foreground/60 line-through'
+                                                    )}>
+                                                        {feature.label}
+                                                    </span>
                                                 </li>
                                             ))}
                                         </ul>
@@ -125,16 +193,17 @@ export default function PackagesPage() {
                                     <CardFooter>
                                         <Button
                                             className="w-full"
-                                            variant={pkg.isPrimary ? "default" : "outline"}
+                                            variant={isCurrentPlan ? "secondary" : pkg.isPrimary ? "default" : "outline"}
                                             onClick={() => handlePurchase(pkg.id)}
-                                            disabled={!!isSubmitting}
+                                            disabled={isDisabled}
                                         >
                                             {isSubmitting === pkg.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            {pkg.isPrimary ? 'Choose Plan' : 'Get Started'}
+                                            {buttonLabel}
                                         </Button>
                                     </CardFooter>
                                 </Card>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <Card className="mt-12">

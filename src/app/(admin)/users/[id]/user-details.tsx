@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { updateAdminUser } from "@/lib/actions";
+import { updateAdminUser } from "@/lib/admin-api";
 import { ArrowLeft, Edit, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
@@ -23,6 +23,7 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
     const [packageId, setPackageId] = useState(user.packageId || 'null');
     const [earningsBalance, setEarningsBalance] = useState(user.earningsBalance);
     const [depositBalance, setDepositBalance] = useState(user.depositBalance);
+    const [expertiseText, setExpertiseText] = useState((user.expertise || []).join(', '));
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
@@ -31,6 +32,10 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
             packageId: packageId === 'null' ? null : packageId,
             earningsBalance,
             depositBalance,
+            expertise: expertiseText
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean),
         });
         
         if (result.success) {
@@ -81,6 +86,18 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
             <Label htmlFor="deposits" className="text-right">Deposits</Label>
             <Input id="deposits" type="number" value={depositBalance} onChange={e => setDepositBalance(Number(e.target.value))} className="col-span-3" />
           </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="expertise" className="text-right pt-2">Expertise</Label>
+              <div className="col-span-3 space-y-1">
+                <Input
+                  id="expertise"
+                  value={expertiseText}
+                  onChange={e => setExpertiseText(e.target.value)}
+                  placeholder="General, Writing, Coding"
+                />
+                <p className="text-xs text-muted-foreground">Comma-separated expertise areas used for contribution matching.</p>
+              </div>
+            </div>
         </div>
         <DialogFooter>
           <DialogClose asChild>

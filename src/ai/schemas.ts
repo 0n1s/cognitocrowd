@@ -68,6 +68,7 @@ export type GenerateProfileImageOutput = z.infer<typeof GenerateProfileImageOutp
 
 export const GenerateImageInputSchema = z.object({
   prompt: z.string().describe('A text prompt to generate an image from.'),
+  imageModel: z.enum(['normal', 'uncensored']).optional().default('normal'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -88,6 +89,20 @@ export const GenerateVideoOutputSchema = z.object({
 });
 export type GenerateVideoOutput = z.infer<typeof GenerateVideoOutputSchema>;
 
+export const GenerateMusicInputSchema = z.object({
+  prompt: z.string().describe('The song lyrics or core music prompt.'),
+  altPrompt: z.string().optional().describe('Optional music caption describing style, mood, and instrumentation.'),
+  durationSeconds: z.number().int().min(10).max(240).optional().default(40),
+  numInferenceSteps: z.number().int().min(10).max(200).optional().default(100),
+  sampleSolver: z.string().optional().default('euler'),
+});
+export type GenerateMusicInput = z.infer<typeof GenerateMusicInputSchema>;
+
+export const GenerateMusicOutputSchema = z.object({
+  audioUrl: z.string().url().describe('The URL of the generated music file.'),
+});
+export type GenerateMusicOutput = z.infer<typeof GenerateMusicOutputSchema>;
+
 export const ImproveImagePromptInputSchema = z.object({
   prompt: z.string().describe('The original image prompt to be improved.'),
 });
@@ -97,3 +112,13 @@ export const ImproveImagePromptOutputSchema = z.object({
   improvedPrompt: z.string().describe('The AI-improved version of the image prompt.'),
 });
 export type ImproveImagePromptOutput = z.infer<typeof ImproveImagePromptOutputSchema>;
+
+export const ImproveMusicPromptInputSchema = z.object({
+  prompt: z.string().describe('The original text to improve for music generation.'),
+});
+export type ImproveMusicPromptInput = z.infer<typeof ImproveMusicPromptInputSchema>;
+
+export const ImproveMusicPromptOutputSchema = z.object({
+  improvedPrompt: z.string().describe('The AI-improved music generation prompt.'),
+});
+export type ImproveMusicPromptOutput = z.infer<typeof ImproveMusicPromptOutputSchema>;

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
-import { updateUserExpertise } from "@/lib/actions";
+import { updateUserExpertise } from "@/lib/user-api";
 
 const EXPERTISE_OPTIONS = [
   "General Knowledge",

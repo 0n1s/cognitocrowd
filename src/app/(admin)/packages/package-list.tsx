@@ -46,9 +46,30 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createAdminPackage, updateAdminPackage, deleteAdminPackage } from "@/lib/actions";
+import { createAdminPackage, updateAdminPackage, deleteAdminPackage } from "@/lib/admin-api";
 import { getPackages } from "@/lib/database";
 import { Separator } from "@/components/ui/separator";
+
+function buildAllowedModelTypesFromEntitlements(values: {
+  allowChatNormal: boolean;
+  allowChatUncensored: boolean;
+  allowChatCoding: boolean;
+  allowChatHacking: boolean;
+  allowImageNormal: boolean;
+  allowImageUncensored: boolean;
+  allowVideoGeneration: boolean;
+  allowMusicGeneration: boolean;
+}) {
+  const modelTypes: string[] = [];
+  if (values.allowChatNormal || values.allowChatUncensored || values.allowChatCoding || values.allowChatHacking) modelTypes.push('text');
+  if (values.allowImageNormal || values.allowImageUncensored) modelTypes.push('image');
+  if (values.allowVideoGeneration) modelTypes.push('video');
+  if (values.allowMusicGeneration) modelTypes.push('music');
+  if (values.allowChatUncensored || values.allowImageUncensored) modelTypes.push('uncensored');
+  if (values.allowChatCoding) modelTypes.push('coding');
+  if (values.allowChatHacking) modelTypes.push('hacking');
+  return modelTypes;
+}
 
 type AddPackageDialogProps = {
   open: boolean;
@@ -63,8 +84,22 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
   const [features, setFeatures] = useState<string[]>([""]);
   const [isPrimary, setIsPrimary] = useState(false);
   const [taskLimit, setTaskLimit] = useState("100");
+  const [allowWithdrawals, setAllowWithdrawals] = useState(true);
+  const [withdrawalMinimumAmount, setWithdrawalMinimumAmount] = useState("0");
+  const [withdrawalMaximumAmount, setWithdrawalMaximumAmount] = useState("0");
   const [imageGenerationLimit, setImageGenerationLimit] = useState("0");
   const [imageGenerationLimitType, setImageGenerationLimitType] = useState<'daily' | 'lifetime'>('daily');
+  const [allowChatNormal, setAllowChatNormal] = useState(true);
+  const [allowChatUncensored, setAllowChatUncensored] = useState(false);
+  const [allowChatCoding, setAllowChatCoding] = useState(false);
+  const [allowChatHacking, setAllowChatHacking] = useState(false);
+  const [allowImageNormal, setAllowImageNormal] = useState(true);
+  const [allowImageUncensored, setAllowImageUncensored] = useState(false);
+  const [allowMusicGeneration, setAllowMusicGeneration] = useState(false);
+  const [aiRankedPayoutEnabled, setAiRankedPayoutEnabled] = useState(true);
+  const [musicGenerationLimit, setMusicGenerationLimit] = useState("0");
+  const [musicGenerationLimitType, setMusicGenerationLimitType] = useState<'daily' | 'lifetime'>('daily');
+  const [allowVideoGeneration, setAllowVideoGeneration] = useState(true);
   const [videoGenerationLimit, setVideoGenerationLimit] = useState("0");
   const [videoGenerationLimitType, setVideoGenerationLimitType] = useState<'daily' | 'lifetime'>('daily');
   const [expiryNumber, setExpiryNumber] = useState(1);
@@ -93,8 +128,22 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
     setFeatures([""]);
     setIsPrimary(false);
     setTaskLimit("100");
+    setAllowWithdrawals(true);
+    setWithdrawalMinimumAmount("0");
+    setWithdrawalMaximumAmount("0");
     setImageGenerationLimit("0");
     setImageGenerationLimitType('daily');
+    setAllowChatNormal(true);
+    setAllowChatUncensored(false);
+    setAllowChatCoding(false);
+    setAllowChatHacking(false);
+    setAllowImageNormal(true);
+    setAllowImageUncensored(false);
+    setAllowMusicGeneration(false);
+    setAiRankedPayoutEnabled(true);
+    setMusicGenerationLimit("0");
+    setMusicGenerationLimitType('daily');
+    setAllowVideoGeneration(true);
     setVideoGenerationLimit("0");
     setVideoGenerationLimitType('daily');
     setExpiryNumber(1);
@@ -106,14 +155,40 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    const allowedModelTypes = buildAllowedModelTypesFromEntitlements({
+      allowChatNormal,
+      allowChatUncensored,
+      allowChatCoding,
+      allowChatHacking,
+      allowImageNormal,
+      allowImageUncensored,
+      allowVideoGeneration,
+      allowMusicGeneration,
+    });
     const result = await createAdminPackage({
         name,
         price,
         features: features.filter(f => f.trim() !== ''),
         isPrimary,
         taskLimit: parseInt(taskLimit, 10) || 0,
+        allowWithdrawals,
+        withdrawalMinimumAmount: parseFloat(withdrawalMinimumAmount) || 0,
+        withdrawalMaximumAmount: parseFloat(withdrawalMaximumAmount) || 0,
         imageGenerationLimit: parseInt(imageGenerationLimit, 10) || 0,
         imageGenerationLimitType,
+        allowChatNormal,
+        allowChatUncensored,
+        allowChatCoding,
+        allowChatHacking,
+        allowImageNormal,
+        allowImageUncensored,
+        allowedModelTypes,
+        allowUncensoredImageGeneration: allowImageUncensored,
+        allowMusicGeneration,
+        aiRankedPayoutEnabled,
+        musicGenerationLimit: parseInt(musicGenerationLimit, 10) || 0,
+        musicGenerationLimitType,
+        allowVideoGeneration,
         videoGenerationLimit: parseInt(videoGenerationLimit, 10) || 0,
         videoGenerationLimitType,
         expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
@@ -135,14 +210,14 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="font-headline">Add New Package</DialogTitle>
           <DialogDescription>
             Configure the details for the new subscription package.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto pr-4">
+        <div className="grid gap-4 py-4 max-h-[calc(90vh-10rem)] overflow-y-auto pr-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Name</Label>
             <Input id="name" value={name} onChange={e => setName(e.target.value)} className="col-span-3" placeholder="e.g., Pro" />
@@ -154,6 +229,20 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="taskLimit" className="text-right">Contribution Limit</Label>
             <Input id="taskLimit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="allowWithdrawals" className="text-right">Withdrawals</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="allowWithdrawals" checked={allowWithdrawals} onCheckedChange={checked => setAllowWithdrawals(checked as boolean)} />
+              <Label htmlFor="allowWithdrawals" className="ml-2 font-normal text-sm text-muted-foreground">Allow users on this package to request withdrawals.</Label>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Withdrawal Limit</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+              <Input type="number" min="0" step="0.01" value={withdrawalMinimumAmount} onChange={e => setWithdrawalMinimumAmount(e.target.value)} placeholder="Min (USD)" />
+              <Input type="number" min="0" step="0.01" value={withdrawalMaximumAmount} onChange={e => setWithdrawalMaximumAmount(e.target.value)} placeholder="Max (USD, 0 = none)" />
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="imageGenerationLimit" className="text-right">Image Gen. Limit</Label>
@@ -168,6 +257,76 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
                         <SelectItem value="lifetime">Per Package</SelectItem>
                     </SelectContent>
                 </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Chat Models</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2 rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatNormal" checked={allowChatNormal} onCheckedChange={(checked) => setAllowChatNormal(Boolean(checked))} />
+                <Label htmlFor="allowChatNormal" className="text-sm font-normal">Normal</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatUncensored" checked={allowChatUncensored} onCheckedChange={(checked) => setAllowChatUncensored(Boolean(checked))} />
+                <Label htmlFor="allowChatUncensored" className="text-sm font-normal">Uncensored</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatCoding" checked={allowChatCoding} onCheckedChange={(checked) => setAllowChatCoding(Boolean(checked))} />
+                <Label htmlFor="allowChatCoding" className="text-sm font-normal">Coding</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatHacking" checked={allowChatHacking} onCheckedChange={(checked) => setAllowChatHacking(Boolean(checked))} />
+                <Label htmlFor="allowChatHacking" className="text-sm font-normal">Hacking</Label>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Image Models</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2 rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowImageNormal" checked={allowImageNormal} onCheckedChange={(checked) => setAllowImageNormal(Boolean(checked))} />
+                <Label htmlFor="allowImageNormal" className="text-sm font-normal">Normal</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowImageUncensored" checked={allowImageUncensored} onCheckedChange={(checked) => setAllowImageUncensored(Boolean(checked))} />
+                <Label htmlFor="allowImageUncensored" className="text-sm font-normal">Uncensored</Label>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="allowMusicGeneration" className="text-right">Music Generation</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="allowMusicGeneration" checked={allowMusicGeneration} onCheckedChange={(checked) => setAllowMusicGeneration(Boolean(checked))} />
+              <Label htmlFor="allowMusicGeneration" className="ml-2 font-normal text-sm text-muted-foreground">Enabled</Label>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="aiRankedPayoutEnabled" className="text-right">AI Ranked Payout</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="aiRankedPayoutEnabled" checked={aiRankedPayoutEnabled} onCheckedChange={(checked) => setAiRankedPayoutEnabled(Boolean(checked))} />
+              <Label htmlFor="aiRankedPayoutEnabled" className="ml-2 font-normal text-sm text-muted-foreground">Use AI score % to award points (when mode is per package)</Label>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="musicGenerationLimit" className="text-right">Music Gen. Limit</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="musicGenerationLimit" type="number" value={musicGenerationLimit} onChange={e => setMusicGenerationLimit(e.target.value)} placeholder="e.g., 5" />
+                <Select value={musicGenerationLimitType} onValueChange={(v) => setMusicGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="allowVideoGeneration" className="text-right">Video Generation</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="allowVideoGeneration" checked={allowVideoGeneration} onCheckedChange={(checked) => setAllowVideoGeneration(Boolean(checked))} />
+              <Label htmlFor="allowVideoGeneration" className="ml-2 font-normal text-sm text-muted-foreground">Enabled</Label>
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -283,8 +442,23 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
     const [features, setFeatures] = useState(pkg.features.length > 0 ? pkg.features : [""]);
     const [isPrimary, setIsPrimary] = useState(pkg.isPrimary || false);
     const [taskLimit, setTaskLimit] = useState(String(pkg.taskLimit || 100));
+    const [allowWithdrawals, setAllowWithdrawals] = useState(pkg.allowWithdrawals !== false);
+    const [withdrawalMinimumAmount, setWithdrawalMinimumAmount] = useState(String(pkg.withdrawalMinimumAmount || 0));
+    const [withdrawalMaximumAmount, setWithdrawalMaximumAmount] = useState(String(pkg.withdrawalMaximumAmount || 0));
     const [imageGenerationLimit, setImageGenerationLimit] = useState(String(pkg.imageGenerationLimit || 0));
     const [imageGenerationLimitType, setImageGenerationLimitType] = useState<'daily' | 'lifetime'>(pkg.imageGenerationLimitType || 'daily');
+    const legacyTypes = pkg.allowedModelTypes || [];
+    const [allowChatNormal, setAllowChatNormal] = useState(pkg.allowChatNormal ?? legacyTypes.includes('text'));
+    const [allowChatUncensored, setAllowChatUncensored] = useState(pkg.allowChatUncensored ?? legacyTypes.includes('uncensored'));
+    const [allowChatCoding, setAllowChatCoding] = useState(pkg.allowChatCoding ?? legacyTypes.includes('coding'));
+    const [allowChatHacking, setAllowChatHacking] = useState(pkg.allowChatHacking ?? legacyTypes.includes('hacking'));
+    const [allowImageNormal, setAllowImageNormal] = useState(pkg.allowImageNormal ?? legacyTypes.includes('image'));
+    const [allowImageUncensored, setAllowImageUncensored] = useState(pkg.allowImageUncensored ?? pkg.allowUncensoredImageGeneration ?? legacyTypes.includes('uncensored'));
+    const [allowMusicGeneration, setAllowMusicGeneration] = useState(pkg.allowMusicGeneration || false);
+    const [aiRankedPayoutEnabled, setAiRankedPayoutEnabled] = useState(pkg.aiRankedPayoutEnabled ?? true);
+    const [musicGenerationLimit, setMusicGenerationLimit] = useState(String(pkg.musicGenerationLimit || 0));
+    const [musicGenerationLimitType, setMusicGenerationLimitType] = useState<'daily' | 'lifetime'>(pkg.musicGenerationLimitType || 'daily');
+    const [allowVideoGeneration, setAllowVideoGeneration] = useState(pkg.allowVideoGeneration ?? true);
     const [videoGenerationLimit, setVideoGenerationLimit] = useState(String(pkg.videoGenerationLimit || 0));
     const [videoGenerationLimitType, setVideoGenerationLimitType] = useState<'daily' | 'lifetime'>(pkg.videoGenerationLimitType || 'daily');
     
@@ -315,14 +489,40 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
   
     const handleSubmit = async () => {
         setIsSubmitting(true);
+      const allowedModelTypes = buildAllowedModelTypesFromEntitlements({
+        allowChatNormal,
+        allowChatUncensored,
+        allowChatCoding,
+        allowChatHacking,
+        allowImageNormal,
+        allowImageUncensored,
+        allowVideoGeneration,
+        allowMusicGeneration,
+      });
         const result = await updateAdminPackage(pkg.id, {
             name,
             price,
             features: features.filter(f => f.trim() !== ''),
             isPrimary,
             taskLimit: parseInt(taskLimit, 10) || 0,
+            allowWithdrawals,
+            withdrawalMinimumAmount: parseFloat(withdrawalMinimumAmount) || 0,
+            withdrawalMaximumAmount: parseFloat(withdrawalMaximumAmount) || 0,
             imageGenerationLimit: parseInt(imageGenerationLimit, 10) || 0,
             imageGenerationLimitType,
+            allowChatNormal,
+            allowChatUncensored,
+            allowChatCoding,
+            allowChatHacking,
+            allowImageNormal,
+            allowImageUncensored,
+            allowedModelTypes,
+            allowUncensoredImageGeneration: allowImageUncensored,
+            allowMusicGeneration,
+            aiRankedPayoutEnabled,
+            musicGenerationLimit: parseInt(musicGenerationLimit, 10) || 0,
+            musicGenerationLimitType,
+            allowVideoGeneration,
             videoGenerationLimit: parseInt(videoGenerationLimit, 10) || 0,
             videoGenerationLimitType,
             expiryPeriod: `${expiryNumber} ${expiryNumber === 1 ? expiryUnit.slice(0,-1) : expiryUnit}`,
@@ -343,14 +543,14 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="font-headline">Edit Package</DialogTitle>
           <DialogDescription>
             Update the details for the subscription package.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto pr-4">
+        <div className="grid gap-4 py-4 max-h-[calc(90vh-10rem)] overflow-y-auto pr-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name-edit" className="text-right">Name</Label>
             <Input id="name-edit" value={name} onChange={e => setName(e.target.value)} className="col-span-3" placeholder="e.g., Pro" />
@@ -362,6 +562,20 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="taskLimit-edit" className="text-right">Contribution Limit</Label>
             <Input id="taskLimit-edit" type="number" value={taskLimit} onChange={e => setTaskLimit(e.target.value)} className="col-span-3" placeholder="e.g., 100" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="allowWithdrawals-edit" className="text-right">Withdrawals</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="allowWithdrawals-edit" checked={allowWithdrawals} onCheckedChange={checked => setAllowWithdrawals(checked as boolean)} />
+              <Label htmlFor="allowWithdrawals-edit" className="ml-2 font-normal text-sm text-muted-foreground">Allow users on this package to request withdrawals.</Label>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Withdrawal Limit</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+              <Input type="number" min="0" step="0.01" value={withdrawalMinimumAmount} onChange={e => setWithdrawalMinimumAmount(e.target.value)} placeholder="Min (USD)" />
+              <Input type="number" min="0" step="0.01" value={withdrawalMaximumAmount} onChange={e => setWithdrawalMaximumAmount(e.target.value)} placeholder="Max (USD, 0 = none)" />
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="imageGenerationLimit-edit" className="text-right">Image Gen. Limit</Label>
@@ -376,6 +590,76 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
                         <SelectItem value="lifetime">Per Package</SelectItem>
                     </SelectContent>
                 </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Chat Models</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2 rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatNormal-edit" checked={allowChatNormal} onCheckedChange={(checked) => setAllowChatNormal(Boolean(checked))} />
+                <Label htmlFor="allowChatNormal-edit" className="text-sm font-normal">Normal</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatUncensored-edit" checked={allowChatUncensored} onCheckedChange={(checked) => setAllowChatUncensored(Boolean(checked))} />
+                <Label htmlFor="allowChatUncensored-edit" className="text-sm font-normal">Uncensored</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatCoding-edit" checked={allowChatCoding} onCheckedChange={(checked) => setAllowChatCoding(Boolean(checked))} />
+                <Label htmlFor="allowChatCoding-edit" className="text-sm font-normal">Coding</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowChatHacking-edit" checked={allowChatHacking} onCheckedChange={(checked) => setAllowChatHacking(Boolean(checked))} />
+                <Label htmlFor="allowChatHacking-edit" className="text-sm font-normal">Hacking</Label>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Image Models</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2 rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowImageNormal-edit" checked={allowImageNormal} onCheckedChange={(checked) => setAllowImageNormal(Boolean(checked))} />
+                <Label htmlFor="allowImageNormal-edit" className="text-sm font-normal">Normal</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="allowImageUncensored-edit" checked={allowImageUncensored} onCheckedChange={(checked) => setAllowImageUncensored(Boolean(checked))} />
+                <Label htmlFor="allowImageUncensored-edit" className="text-sm font-normal">Uncensored</Label>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="allowMusicGeneration-edit" className="text-right">Music Generation</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="allowMusicGeneration-edit" checked={allowMusicGeneration} onCheckedChange={(checked) => setAllowMusicGeneration(Boolean(checked))} />
+              <Label htmlFor="allowMusicGeneration-edit" className="ml-2 font-normal text-sm text-muted-foreground">Enabled</Label>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="aiRankedPayoutEnabled-edit" className="text-right">AI Ranked Payout</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="aiRankedPayoutEnabled-edit" checked={aiRankedPayoutEnabled} onCheckedChange={(checked) => setAiRankedPayoutEnabled(Boolean(checked))} />
+              <Label htmlFor="aiRankedPayoutEnabled-edit" className="ml-2 font-normal text-sm text-muted-foreground">Use AI score % to award points (when mode is per package)</Label>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="musicGenerationLimit-edit" className="text-right">Music Gen. Limit</Label>
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+                <Input id="musicGenerationLimit-edit" type="number" value={musicGenerationLimit} onChange={e => setMusicGenerationLimit(e.target.value)} placeholder="e.g., 5" />
+                <Select value={musicGenerationLimitType} onValueChange={(v) => setMusicGenerationLimitType(v as any)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="daily">Per Day</SelectItem>
+                        <SelectItem value="lifetime">Per Package</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="allowVideoGeneration-edit" className="text-right">Video Generation</Label>
+            <div className="col-span-3 flex items-center">
+              <Checkbox id="allowVideoGeneration-edit" checked={allowVideoGeneration} onCheckedChange={(checked) => setAllowVideoGeneration(Boolean(checked))} />
+              <Label htmlFor="allowVideoGeneration-edit" className="ml-2 font-normal text-sm text-muted-foreground">Enabled</Label>
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -530,7 +814,10 @@ const LoadingSkeleton = () => (
               <TableHead>Price</TableHead>
               <TableHead>Task Limit</TableHead>
               <TableHead>Image Limit</TableHead>
+              <TableHead>Music Limit</TableHead>
               <TableHead>Video Limit</TableHead>
+              <TableHead>Withdrawals</TableHead>
+              <TableHead>Withdrawal Limit</TableHead>
               <TableHead>Expiry</TableHead>
               <TableHead>Primary</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -544,6 +831,9 @@ const LoadingSkeleton = () => (
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
@@ -602,7 +892,10 @@ export function PackageList() {
                     <TableHead>Price</TableHead>
                     <TableHead>Task Limit</TableHead>
                     <TableHead>Image Limit</TableHead>
+                    <TableHead>Music Limit</TableHead>
                     <TableHead>Video Limit</TableHead>
+                    <TableHead>Withdrawals</TableHead>
+                    <TableHead>Withdrawal Limit</TableHead>
                     <TableHead>Expiry</TableHead>
                     <TableHead>Primary</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -615,7 +908,10 @@ export function PackageList() {
                             <TableCell>{pkg.price}</TableCell>
                             <TableCell>{pkg.taskLimit}</TableCell>
                             <TableCell>{formatLimit(pkg.imageGenerationLimit, pkg.imageGenerationLimitType)}</TableCell>
+                            <TableCell>{formatLimit(pkg.musicGenerationLimit, pkg.musicGenerationLimitType)}</TableCell>
                             <TableCell>{formatLimit(pkg.videoGenerationLimit, pkg.videoGenerationLimitType)}</TableCell>
+                            <TableCell>{pkg.allowWithdrawals === false ? 'Disabled' : 'Enabled'}</TableCell>
+                            <TableCell>{(pkg.withdrawalMinimumAmount ?? 0) > 0 || (pkg.withdrawalMaximumAmount ?? 0) > 0 ? `$${(pkg.withdrawalMinimumAmount ?? 0).toFixed(2)} - ${pkg.withdrawalMaximumAmount && pkg.withdrawalMaximumAmount > 0 ? `$${pkg.withdrawalMaximumAmount.toFixed(2)}` : 'No Max'}` : 'N/A'}</TableCell>
                             <TableCell>{pkg.expiryPeriod}</TableCell>
                             <TableCell>
                             {pkg.isPrimary && <Badge variant="secondary">Yes</Badge>}

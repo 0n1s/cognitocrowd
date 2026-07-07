@@ -45,7 +45,14 @@ export default function AuthLayout({
     if (!user) return;
 
     const checkOnboarding = async () => {
-      const userData = await getUserData(user.uid);
+      let userData = await getUserData(user.uid);
+      // Auth becomes ready before the signup API has persisted the profile.
+      // Waiting here prevents /dashboard from creating a referral-less fallback profile.
+      for (let attempt = 0; !userData && attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        userData = await getUserData(user.uid);
+      }
+      if (!userData) return;
       if (userData?.onboardingStatus === 'pending') {
         router.push('/onboarding/welcome');
       } else {

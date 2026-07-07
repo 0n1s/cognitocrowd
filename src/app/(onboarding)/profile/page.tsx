@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { COUNTRIES } from "@/lib/countries";
-import { updateUserOnboardingProfile } from "@/lib/actions";
+import { updateUserOnboardingProfile } from "@/lib/user-api";
 
 export default function OnboardingProfilePage() {
     const { user } = useAuth();

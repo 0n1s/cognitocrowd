@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck, Sparkles, X, Music2, WandSparkles } from 'lucide-react';
 import NextImage from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getEnabledExpertiseAreas, getPackages, getAppSettings } from '@/lib/database';
 import { Package } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { getAiWorkspaceFeatures } from '@/lib/package-workspace';
+import { LandingAuthButtons } from '@/components/landing-auth-buttons';
 
 
 const LandingHeader = () => (
@@ -26,12 +28,7 @@ const LandingHeader = () => (
       </nav>
       <div className="flex flex-1 items-center justify-end space-x-2">
         <ThemeToggle />
-        <Button variant="ghost" asChild>
-          <Link href="/login">Log In</Link>
-        </Button>
-        <Button asChild>
-          <Link href="/signup">Sign Up</Link>
-        </Button>
+        <LandingAuthButtons />
       </div>
     </div>
   </header>
@@ -51,7 +48,14 @@ const LandingFooter = () => (
 
 const featureIcons = [PencilRuler, Code, Shield, Bot];
 const whyUsIcons = [TrendingUp, Award, Clock, ShieldCheck];
-const aiToolIcons = [MessageCircle, ImageIcon, Video];
+
+function parsePackagePrice(priceText: string): number {
+  const normalized = (priceText || '').trim().toLowerCase();
+  if (!normalized || normalized === 'free') return 0;
+  const match = normalized.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  const numeric = match ? Number(match[0]) : Number.NaN;
+  return Number.isFinite(numeric) ? numeric : Number.POSITIVE_INFINITY;
+}
 
 const ALL_EXPERTISE_AREAS = [
   "General Knowledge",
@@ -81,6 +85,35 @@ export default async function Home() {
   const settings = await getAppSettings();
   const enabledExpertise = await getEnabledExpertiseAreas();
   const packages = await getPackages();
+  const sortedPackages = [...packages].sort((a, b) => {
+    const priceDifference = parsePackagePrice(a.price) - parsePackagePrice(b.price);
+    return priceDifference || a.name.localeCompare(b.name);
+  });
+  const packageWorkspaceFeatures = packages.flatMap(getAiWorkspaceFeatures);
+  const workspaceFeatureIsAvailable = (labelPrefix: string) =>
+    packageWorkspaceFeatures.some((feature) => feature.enabled && feature.label.startsWith(labelPrefix));
+  const workspaceFeatureMeta = [
+    {
+      icon: MessageCircle,
+      available: workspaceFeatureIsAvailable('AI Chat'),
+    },
+    {
+      icon: ImageIcon,
+      available: workspaceFeatureIsAvailable('Image Generation'),
+    },
+    {
+      icon: Video,
+      available: workspaceFeatureIsAvailable('Video Generation'),
+    },
+    {
+      icon: Music2,
+      available: workspaceFeatureIsAvailable('Music Generation'),
+    },
+    {
+      icon: WandSparkles,
+      available: workspaceFeatureIsAvailable('Music Lyrics & Caption AI Assist'),
+    },
+  ];
 
   const { landingPageContent } = settings;
   
@@ -92,7 +125,7 @@ export default async function Home() {
     heroTitle, heroSubtitle, heroCtaButton,
     platformTitle, platformSubtitle, featureItems,
     whyUsTitle, whyUsSubtitle, whyUsItems,
-    toolsTitle, toolsSubtitle, toolsItems,
+    workspaceTitle, workspaceSubtitle, workspaceItems,
     processTitle, processSubtitle, processSteps,
     pricingTitle, pricingSubtitle,
     testimonialsTitle, testimonialsSubtitle, testimonials,
@@ -187,26 +220,40 @@ export default async function Home() {
         {/* AI Tools Section */}
         <section id="tools" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
           <div className="container">
-            <div className="text-center max-w-2xl mx-auto mb-12">
-                <h2 className="font-headline text-4xl font-bold">{toolsTitle}</h2>
-                <p className="text-muted-foreground mt-4 text-lg">{toolsSubtitle}</p>
+            <div className="text-center max-w-2xl mx-auto mb-10">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <h2 className="font-headline text-3xl font-bold">{workspaceTitle}</h2>
+              <p className="mt-3 text-muted-foreground">
+                {workspaceSubtitle}
+              </p>
             </div>
-            <div className="grid gap-8 md:grid-cols-3">
-              {toolsItems.map((item, index) => {
-                const Icon = aiToolIcons[index] || MessageCircle;
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {workspaceItems.map((feature, index) => {
+                const meta = workspaceFeatureMeta[index] || workspaceFeatureMeta[0];
+                const Icon = meta.icon;
                 return (
-                  <Card key={item.title} className="bg-card/50 border-border/30 backdrop-blur-sm">
-                    <CardHeader className="items-center text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4 border border-primary/20">
-                          <Icon className="h-6 w-6 text-primary" />
+                  <Card key={feature.title} className="border-border/40 bg-background/70 transition-transform hover:-translate-y-1 hover:shadow-md">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <span className={cn(
+                          'rounded-full px-2.5 py-1 text-xs font-medium',
+                          meta.available ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-muted text-muted-foreground'
+                        )}>
+                          {meta.available ? 'Available on select plans' : 'Coming soon'}
+                        </span>
                       </div>
-                      <CardTitle>{item.title}</CardTitle>
+                      <CardTitle className="pt-2 text-lg">{feature.title}</CardTitle>
                     </CardHeader>
-                    <CardContent className="text-center">
-                      <p className="text-muted-foreground">{item.description}</p>
+                    <CardContent>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
                     </CardContent>
                   </Card>
-                )
+                );
               })}
             </div>
           </div>
@@ -258,9 +305,11 @@ export default async function Home() {
               <p className="text-muted-foreground mt-4 text-lg">{pricingSubtitle}</p>
             </div>
             {packages.length > 0 ? (
-              <div className="grid gap-8 md:grid-cols-3 items-start max-w-5xl mx-auto">
-                {packages.sort((a, b) => a.price.localeCompare(b.price)).map((pkg) => (
-                  <Card key={pkg.id} className={cn("flex flex-col", pkg.isPrimary && "border-2 border-primary shadow-lg shadow-primary/20")}>
+              <div className="grid gap-8 md:grid-cols-3 items-stretch max-w-5xl mx-auto">
+                {sortedPackages.map((pkg) => {
+                  const workspaceFeatures = getAiWorkspaceFeatures(pkg);
+                  return (
+                  <Card key={pkg.id} className={cn("flex h-full flex-col", pkg.isPrimary && "border-2 border-primary shadow-lg shadow-primary/20")}>
                     <CardHeader className="items-center text-center">
                       <CardTitle className="text-2xl font-headline">{pkg.name}</CardTitle>
                       <div className="text-4xl font-bold">
@@ -275,15 +324,40 @@ export default async function Home() {
                       </div>
                     </CardHeader>
                     <CardContent className="flex-grow">
+                      <p className="mb-3 text-sm font-semibold">Package features</p>
                       <ul className="space-y-3">
                         <li className="flex items-center gap-3">
                           <Check className="h-5 w-5 text-green-500" />
                           <span className="text-muted-foreground">{`${pkg.taskLimit} tasks / ${pkg.expiryPeriod.replace('1 ', '')}`}</span>
                         </li>
-                        {pkg.features.map((feature, i) => (
+                        {(pkg.features || []).map((feature, i) => (
                           <li key={i} className="flex items-center gap-3">
                             <Check className="h-5 w-5 text-green-500" />
                             <span className="text-muted-foreground">{feature}</span>
+                          </li>
+                        ))}
+                        {(pkg.features || []).length === 0 && (
+                          <li className="text-sm text-muted-foreground">No additional features listed.</li>
+                        )}
+                      </ul>
+                      <div className="my-5 border-t" />
+                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        AI Workspace
+                      </div>
+                      <ul className="space-y-2.5">
+                        {workspaceFeatures.map((feature) => (
+                          <li key={feature.label} className="flex items-start gap-2 text-sm">
+                            {feature.enabled ? (
+                              <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                            ) : (
+                              <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/50" />
+                            )}
+                            <span className={cn(
+                              feature.enabled ? 'text-muted-foreground' : 'text-muted-foreground/60 line-through'
+                            )}>
+                              {feature.label}
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -294,7 +368,8 @@ export default async function Home() {
                       </Button>
                     </CardFooter>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-center text-muted-foreground">Pricing plans will be available soon.</p>

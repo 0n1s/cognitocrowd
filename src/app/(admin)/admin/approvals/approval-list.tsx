@@ -22,7 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPendingApprovals } from "@/lib/database";
-import { updateUserApprovalStatus, bulkUpdateUserApprovalStatus } from "@/lib/actions";
+import { updateUserApprovalStatus, bulkUpdateUserApprovalStatus } from "@/lib/admin-api";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 

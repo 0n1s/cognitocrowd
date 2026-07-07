@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Wand2, Upload, Clipboard, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateAppSettings, updateLandingPageImage, generateLandingImage as generateImageAction, improveLandingPageText, improveImagePrompt } from "@/lib/actions";
+import { updateLandingPageImage, generateLandingImage as generateImageAction, improveLandingPageText, improveImagePrompt } from "@/lib/actions";
+import { updateAppSettings } from "@/lib/admin-api";
 import { getAppSettings } from "@/lib/database";
 import { Separator } from "@/components/ui/separator";
 
@@ -529,6 +530,46 @@ export function LandingPageForm() {
                                         value={item.description}
                                         onChange={value => handleContentChange(`landingPageContent.whyUsItems.${index}.description`, value)}
                                         context="'Why Us' item description"
+                                        isTextarea
+                                    />
+                                </div>
+                            ))}
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="workspace">
+                        <AccordionTrigger className="text-lg font-semibold">AI Workspace Section</AccordionTrigger>
+                        <AccordionContent className="space-y-6 pt-4">
+                            <TextInputWithAI
+                                id="workspaceTitle"
+                                label="Title"
+                                value={content.workspaceTitle}
+                                onChange={value => handleContentChange('landingPageContent.workspaceTitle', value)}
+                                context="AI Workspace section title"
+                            />
+                            <TextInputWithAI
+                                id="workspaceSubtitle"
+                                label="Subtitle"
+                                value={content.workspaceSubtitle}
+                                onChange={value => handleContentChange('landingPageContent.workspaceSubtitle', value)}
+                                context="AI Workspace section subtitle"
+                                isTextarea
+                            />
+                            {content.workspaceItems.map((item, index) => (
+                                <div key={index} className="p-4 border rounded-lg space-y-4">
+                                    <TextInputWithAI
+                                        id={`workspace-${index}-title`}
+                                        label={`Workspace Feature ${index + 1} Title`}
+                                        value={item.title}
+                                        onChange={value => handleContentChange(`landingPageContent.workspaceItems.${index}.title`, value)}
+                                        context="AI Workspace feature title"
+                                    />
+                                    <TextInputWithAI
+                                        id={`workspace-${index}-description`}
+                                        label={`Workspace Feature ${index + 1} Description`}
+                                        value={item.description}
+                                        onChange={value => handleContentChange(`landingPageContent.workspaceItems.${index}.description`, value)}
+                                        context="AI Workspace feature explanation"
                                         isTextarea
                                     />
                                 </div>

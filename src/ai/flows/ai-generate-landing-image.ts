@@ -5,6 +5,9 @@
 
 import {ai} from '@/ai/genkit';
 import { GenerateLandingImageInputSchema, GenerateLandingImageOutputSchema, type GenerateLandingImageInput, type GenerateLandingImageOutput } from '@/ai/schemas';
+import { getAppSettings } from '@/lib/database';
+import { resolveConfiguredModel, validateModelAvailability } from '@/ai/model-resolver';
+import { generateOpenAiCompatibleImage } from '@/ai/openai-image';
 
 export async function generateLandingImage(input: GenerateLandingImageInput): Promise<GenerateLandingImageOutput> {
   return generateLandingImageFlow(input);
@@ -17,18 +20,19 @@ const generateLandingImageFlow = ai.defineFlow(
     outputSchema: GenerateLandingImageOutputSchema,
   },
   async (input) => {
-    const { media } = await ai.generate({
-      model: 'googleai/gemini-2.0-flash-preview-image-generation',
-      prompt: input.prompt,
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'],
-      },
-    });
+    const settings = await getAppSettings();
+    const configuredModel = resolveConfiguredModel(settings.defaultImageGenAiModel, 'image');
+    const model = validateModelAvailability(configuredModel, 'image', settings.aiProviders, false);
 
-    if (!media) {
-      throw new Error('Image generation failed. No media was returned.');
+    if (!model) {
+      throw new Error('Selected image model is unavailable for current provider configuration.');
     }
 
-    return { imageDataUri: media.url };
+    const imageDataUri = await generateOpenAiCompatibleImage({
+      model,
+      prompt: input.prompt,
+      providers: settings.aiProviders,
+    });
+    return { imageDataUri };
   }
 );

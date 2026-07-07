@@ -2,7 +2,7 @@
 
 "use client";
 
-import { Task, TaskSettings } from "@/lib/types";
+import { Task, TaskOption, TaskSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -14,7 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
-import { submitTaskResponse } from "@/lib/actions";
+import { auth } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 
 const AdditionalFeedback = ({ settings }: { settings?: TaskSettings }) => {
@@ -47,6 +47,13 @@ const AdditionalFeedback = ({ settings }: { settings?: TaskSettings }) => {
     );
 };
 
+function getOptionText(option: TaskOption): string {
+  if (typeof option === 'string') return option;
+  if ('text' in option && typeof option.text === 'string') return option.text;
+  if ('label' in option && typeof option.label === 'string') return option.label;
+  return '';
+}
+
 
 export function TaskForms({ task }: { task: Task }) {
   const { toast } = useToast();
@@ -54,7 +61,7 @@ export function TaskForms({ task }: { task: Task }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
   
-  const initialRanking = task.type === 'ranking' ? task.options?.map(opt => typeof opt === 'string' ? opt : '') ?? [] : [];
+  const initialRanking = task.type === 'ranking' ? task.options?.map(getOptionText).filter(Boolean) ?? [] : [];
   const [rankedItems, setRankedItems] = useState(initialRanking);
 
   const dragItem = useRef<number | null>(null);
@@ -97,6 +104,36 @@ export function TaskForms({ task }: { task: Task }) {
     e.preventDefault();
   };
 
+  const buildResponseData = (taskType: Task["type"], formData: FormData) => {
+    const responseData: Record<string, unknown> = {};
+
+    if (taskType === "ranking") {
+      formData.forEach((value, key) => {
+        if (key !== "ranking") responseData[key] = value;
+      });
+      responseData.ranking = formData.getAll("ranking");
+      return responseData;
+    }
+
+    if (taskType === "label_multiple") {
+      const labels: string[] = [];
+      formData.forEach((value, key) => {
+        if (key.startsWith("label-")) {
+          if (value === "on") labels.push(key.replace("label-", ""));
+        } else {
+          responseData[key] = value;
+        }
+      });
+      responseData.labels = labels;
+      return responseData;
+    }
+
+    formData.forEach((value, key) => {
+      responseData[key] = value;
+    });
+    return responseData;
+  };
+
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -116,12 +153,60 @@ export function TaskForms({ task }: { task: Task }) {
         });
     }
     
-    const result = await submitTaskResponse(task.id, task.points, formData, user.uid, task.type);
+    if (!auth?.currentUser) {
+      toast({
+        title: "Authentication Error",
+        description: "Session expired. Please log in again.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    const responseData = buildResponseData(task.type, formData);
+
+    let result: {
+      success: boolean;
+      message?: string;
+      nextTaskId?: string | null;
+      earnings?: number;
+      pointsEarned?: number;
+      maxPoints?: number;
+      scorePercent?: number;
+    };
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const response = await fetch('/api/tasks/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          taskId: task.id,
+          taskType: task.type,
+          responseData,
+        }),
+      });
+
+      result = await response.json();
+      if (!response.ok && result.success !== false) {
+        result = { success: false, message: 'Failed to submit contribution.' };
+      }
+    } catch {
+      result = { success: false, message: 'Network error while submitting contribution.' };
+    }
 
     if (result.success) {
+      const scorePercent = typeof result.scorePercent === 'number' ? result.scorePercent : 100;
+      const amountEarned = typeof result.earnings === 'number'
+        ? result.earnings
+        : typeof result.pointsEarned === 'number'
+        ? result.pointsEarned / 100
+        : task.points / 100;
         toast({
             title: "Contribution Submitted!",
-            description: `You've earned ${task.points} points. Loading next contribution...`,
+        description: `Accuracy: ${scorePercent}%. Amount earned: $${amountEarned.toFixed(2)}. Loading next contribution...`,
         });
 
         // Redirect to the next available task, or back to the list if none are left.
@@ -181,12 +266,14 @@ export function TaskForms({ task }: { task: Task }) {
       case "topic_classification":
         formContent = (
           <RadioGroup name="classification" required>
-            {task.options?.map((option, index) => (
+            {task.options?.map((option, index) => {
+              const optionText = getOptionText(option);
+              return (
               <div key={index} className="flex items-center space-x-2">
-                <RadioGroupItem value={option as string} id={`option-${index}`} />
-                <Label htmlFor={`option-${index}`}>{option as string}</Label>
+                <RadioGroupItem value={optionText} id={`option-${index}`} />
+                <Label htmlFor={`option-${index}`}>{optionText}</Label>
               </div>
-            ))}
+            )})}
           </RadioGroup>
         );
         break;
@@ -197,7 +284,7 @@ export function TaskForms({ task }: { task: Task }) {
             <div className="space-y-2">
                 {rankedItems.map((option, index) => (
                     <div
-                        key={option as string}
+                    key={option}
                         className="flex items-center p-3 border rounded-md bg-muted cursor-grab transition-colors active:cursor-grabbing"
                         draggable
                         onDragStart={(e) => handleDragStart(e, index)}
@@ -207,47 +294,55 @@ export function TaskForms({ task }: { task: Task }) {
                         onDrop={handleDrop}
                       >
                         <span className="font-bold mr-4 text-muted-foreground">{index + 1}</span>
-                        <span>{option as string}</span>
+                        <span>{option}</span>
                     </div>
                 ))}
             </div>
           </>
         );
         break;
-      case "likert_scale":
-        if (!task.scale) return <p>Task configuration error.</p>;
-        const scaleOptions = Array.from({ length: task.scale.max - task.scale.min + 1 }, (_, i) => task.scale.min + i);
+        case "likert_scale": {
+          const scale = task.scale ?? {
+            min: 1,
+            max: 5,
+            labels: [
+              { value: 1, label: 'Low' },
+              { value: 5, label: 'High' },
+            ],
+          };
+        const scaleOptions = Array.from({ length: scale.max - scale.min + 1 }, (_, i) => scale.min + i);
         
         let minLabel: string;
         let maxLabel: string;
 
-        if (Array.isArray(task.scale.labels)) {
-            minLabel = task.scale.labels.find(l => l.value === task.scale.min)?.label || task.scale.min.toString();
-            maxLabel = task.scale.labels.find(l => l.value === task.scale.max)?.label || task.scale.max.toString();
+        if (Array.isArray(scale.labels)) {
+          minLabel = scale.labels.find(l => l.value === scale.min)?.label || scale.min.toString();
+          maxLabel = scale.labels.find(l => l.value === scale.max)?.label || scale.max.toString();
         } else {
-            // Handle old object format for backward compatibility
-            const labelsObject = task.scale.labels as unknown as Record<string, string>;
-            minLabel = labelsObject?.[task.scale.min] || task.scale.min.toString();
-            maxLabel = labelsObject?.[task.scale.max] || task.scale.max.toString();
+          // Handle old object format for backward compatibility
+          const labelsObject = scale.labels as unknown as Record<string, string>;
+          minLabel = labelsObject?.[scale.min] || scale.min.toString();
+          maxLabel = labelsObject?.[scale.max] || scale.max.toString();
         }
 
         formContent = (
-            <>
-                <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
-                    <span>{minLabel}</span>
-                    <span>{maxLabel}</span>
+          <>
+            <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
+              <span>{minLabel}</span>
+              <span>{maxLabel}</span>
+            </div>
+            <RadioGroup name="likert" required className="flex justify-between items-center bg-muted p-2 rounded-lg">
+              {scaleOptions.map(value => (
+                <div key={value} className="flex flex-col items-center space-y-1">
+                   <Label htmlFor={`scale-${value}`} className="text-xs">{value}</Label>
+                  <RadioGroupItem value={value.toString()} id={`scale-${value}`} />
                 </div>
-                <RadioGroup name="likert" required className="flex justify-between items-center bg-muted p-2 rounded-lg">
-                    {scaleOptions.map(value => (
-                        <div key={value} className="flex flex-col items-center space-y-1">
-                             <Label htmlFor={`scale-${value}`} className="text-xs">{value}</Label>
-                            <RadioGroupItem value={value.toString()} id={`scale-${value}`} />
-                        </div>
-                    ))}
-                </RadioGroup>
-            </>
+              ))}
+            </RadioGroup>
+          </>
         );
         break;
+        }
       case "compare_pairwise":
         formContent = (
           <RadioGroup name="comparison" required className="space-y-4">
@@ -269,12 +364,14 @@ export function TaskForms({ task }: { task: Task }) {
        case "label_multiple":
         formContent = (
           <div className="space-y-2">
-            {task.options?.map((option, index) => (
+            {task.options?.map((option, index) => {
+              const optionText = getOptionText(option);
+              return (
               <div key={index} className="flex items-center space-x-2">
-                <Checkbox name={`label-${option as string}`} id={`option-${index}`} />
-                <Label htmlFor={`option-${index}`}>{option as string}</Label>
+                <Checkbox name={`label-${optionText}`} id={`option-${index}`} />
+                <Label htmlFor={`option-${index}`}>{optionText}</Label>
               </div>
-            ))}
+            )})}
           </div>
         );
         break;
