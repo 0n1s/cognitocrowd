@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 
 const FREE_TIER_DAILY_LIMIT = 50;
 
@@ -25,6 +26,8 @@ function toDate(value: unknown): Date {
 }
 
 function TaskGrid({ tasks, hasFilters }: { tasks: Task[]; hasFilters: boolean }) {
+  const { formatAmount } = useDisplayCurrency();
+
   if (tasks.length === 0) {
     return (
       <Card className="mt-8">
@@ -71,7 +74,7 @@ function TaskGrid({ tasks, hasFilters }: { tasks: Task[]; hasFilters: boolean })
 
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Reward</span>
-              <span className="font-semibold text-primary">${(task.points / 100).toFixed(2)}</span>
+              <span className="font-semibold text-primary">{formatAmount(task.points / 100, 'USD')}</span>
             </div>
           </CardHeader>
           <CardFooter className="pt-0">
@@ -109,6 +112,7 @@ function LoadingTaskGridSkeleton() {
 }
 
 export default function TasksPage() {
+  const { formatAmount } = useDisplayCurrency();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -199,7 +203,7 @@ export default function TasksPage() {
             <Card className="border-border/50 bg-background/80">
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">Avg Reward</p>
-                <p className="text-xl font-semibold">${averageReward.toFixed(2)}</p>
+                <p className="text-xl font-semibold">{formatAmount(averageReward, 'USD')}</p>
               </CardContent>
             </Card>
           </div>

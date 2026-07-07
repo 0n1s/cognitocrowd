@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { getUserData, getCompletedTaskDetails, getUserTaskResponses } from '@/lib/database';
 import { Task, TaskResponse } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 
 function RewardsPageLoadingSkeleton() {
     return (
@@ -27,6 +28,7 @@ function RewardsPageLoadingSkeleton() {
 }
 
 export default function RewardsPage() {
+  const { formatAmount } = useDisplayCurrency();
   const { user, loading: authLoading } = useAuth();
   const [earningsBalance, setEarningsBalance] = useState(0);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
@@ -83,7 +85,7 @@ export default function RewardsPage() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-primary">${earningsBalance.toFixed(2)}</div>
+            <div className="text-4xl font-bold text-primary">{formatAmount(earningsBalance, 'USD')}</div>
             <p className="text-xs text-muted-foreground mt-1">Your current earnings balance</p>
           </CardContent>
         </Card>
@@ -93,7 +95,7 @@ export default function RewardsPage() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold">${totalAwarded.toFixed(2)}</div>
+            <div className="text-4xl font-bold">{formatAmount(totalAwarded, 'USD')}</div>
             <p className="text-xs text-muted-foreground mt-1">Actual rewards from recorded submissions</p>
           </CardContent>
         </Card>
@@ -133,9 +135,9 @@ export default function RewardsPage() {
                           <span className="text-sm text-muted-foreground">Not AI reviewed</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right text-muted-foreground">${((response?.maxPoints ?? task.points) / 100).toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{formatAmount((response?.maxPoints ?? task.points) / 100, 'USD')}</TableCell>
                       <TableCell className="text-right font-semibold text-primary">
-                        {response ? `+$${(Number(response.pointsEarned || 0) / 100).toFixed(2)}` : 'Unavailable'}
+                        {response ? `+${formatAmount((Number(response.pointsEarned || 0) / 100), 'USD')}` : 'Unavailable'}
                       </TableCell>
                       </TableRow>
                   );

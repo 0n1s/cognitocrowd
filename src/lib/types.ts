@@ -189,6 +189,9 @@ export type Package = {
   id: string;
   name: string;
   price: string;
+  priceAmount?: number;
+  priceCurrency?: string;
+  priceBillingPeriod?: string;
   features: string[];
   isPrimary?: boolean;
   taskLimit: number;
@@ -356,6 +359,8 @@ export type AppSettings = {
   withdrawalDays?: string[];
   withdrawalMinimumAmount?: number;
   withdrawalMaximumAmount?: number;
+  defaultCurrency?: string;
+  supportedCurrencies?: string[];
   defaultTextGenAiModel?: string;
   defaultImageGenAiModel?: string;
   defaultVideoGenAiModel?: string;
@@ -423,6 +428,12 @@ export type WithdrawalRequest = {
   userName: string;
   userEmail: string;
   amount: number; // in points
+  amountInCurrency?: number;
+  amountCurrency?: string;
+  amountUsd?: number;
+  fxRateToUsd?: number;
+  fxBaseCurrency?: string;
+  fxFetchedAtIso?: string;
   source?: 'earnings' | 'partner_wallet';
   partnerId?: string;
   partnerUserId?: string;
@@ -441,6 +452,12 @@ export type Deposit = {
   userName?: string;
   userEmail?: string;
   amount: number;
+  amountInCurrency?: number;
+  amountCurrency?: string;
+  amountUsd?: number;
+  fxRateToUsd?: number;
+  fxBaseCurrency?: string;
+  fxFetchedAtIso?: string;
   method: string;
   status: 'completed' | 'pending' | 'failed';
   depositMethodId?: string;
@@ -454,9 +471,28 @@ export type Deposit = {
   createdAt: any; // Firestore Timestamp or ISO String
 };
 
+export type PackagePurchase = {
+  id: string;
+  userId: string;
+  packageId: string;
+  packageName: string;
+  amount: number;
+  amountCurrency: string;
+  amountUsd: number;
+  status: 'completed';
+  source?: 'deposit_balance';
+  createdAt: any;
+};
+
 export type Expense = {
   id: string;
   amount: number;
+  amountInCurrency?: number;
+  amountCurrency?: string;
+  amountUsd?: number;
+  fxRateToUsd?: number;
+  fxBaseCurrency?: string;
+  fxFetchedAtIso?: string;
   category: string;
   note?: string;
   createdBy?: string;

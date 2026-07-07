@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppSettings, DepositMethod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { initiateDeposit } from "@/lib/user-api";
 import { auth } from "@/lib/firebase";
+import { useSessionCurrency } from "@/hooks/use-session-currency";
+import { useDisplayCurrency } from "@/hooks/use-display-currency";
 
 type DepositDialogProps = {
     open: boolean;
@@ -32,6 +34,8 @@ type DepositDialogProps = {
 
 export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit }: DepositDialogProps) {
     const { toast } = useToast();
+    const { currency, applyCurrencyConfig } = useSessionCurrency();
+    const { formatAmount } = useDisplayCurrency();
     const [amount, setAmount] = useState("");
     const [methodId, setMethodId] = useState("");
     const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
@@ -40,6 +44,10 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
 
     const enabledMethods = (settings.depositMethods || []).filter((method) => method.enabled !== false);
     const selectedMethod = enabledMethods.find((method) => method.id === methodId) || null;
+
+    useEffect(() => {
+        applyCurrencyConfig(settings.defaultCurrency, settings.supportedCurrencies);
+    }, [applyCurrencyConfig, settings.defaultCurrency, settings.supportedCurrencies]);
 
     const setFieldValue = (key: string, value: string) => {
         setFieldValues((current) => ({ ...current, [key]: value }));
@@ -104,12 +112,13 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
 
         const minimumAmount = Number(selectedMethod.minimumAmount || 0);
         const maximumAmount = Number(selectedMethod.maximumAmount || 0);
-        if (Number.isFinite(minimumAmount) && minimumAmount > 0 && depositAmount < minimumAmount) {
-            toast({ title: "Amount Too Low", description: `The minimum for ${selectedMethod.name} is $${minimumAmount.toFixed(2)}.`, variant: "destructive" });
+        const isUsdInput = currency === 'USD';
+        if (isUsdInput && Number.isFinite(minimumAmount) && minimumAmount > 0 && depositAmount < minimumAmount) {
+            toast({ title: "Amount Too Low", description: `The minimum for ${selectedMethod.name} is ${formatAmount(minimumAmount, 'USD')}.`, variant: "destructive" });
             return;
         }
-        if (Number.isFinite(maximumAmount) && maximumAmount > 0 && depositAmount > maximumAmount) {
-            toast({ title: "Amount Too High", description: `The maximum for ${selectedMethod.name} is $${maximumAmount.toFixed(2)}.`, variant: "destructive" });
+        if (isUsdInput && Number.isFinite(maximumAmount) && maximumAmount > 0 && depositAmount > maximumAmount) {
+            toast({ title: "Amount Too High", description: `The maximum for ${selectedMethod.name} is ${formatAmount(maximumAmount, 'USD')}.`, variant: "destructive" });
             return;
         }
 
@@ -127,7 +136,7 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
         setIsSubmitting(true);
         
         try {
-            const result = await initiateDeposit(userId, depositAmount, methodId, fieldValues);
+            const result = await initiateDeposit(userId, depositAmount, methodId, fieldValues, currency);
 
             if (result.success) {
                 toast({ title: "Success", description: result.message });
@@ -160,17 +169,18 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
                 <form onSubmit={handleSubmit}>
                     <div className="grid gap-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="amount">Amount (USD)</Label>
+                            <Label htmlFor="amount">Amount ({currency})</Label>
                             <Input
                                 id="amount"
                                 type="number"
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
-                                placeholder="$10.00"
+                                placeholder="10.00"
                                 min="1"
                                 step="0.01"
                                 disabled={isSubmitting}
                             />
+                            <p className="text-xs text-muted-foreground">Session currency is set from the header picker.</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="method">Deposit Method</Label>
@@ -206,8 +216,9 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
                                 </p>
                                 {(selectedMethod.minimumAmount || selectedMethod.maximumAmount) ? (
                                     <p className="text-xs text-muted-foreground">
-                                        {selectedMethod.minimumAmount ? `Min: $${Number(selectedMethod.minimumAmount).toFixed(2)} ` : ''}
-                                        {selectedMethod.maximumAmount ? `Max: $${Number(selectedMethod.maximumAmount).toFixed(2)}` : ''}
+                                        {selectedMethod.minimumAmount ? `Min: ${formatAmount(Number(selectedMethod.minimumAmount), 'USD')} ` : ''}
+                                        {selectedMethod.maximumAmount ? `Max: ${formatAmount(Number(selectedMethod.maximumAmount), 'USD')}` : ''}
+                                        <span className="ml-1">(validated in USD)</span>
                                     </p>
                                 ) : null}
                                 {selectedMethod.customFields && selectedMethod.customFields.length > 0 && (

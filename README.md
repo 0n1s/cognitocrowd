@@ -44,4 +44,32 @@ Now you can run the app:
 npm run dev
 ```
 
+## Exchange Rates (Open Exchange Rates)
+
+The project now includes a server-side hourly exchange-rate sync foundation.
+
+Required environment variables:
+
+```dotenv
+OPENXCHANGE_API_KEY=your-openexchangerates-app-id
+CRON_SECRET=your-random-long-secret
+```
+
+How it works:
+* Hourly cron path: `/api/cron/exchange-rates`
+* Schedule: `0 * * * *` (configured in `vercel.json`)
+* Provider: Open Exchange Rates `latest.json`
+* Storage location: Firestore document `system/exchange_rates`
+
+Security:
+* The cron route accepts `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is set.
+* If `CRON_SECRET` is not configured, the route is open (useful for local testing only).
+
+Manual test:
+
+```bash
+curl -X POST http://localhost:9002/api/cron/exchange-rates \
+    -H "Authorization: Bearer $CRON_SECRET"
+```
+
 To get started with development, take a look at `src/app/page.tsx`.

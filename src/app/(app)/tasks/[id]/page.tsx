@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 
 const FREE_TIER_DAILY_LIMIT = 50;
 
@@ -49,6 +50,7 @@ function LoadingSkeleton() {
 }
 
 export default function TaskPage() {
+  const { formatAmount } = useDisplayCurrency();
   const params = useParams<{ id: string }>();
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,7 +148,7 @@ export default function TaskPage() {
               {task.difficulty}
             </Badge>
           </div>
-          <p className="text-xl font-semibold text-primary">${(task.points / 100).toFixed(2)}</p>
+          <p className="text-xl font-semibold text-primary">{formatAmount(task.points / 100, 'USD')}</p>
           <CardDescription className="text-base pt-2">{task.description}</CardDescription>
         </CardHeader>
         <CardContent>

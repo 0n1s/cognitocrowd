@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { requestWithdrawal } from "@/lib/user-api";
 import { auth } from "@/lib/firebase";
+import { useSessionCurrency } from "@/hooks/use-session-currency";
+import { useDisplayCurrency } from "@/hooks/use-display-currency";
 
 type WithdrawalFormProps = {
     userId: string;
@@ -25,6 +27,8 @@ type WithdrawalFormProps = {
 
 export function WithdrawalForm({ userId, settings, currentBalance, minWithdrawalAmount = 0, maxWithdrawalAmount = 0, withdrawalsAllowed = true, onWithdrawal }: WithdrawalFormProps) {
     const { toast } = useToast();
+    const { currency, applyCurrencyConfig } = useSessionCurrency();
+    const { formatAmount } = useDisplayCurrency();
     const [amount, setAmount] = useState("");
     const [methodId, setMethodId] = useState("");
     const [details, setDetails] = useState("");
@@ -46,6 +50,10 @@ export function WithdrawalForm({ userId, settings, currentBalance, minWithdrawal
     const selectedMethod = enabledMethods.find((method) => method.id === methodId) || null;
     const selectedCustomFields = selectedMethod?.customFields || [];
     const shouldUseLegacyDetailsField = selectedCustomFields.length === 0;
+
+    useEffect(() => {
+        applyCurrencyConfig(settings.defaultCurrency, settings.supportedCurrencies);
+    }, [applyCurrencyConfig, settings.defaultCurrency, settings.supportedCurrencies]);
 
     const setFieldValue = (key: string, value: string) => {
         setFieldValues((current) => ({ ...current, [key]: value }));
@@ -145,12 +153,13 @@ export function WithdrawalForm({ userId, settings, currentBalance, minWithdrawal
             toast({ title: "Insufficient Balance", description: "You don't have enough funds in your earnings balance to withdraw that amount.", variant: "destructive" });
             return;
         }
-        if (minWithdrawalAmount > 0 && withdrawalAmount < minWithdrawalAmount) {
-            toast({ title: "Below Minimum", description: `Minimum withdrawal amount is $${minWithdrawalAmount.toFixed(2)}.`, variant: "destructive" });
+        const isUsdInput = currency === 'USD';
+        if (isUsdInput && minWithdrawalAmount > 0 && withdrawalAmount < minWithdrawalAmount) {
+            toast({ title: "Below Minimum", description: `Minimum withdrawal amount is ${formatAmount(minWithdrawalAmount, 'USD')}.`, variant: "destructive" });
             return;
         }
-        if (maxWithdrawalAmount > 0 && withdrawalAmount > maxWithdrawalAmount) {
-            toast({ title: "Above Maximum", description: `Maximum withdrawal amount is $${maxWithdrawalAmount.toFixed(2)}.`, variant: "destructive" });
+        if (isUsdInput && maxWithdrawalAmount > 0 && withdrawalAmount > maxWithdrawalAmount) {
+            toast({ title: "Above Maximum", description: `Maximum withdrawal amount is ${formatAmount(maxWithdrawalAmount, 'USD')}.`, variant: "destructive" });
             return;
         }
         if (!methodId || !selectedMethod) {
@@ -178,7 +187,7 @@ export function WithdrawalForm({ userId, settings, currentBalance, minWithdrawal
         const payloadFields = shouldUseLegacyDetailsField
             ? { details: details.trim() }
             : fieldValues;
-        const result = await requestWithdrawal(userId, withdrawalAmount, methodId, payloadFields);
+        const result = await requestWithdrawal(userId, withdrawalAmount, methodId, payloadFields, currency);
 
         if (result.success) {
             toast({ title: "Success", description: "Your redemption request has been submitted." });
@@ -201,7 +210,7 @@ export function WithdrawalForm({ userId, settings, currentBalance, minWithdrawal
                     {scheduleDescription}
                     {(minWithdrawalAmount > 0 || maxWithdrawalAmount > 0) && (
                         <span className="block mt-2">
-                            Withdrawal limits: {minWithdrawalAmount > 0 ? `Min $${minWithdrawalAmount.toFixed(2)}` : 'No min'} / {maxWithdrawalAmount > 0 ? `Max $${maxWithdrawalAmount.toFixed(2)}` : 'No max'}
+                            Withdrawal limits: {minWithdrawalAmount > 0 ? `Min ${formatAmount(minWithdrawalAmount, 'USD')}` : 'No min'} / {maxWithdrawalAmount > 0 ? `Max ${formatAmount(maxWithdrawalAmount, 'USD')}` : 'No max'}
                         </span>
                     )}
                     {!withdrawalsAllowed && (
@@ -214,18 +223,19 @@ export function WithdrawalForm({ userId, settings, currentBalance, minWithdrawal
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="amount">Amount (USD)</Label>
+                        <Label htmlFor="amount">Amount ({currency})</Label>
                         <Input
                             id="amount"
                             type="number"
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
-                            placeholder={`Max $${currentBalance.toFixed(2)}`}
+                            placeholder={`Max ${formatAmount(currentBalance, 'USD')}`}
                             max={maxWithdrawalAmount > 0 ? Math.min(currentBalance, maxWithdrawalAmount) : currentBalance}
                             min={minWithdrawalAmount > 0 ? minWithdrawalAmount : 0.01}
                             step="0.01"
                             disabled={isSubmitting}
                         />
+                        <p className="text-xs text-muted-foreground">Session currency is set from the header picker.</p>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="method">Payment Method</Label>

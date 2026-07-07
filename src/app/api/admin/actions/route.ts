@@ -9,6 +9,8 @@ import { validateModelAvailability } from '@/ai/model-resolver';
 import { generateOpenAiCompatibleVideo } from '@/ai/openai-video';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { awardReferralBonusForDeposit, reverseReferralBonusForDeposit } from '@/lib/referrals-admin';
+import { normalizeCurrencyCode } from '@/lib/currency';
+import { normalizeToUsdAmount } from '@/lib/exchange-rates';
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -774,11 +776,13 @@ async function handleAction(action: string, payload: Record<string, any>) {
         const applicationRef = adminDb.collection('partner_applications').doc(applicationId); const application = await transaction.get(applicationRef);
         if (!application.exists || application.data()?.status !== 'pending') throw new Error('Pending application not found.');
         const app = application.data() || {}; const userRef = adminDb.collection('users').doc(String(app.userId)); const user = await transaction.get(userRef); if (!user.exists) throw new Error('Applicant not found.');
-        if (decision === 'rejected') { transaction.update(applicationRef, { status: 'rejected', rejectionReason: String(data.rejectionReason || 'Application did not meet requirements.'), reviewedAt: Timestamp.now() }); return; }
+        const lockRef = adminDb.collection('partner_application_locks').doc(String(app.userId));
+        if (decision === 'rejected') { transaction.update(applicationRef, { status: 'rejected', rejectionReason: String(data.rejectionReason || 'Application did not meet requirements.'), reviewedAt: Timestamp.now() }); transaction.delete(lockRef); return; }
         const partnerRef = adminDb.collection('countryPartners').doc();
         transaction.update(userRef, { role: 'country_partner' });
         transaction.set(partnerRef, { userId: app.userId, name: app.name, email: app.email, country: String(data.country || app.country), paymentMethods: Array.isArray(data.paymentMethods) ? data.paymentMethods : app.paymentMethods || [], workingHours: app.workingHours || '', depositFeePercent: Number(data.depositFeePercent || 0), withdrawalFeePercent: Number(data.withdrawalFeePercent || 0), partnerWalletBalance: Number(data.initialWalletBalance || 0), depositLimit: Number(data.depositLimit || 0), withdrawalLimit: Number(data.withdrawalLimit || 0), minimumWalletBalance: Number(data.minimumWalletBalance || 0), permissions: { deposits: data.allowDeposits !== false, withdrawals: data.allowWithdrawals !== false, messaging: data.allowMessaging !== false }, isActive: true, isAvailable: true, applicationId, createdAt: Timestamp.now() });
         transaction.update(applicationRef, { status: 'approved', partnerId: partnerRef.id, reviewedAt: Timestamp.now() });
+        transaction.delete(lockRef);
       });
       return { success: true, message: `Application ${decision}.` };
     }
@@ -907,12 +911,21 @@ async function handleAction(action: string, payload: Record<string, any>) {
       const amount = Number(payload.amount);
       const category = String(payload.category || '').trim();
       const note = String(payload.note || '').trim();
+      const currency = normalizeCurrencyCode(payload.currency || 'USD', 'USD');
       if (!Number.isFinite(amount) || amount <= 0 || !category) {
         throw new Error('Invalid payload for recordExpense.');
       }
 
+      const normalizedAmount = await normalizeToUsdAmount(amount, currency);
+
       await adminDb.collection('expenses').add({
-        amount,
+        amount: normalizedAmount.amountUsd,
+        amountInCurrency: normalizedAmount.amountInCurrency,
+        amountCurrency: normalizedAmount.amountCurrency,
+        amountUsd: normalizedAmount.amountUsd,
+        fxRateToUsd: normalizedAmount.fxRateToUsd,
+        fxBaseCurrency: normalizedAmount.fxBaseCurrency,
+        fxFetchedAtIso: normalizedAmount.fxFetchedAtIso,
         category,
         note,
         createdAt: Timestamp.now(),

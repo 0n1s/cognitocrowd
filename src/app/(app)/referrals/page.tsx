@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 
 type ReferredUser = {
   id: string; name: string; email: string; packageName: string; firstDepositAmount: number | null;
@@ -18,6 +19,7 @@ type ReferredUser = {
 };
 
 export default function ReferralsPage() {
+  const { formatAmount } = useDisplayCurrency();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -59,8 +61,8 @@ export default function ReferralsPage() {
       <div><h1 className="text-3xl font-bold font-headline">Referral Program</h1><p className="mt-1 text-muted-foreground">Invite friends and earn when their eligible deposits succeed.</p></div>
       <div className="grid gap-4 md:grid-cols-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Referred users</CardTitle></CardHeader><CardContent className="text-3xl font-bold">{data.referredUsers.length}</CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Referral balance</CardTitle></CardHeader><CardContent className="text-3xl font-bold text-primary">${data.referralBalance.toFixed(2)}</CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total earned</CardTitle></CardHeader><CardContent className="text-3xl font-bold">${data.totalEarnings.toFixed(2)}</CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Referral balance</CardTitle></CardHeader><CardContent className="text-3xl font-bold text-primary">{formatAmount(data.referralBalance, 'USD')}</CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total earned</CardTitle></CardHeader><CardContent className="text-3xl font-bold">{formatAmount(data.totalEarnings, 'USD')}</CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Bonus status</CardTitle></CardHeader><CardContent className="text-sm"><span className="font-semibold">{credited}</span> credited · <span className="font-semibold">{pending}</span> pending</CardContent></Card>
       </div>
       <Card>
@@ -73,7 +75,7 @@ export default function ReferralsPage() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Referral activity</CardTitle></CardHeader>
         <CardContent><Table><TableHeader><TableRow><TableHead>User</TableHead><TableHead>Package</TableHead><TableHead>First deposit</TableHead><TableHead>Bonus</TableHead><TableHead>Status</TableHead><TableHead>Signup date</TableHead><TableHead>Credited</TableHead></TableRow></TableHeader>
-          <TableBody>{data.referredUsers.length ? data.referredUsers.map((item) => <TableRow key={item.id}><TableCell><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.email}</div></TableCell><TableCell>{item.packageName}</TableCell><TableCell>{item.firstDepositAmount == null ? 'None' : `$${item.firstDepositAmount.toFixed(2)}`}</TableCell><TableCell>${item.bonusEarned.toFixed(2)}</TableCell><TableCell><Badge variant={item.status === 'credited' ? 'secondary' : 'outline'}>{item.status}</Badge></TableCell><TableCell>{item.signupDate ? new Date(item.signupDate).toLocaleDateString() : 'N/A'}</TableCell><TableCell>{item.creditedAt ? new Date(item.creditedAt).toLocaleDateString() : '—'}</TableCell></TableRow>) : <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No referrals yet. Share your link to get started.</TableCell></TableRow>}</TableBody>
+          <TableBody>{data.referredUsers.length ? data.referredUsers.map((item) => <TableRow key={item.id}><TableCell><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.email}</div></TableCell><TableCell>{item.packageName}</TableCell><TableCell>{item.firstDepositAmount == null ? 'None' : formatAmount(item.firstDepositAmount, 'USD')}</TableCell><TableCell>{formatAmount(item.bonusEarned, 'USD')}</TableCell><TableCell><Badge variant={item.status === 'credited' ? 'secondary' : 'outline'}>{item.status}</Badge></TableCell><TableCell>{item.signupDate ? new Date(item.signupDate).toLocaleDateString() : 'N/A'}</TableCell><TableCell>{item.creditedAt ? new Date(item.creditedAt).toLocaleDateString() : '—'}</TableCell></TableRow>) : <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No referrals yet. Share your link to get started.</TableCell></TableRow>}</TableBody>
         </Table></CardContent>
       </Card>
     </div>

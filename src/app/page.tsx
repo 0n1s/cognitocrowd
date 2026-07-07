@@ -11,6 +11,7 @@ import { Package } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { getAiWorkspaceFeatures } from '@/lib/package-workspace';
 import { LandingAuthButtons } from '@/components/landing-auth-buttons';
+import { formatMoney, getPackageMoney } from '@/lib/currency';
 
 
 const LandingHeader = () => (
@@ -49,14 +50,6 @@ const LandingFooter = () => (
 const featureIcons = [PencilRuler, Code, Shield, Bot];
 const whyUsIcons = [TrendingUp, Award, Clock, ShieldCheck];
 
-function parsePackagePrice(priceText: string): number {
-  const normalized = (priceText || '').trim().toLowerCase();
-  if (!normalized || normalized === 'free') return 0;
-  const match = normalized.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
-  const numeric = match ? Number(match[0]) : Number.NaN;
-  return Number.isFinite(numeric) ? numeric : Number.POSITIVE_INFINITY;
-}
-
 const ALL_EXPERTISE_AREAS = [
   "General Knowledge",
   "Mathematics",
@@ -86,7 +79,7 @@ export default async function Home() {
   const enabledExpertise = await getEnabledExpertiseAreas();
   const packages = await getPackages();
   const sortedPackages = [...packages].sort((a, b) => {
-    const priceDifference = parsePackagePrice(a.price) - parsePackagePrice(b.price);
+    const priceDifference = getPackageMoney(a).amount - getPackageMoney(b).amount;
     return priceDifference || a.name.localeCompare(b.name);
   });
   const packageWorkspaceFeatures = packages.flatMap(getAiWorkspaceFeatures);
@@ -308,19 +301,18 @@ export default async function Home() {
               <div className="grid gap-8 md:grid-cols-3 items-stretch max-w-5xl mx-auto">
                 {sortedPackages.map((pkg) => {
                   const workspaceFeatures = getAiWorkspaceFeatures(pkg);
+                  const packageMoney = getPackageMoney(pkg);
+                  const displayPrice = packageMoney.isFree
+                    ? 'Free'
+                    : formatMoney(packageMoney.amount, packageMoney.currency);
                   return (
                   <Card key={pkg.id} className={cn("flex h-full flex-col", pkg.isPrimary && "border-2 border-primary shadow-lg shadow-primary/20")}>
                     <CardHeader className="items-center text-center">
                       <CardTitle className="text-2xl font-headline">{pkg.name}</CardTitle>
                       <div className="text-4xl font-bold">
-                        {pkg.price.startsWith('$') ? (
-                          <>
-                            {pkg.price.split('/')[0]}
-                            <span className="text-sm font-normal text-muted-foreground">/{pkg.price.split('/')[1]}</span>
-                          </>
-                        ) : (
-                          pkg.price
-                        )}
+                        {displayPrice}
+                        {packageMoney.period && <span className="text-sm font-normal text-muted-foreground">/{packageMoney.period}</span>}
+                        {!packageMoney.isFree && <span className="ml-2 align-middle text-xs font-semibold tracking-wide text-muted-foreground">{packageMoney.currency}</span>}
                       </div>
                     </CardHeader>
                     <CardContent className="flex-grow">

@@ -29,20 +29,32 @@ async function runUserAction<T = Record<string, unknown>>(action: string, payloa
   return result as ApiResult<T>;
 }
 
-export async function requestWithdrawal(_userId: string, amount: number, methodId: string, fieldValues: Record<string, string>) {
+export async function requestWithdrawal(_userId: string, amount: number, methodId: string, fieldValues: Record<string, string>, currency?: string) {
   return runUserAction('requestWithdrawal', {
     amount,
     methodId,
     fieldValues,
+    currency,
   });
 }
 
-export async function initiateDeposit(_userId: string, amount: number, methodId: string, fieldValues?: Record<string, string>) {
-  return runUserAction('initiateDeposit', { amount, methodId, fieldValues });
+export async function initiateDeposit(_userId: string, amount: number, methodId: string, fieldValues?: Record<string, string>, currency?: string) {
+  return runUserAction('initiateDeposit', { amount, methodId, fieldValues, currency });
 }
 
 export async function getUserWithdrawalHistory(_userId: string) {
   return runUserAction<{ withdrawals?: any[] }>('getUserWithdrawalHistory', {});
+}
+
+export async function getWalletData(_userId: string) {
+  return runUserAction<{
+    balances?: { earnings: number; deposits: number; referrals: number };
+    settings?: Record<string, unknown>;
+    withdrawalLimits?: { min: number; max: number; allowed: boolean };
+    deposits?: any[];
+    withdrawals?: any[];
+    packagePurchases?: any[];
+  }>('getWalletData', {});
 }
 
 export async function getReferralDashboard() {
@@ -63,7 +75,7 @@ export async function linkRegistrationReferral(referralCode: string) {
 
 export async function getPartnerProgramData() { return runUserAction<any>('getPartnerProgramData', {}); }
 export async function submitPartnerApplication(data: Record<string, unknown>) { return runUserAction('submitPartnerApplication', data); }
-export async function createPartnerTransaction(data: { type: 'deposit' | 'withdrawal'; partnerId: string; amount: number; paymentMethod: string; paymentInstructions?: string }) { return runUserAction('createPartnerTransaction', data); }
+export async function createPartnerTransaction(data: { type: 'deposit' | 'withdrawal'; partnerId: string; amount: number; paymentMethod: string; paymentInstructions?: string; currency?: string }) { return runUserAction('createPartnerTransaction', data); }
 export async function getPartnerPortalData() { return runUserAction<any>('getPartnerPortalData', {}); }
 export async function updatePartnerAvailability(available: boolean) { return runUserAction('updatePartnerAvailability', { available }); }
 export async function updatePartnerPortalConfig(data: {
@@ -77,8 +89,8 @@ export async function updatePartnerPortalConfig(data: {
   return runUserAction('updatePartnerPortalConfig', data);
 }
 export async function requestPartnerWalletFunding(amount: number) { return runUserAction('requestPartnerWalletFunding', { amount }); }
-export async function requestPartnerWithdrawal(amount: number, methodId: string, fieldValues: Record<string, string>) {
-  return runUserAction('requestPartnerWithdrawal', { amount, methodId, fieldValues });
+export async function requestPartnerWithdrawal(amount: number, methodId: string, fieldValues: Record<string, string>, currency?: string) {
+  return runUserAction('requestPartnerWithdrawal', { amount, methodId, fieldValues, currency });
 }
 export async function partnerTransactionAction(transactionId: string, actionName: string) { return runUserAction('partnerTransactionAction', { transactionId, actionName }); }
 export async function addPartnerTransactionNote(transactionId: string, message: string) { return runUserAction('addPartnerTransactionNote', { transactionId, message }); }

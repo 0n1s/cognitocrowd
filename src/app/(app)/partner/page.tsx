@@ -23,8 +23,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
+import { useSessionCurrency } from '@/hooks/use-session-currency';
 
 export default function PartnerPortalPage() {
+  const { formatAmount, currency } = useDisplayCurrency();
+  const { currency: sessionCurrency } = useSessionCurrency();
   const { toast } = useToast();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -241,11 +245,11 @@ export default function PartnerPortalPage() {
       return;
     }
     if (depositMin > 0 && amount < depositMin) {
-      toast({ title: 'Below minimum', description: `Minimum partner deposit amount is $${depositMin.toFixed(2)}.`, variant: 'destructive' });
+      toast({ title: 'Below minimum', description: `Minimum partner deposit amount is ${formatAmount(depositMin, 'USD')}.`, variant: 'destructive' });
       return;
     }
     if (depositMax > 0 && amount > depositMax) {
-      toast({ title: 'Above maximum', description: `Maximum partner deposit amount is $${depositMax.toFixed(2)}.`, variant: 'destructive' });
+      toast({ title: 'Above maximum', description: `Maximum partner deposit amount is ${formatAmount(depositMax, 'USD')}.`, variant: 'destructive' });
       return;
     }
 
@@ -281,11 +285,11 @@ export default function PartnerPortalPage() {
       return;
     }
     if (effectiveMin > 0 && amount < effectiveMin) {
-      toast({ title: 'Below minimum', description: `Minimum withdrawal amount is $${effectiveMin.toFixed(2)}.`, variant: 'destructive' });
+      toast({ title: 'Below minimum', description: `Minimum withdrawal amount is ${formatAmount(effectiveMin, 'USD')}.`, variant: 'destructive' });
       return;
     }
     if (effectiveMax > 0 && amount > effectiveMax) {
-      toast({ title: 'Above maximum', description: `Maximum withdrawal amount is $${effectiveMax.toFixed(2)}.`, variant: 'destructive' });
+      toast({ title: 'Above maximum', description: `Maximum withdrawal amount is ${formatAmount(effectiveMax, 'USD')}.`, variant: 'destructive' });
       return;
     }
     if (!withdrawMethodId || !selectedMethod) {
@@ -314,7 +318,7 @@ export default function PartnerPortalPage() {
       : withdrawFieldValues;
 
     setWithdrawingBusy(true);
-    const result = await requestPartnerWithdrawal(amount, withdrawMethodId, payloadFields);
+    const result = await requestPartnerWithdrawal(amount, withdrawMethodId, payloadFields, sessionCurrency);
     setWithdrawingBusy(false);
 
     toast({
@@ -343,11 +347,11 @@ export default function PartnerPortalPage() {
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Partner wallet</CardTitle></CardHeader>
-          <CardContent className="text-3xl font-bold">${partnerWalletBalance.toFixed(2)}</CardContent>
+          <CardContent className="text-3xl font-bold">{formatAmount(partnerWalletBalance, 'USD')}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Deposit Balance</CardTitle></CardHeader>
-          <CardContent className="text-xl font-semibold">${depositBalance.toFixed(2)}</CardContent>
+          <CardContent className="text-xl font-semibold">{formatAmount(depositBalance, 'USD')}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Country</CardTitle></CardHeader>
@@ -355,11 +359,11 @@ export default function PartnerPortalPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Deposit limit</CardTitle></CardHeader>
-          <CardContent>${Number(partner.depositLimit || 0).toFixed(2)}</CardContent>
+          <CardContent>{formatAmount(Number(partner.depositLimit || 0), 'USD')}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Withdrawal limit</CardTitle></CardHeader>
-          <CardContent>${Number(partner.withdrawalLimit || 0).toFixed(2)}</CardContent>
+          <CardContent>{formatAmount(Number(partner.withdrawalLimit || 0), 'USD')}</CardContent>
         </Card>
       </div>
 
@@ -448,16 +452,16 @@ export default function PartnerPortalPage() {
               </DialogHeader>
               <div className="space-y-4">
                 {(depositMin > 0 || depositMax > 0) ? (
-                  <p className="text-sm text-muted-foreground">Limits: {depositMin > 0 ? `Min $${depositMin.toFixed(2)}` : 'No min'} / {depositMax > 0 ? `Max $${depositMax.toFixed(2)}` : 'No max'}</p>
+                  <p className="text-sm text-muted-foreground">Limits: {depositMin > 0 ? `Min ${formatAmount(depositMin, 'USD')}` : 'No min'} / {depositMax > 0 ? `Max ${formatAmount(depositMax, 'USD')}` : 'No max'}</p>
                 ) : null}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md border p-3">
                     <p className="text-xs text-muted-foreground">Deposit Balance</p>
-                    <p className="text-lg font-semibold">${depositBalance.toFixed(2)}</p>
+                    <p className="text-lg font-semibold">{formatAmount(depositBalance, 'USD')}</p>
                   </div>
                   <div className="rounded-md border p-3">
                     <p className="text-xs text-muted-foreground">Max amount that can be moved</p>
-                    <p className="text-lg font-semibold">${depositBalance.toFixed(2)}</p>
+                    <p className="text-lg font-semibold">{formatAmount(depositBalance, 'USD')}</p>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -466,7 +470,7 @@ export default function PartnerPortalPage() {
                     type="number"
                     value={fundAmount}
                     onChange={(e) => setFundAmount(e.target.value)}
-                    placeholder={`Max $${depositBalance.toFixed(2)}`}
+                    placeholder={`Max ${formatAmount(depositBalance, 'USD')}`}
                     step="0.01"
                     min="0.01"
                     max={depositBalance}
@@ -497,16 +501,16 @@ export default function PartnerPortalPage() {
 
               <div className="space-y-4">
                 {(effectiveMin > 0 || effectiveMax > 0) ? (
-                  <p className="text-sm text-muted-foreground">Limits: {effectiveMin > 0 ? `Min $${effectiveMin.toFixed(2)}` : 'No min'} / {effectiveMax > 0 ? `Max $${effectiveMax.toFixed(2)}` : 'No max'}</p>
+                  <p className="text-sm text-muted-foreground">Limits: {effectiveMin > 0 ? `Min ${formatAmount(effectiveMin, 'USD')}` : 'No min'} / {effectiveMax > 0 ? `Max ${formatAmount(effectiveMax, 'USD')}` : 'No max'}</p>
                 ) : null}
 
                 <div className="space-y-2">
-                  <Label>Amount (USD)</Label>
+                  <Label>Amount ({currency})</Label>
                   <Input
                     type="number"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
-                    placeholder={`Max $${partnerWalletBalance.toFixed(2)}`}
+                    placeholder={`Max ${formatAmount(partnerWalletBalance, 'USD')}`}
                     step="0.01"
                     min={effectiveMin > 0 ? effectiveMin : 0.01}
                     max={effectiveMax > 0 ? Math.min(partnerWalletBalance, effectiveMax) : partnerWalletBalance}
@@ -618,7 +622,7 @@ export default function PartnerPortalPage() {
               {data.partnerWithdrawals?.length ? data.partnerWithdrawals.map((item: any) => (
                 <TableRow key={item.id}>
                   <TableCell>{item.requestedAt ? new Date(item.requestedAt).toLocaleString() : 'N/A'}</TableCell>
-                  <TableCell>${Number(item.amount || 0).toFixed(2)}</TableCell>
+                  <TableCell>{formatAmount(Number(item.amount || 0), item.amountCurrency || 'USD')}</TableCell>
                   <TableCell>{item.paymentMethod || 'N/A'}</TableCell>
                   <TableCell><Badge variant="outline">{item.status || 'pending'}</Badge></TableCell>
                 </TableRow>
@@ -652,7 +656,7 @@ export default function PartnerPortalPage() {
                     <div className="text-xs text-muted-foreground">{item.userEmail}</div>
                   </TableCell>
                   <TableCell>{item.type}</TableCell>
-                  <TableCell>${Number(item.amount).toFixed(2)}</TableCell>
+                  <TableCell>{formatAmount(Number(item.amount), item.amountCurrency || 'USD')}</TableCell>
                   <TableCell>{item.paymentMethod}</TableCell>
                   <TableCell><Badge variant="outline">{item.status}</Badge></TableCell>
                   <TableCell className="min-w-[300px]">

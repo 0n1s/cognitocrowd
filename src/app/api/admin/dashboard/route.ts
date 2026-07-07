@@ -162,7 +162,7 @@ async function getFinancialFlowAnalytics(rangeDays: number): Promise<FinancialFl
     if (!eventDate || eventDate < startDate || eventDate >= endDate) continue;
     const point = points.get(getBucketStart(eventDate, granularity).toISOString());
     if (!point) continue;
-    const amount = Number(deposit.amount || 0);
+    const amount = Number(deposit.amountUsd ?? deposit.amount ?? 0);
     if (!Number.isFinite(amount) || amount <= 0) continue;
     point.deposits += amount;
     totalDeposits += amount;
@@ -175,7 +175,7 @@ async function getFinancialFlowAnalytics(rangeDays: number): Promise<FinancialFl
     if (!eventDate || eventDate < startDate || eventDate >= endDate) continue;
     const point = points.get(getBucketStart(eventDate, granularity).toISOString());
     if (!point) continue;
-    const amount = Number(withdrawal.amount || 0);
+    const amount = Number(withdrawal.amountUsd ?? withdrawal.amount ?? 0);
     if (!Number.isFinite(amount) || amount <= 0) continue;
     point.withdrawals += amount;
     totalWithdrawals += amount;
@@ -187,7 +187,7 @@ async function getFinancialFlowAnalytics(rangeDays: number): Promise<FinancialFl
     if (!eventDate || eventDate < startDate || eventDate >= endDate) continue;
     const point = points.get(getBucketStart(eventDate, granularity).toISOString());
     if (!point) continue;
-    const amount = Number(expense.amount || 0);
+    const amount = Number(expense.amountUsd ?? expense.amount ?? 0);
     if (!Number.isFinite(amount) || amount <= 0) continue;
     point.expenses += amount;
     totalExpenses += amount;

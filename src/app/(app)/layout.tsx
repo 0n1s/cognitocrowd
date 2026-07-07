@@ -53,6 +53,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { getPackage, getUserData } from "@/lib/database";
 import { setupNewUser } from "@/lib/user-api";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SessionCurrencyPicker } from "@/components/session-currency-picker";
 import type { Package as UserPackage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -85,6 +86,7 @@ const AppHeader = () => {
         <h1 className="font-headline text-lg font-semibold">Trainly</h1>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
+        <SessionCurrencyPicker />
         <ThemeToggle />
         <div className="hidden text-right sm:block">
           <p className="font-semibold text-sm">{user?.displayName || "User"}</p>

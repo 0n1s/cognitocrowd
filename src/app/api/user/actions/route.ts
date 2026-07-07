@@ -5,6 +5,8 @@ import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import type { DepositMethod, WithdrawalMethod } from '@/lib/types';
 import { logJsonEvent } from '@/lib/json-logger';
 import { awardReferralBonusForDeposit } from '@/lib/referrals-admin';
+import { getPackageMoney, normalizeCurrencyCode } from '@/lib/currency';
+import { normalizeToUsdAmount } from '@/lib/exchange-rates';
 
 export const runtime = 'nodejs';
 
@@ -76,13 +78,25 @@ async function verifyUser(request: NextRequest): Promise<VerifiedUser> {
   };
 }
 
-function parsePackagePrice(priceText: string): number {
-  const normalized = String(priceText || '').trim().toLowerCase();
-  if (!normalized || normalized === 'free') return 0;
-  if (!normalized.startsWith('$')) return Number.POSITIVE_INFINITY;
+type PackagePricingDoc = {
+  price?: string;
+  priceAmount?: number;
+  priceCurrency?: string;
+  priceBillingPeriod?: string;
+};
 
-  const numeric = Number.parseFloat(normalized.substring(1));
-  return Number.isFinite(numeric) ? numeric : Number.POSITIVE_INFINITY;
+async function toLedgerUsd(amount: number, currency: string) {
+  const normalizedAmount = Number(amount);
+  if (!Number.isFinite(normalizedAmount)) {
+    throw new Error('Invalid package amount.');
+  }
+
+  if (normalizedAmount <= 0) {
+    return 0;
+  }
+
+  const normalized = await normalizeToUsdAmount(normalizedAmount, currency);
+  return normalized.amountUsd;
 }
 
 function normalizeWeekday(value: string) {
@@ -98,6 +112,44 @@ function getCurrentWeekday(timeZone?: string) {
   } catch {
     return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date());
   }
+}
+
+const DEPOSIT_TRANSACTION_ID_HINT = /(transaction|txid|trx|reference|ref|payment[\s_-]*id|deposit[\s_-]*id|utr|rrn|hash)/i;
+
+function normalizeTransactionIdentifier(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function getDepositTransactionIdentifier(
+  method: Pick<DepositMethod, 'customFields'>,
+  fieldValues: Record<string, string>,
+): { key: string; value: string; normalized: string } | null {
+  const keyCandidates = new Set<string>();
+
+  Object.keys(fieldValues || {}).forEach((key) => {
+    if (DEPOSIT_TRANSACTION_ID_HINT.test(key)) {
+      keyCandidates.add(key);
+    }
+  });
+
+  (method.customFields || []).forEach((field) => {
+    const identityText = `${field.key || ''} ${field.label || ''} ${field.placeholder || ''}`;
+    if (DEPOSIT_TRANSACTION_ID_HINT.test(identityText)) {
+      keyCandidates.add(field.key);
+    }
+  });
+
+  for (const key of keyCandidates) {
+    const value = String(fieldValues[key] || '').trim();
+    if (!value) continue;
+    return {
+      key,
+      value,
+      normalized: normalizeTransactionIdentifier(value),
+    };
+  }
+
+  return null;
 }
 
 function getAppBaseUrl(request: NextRequest, configuredBaseUrl?: string) {
@@ -980,6 +1032,7 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
     case 'requestWithdrawal': {
       const amount = Number(payload.amount);
+      const requestedCurrency = normalizeCurrencyCode(payload.currency || 'USD', 'USD');
       const methodId = String(payload.methodId || payload.paymentMethod || '').trim();
       const fieldValues = payload.fieldValues && typeof payload.fieldValues === 'object'
         ? (payload.fieldValues as Record<string, string>)
@@ -989,6 +1042,8 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       if (!Number.isFinite(amount) || amount <= 0 || !methodId) {
         throw new Error('Invalid withdrawal payload.');
       }
+
+      const normalizedAmount = await normalizeToUsdAmount(amount, requestedCurrency);
 
       await adminDb.runTransaction(async (transaction) => {
         const settingsRef = adminDb.collection('settings').doc('main');
@@ -1086,15 +1141,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           throw new Error('Withdrawal limits are misconfigured. Please contact support.');
         }
 
-        if (amount < effectiveMin) {
+        if (normalizedAmount.amountUsd < effectiveMin) {
           throw new Error(`Minimum withdrawal amount is $${effectiveMin.toFixed(2)}.`);
         }
-        if (effectiveMax > 0 && amount > effectiveMax) {
+        if (effectiveMax > 0 && normalizedAmount.amountUsd > effectiveMax) {
           throw new Error(`Maximum withdrawal amount is $${effectiveMax.toFixed(2)}.`);
         }
 
         const currentBalance = userData.earningsBalance || 0;
-        if (currentBalance < amount) {
+        if (currentBalance < normalizedAmount.amountUsd) {
           throw new Error('Insufficient earnings balance.');
         }
 
@@ -1117,13 +1172,19 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           throw new Error('Payment details are required.');
         }
 
-        transaction.update(userRef, { earningsBalance: currentBalance - amount });
+        transaction.update(userRef, { earningsBalance: currentBalance - normalizedAmount.amountUsd });
         const withdrawalRef = adminDb.collection('withdrawal_requests').doc();
         transaction.set(withdrawalRef, {
           userId: uid,
           userName: userData.name,
           userEmail: userData.email,
-          amount,
+          amount: normalizedAmount.amountUsd,
+          amountInCurrency: normalizedAmount.amountInCurrency,
+          amountCurrency: normalizedAmount.amountCurrency,
+          amountUsd: normalizedAmount.amountUsd,
+          fxRateToUsd: normalizedAmount.fxRateToUsd,
+          fxBaseCurrency: normalizedAmount.fxBaseCurrency,
+          fxFetchedAtIso: normalizedAmount.fxFetchedAtIso || null,
           withdrawalMethodId: selectedMethod.id,
           paymentMethod: selectedMethod.name,
           paymentDetails,
@@ -1134,6 +1195,215 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       });
 
       return { success: true, message: 'Withdrawal request submitted.' };
+    }
+
+    case 'getWalletData': {
+      const userSnap = await adminDb.collection('users').doc(uid).get();
+      if (!userSnap.exists) throw new Error('User not found.');
+
+      const userData = userSnap.data() || {};
+      const userEmail = String(userData.email || '').trim();
+      const normalizedUserEmail = userEmail.toLowerCase();
+
+      const settingsSnap = await adminDb.collection('settings').doc('main').get();
+      const settingsData = (settingsSnap.data() || {}) as {
+        paymentMethods?: Array<{ id: string; name: string }>;
+        depositMethods?: DepositMethod[];
+        withdrawalMethods?: WithdrawalMethod[];
+        withdrawalScheduleInfo?: string;
+        processingTimeZone?: string;
+        withdrawalDays?: string[];
+        withdrawalMinimumAmount?: number;
+        withdrawalMaximumAmount?: number;
+        defaultCurrency?: string;
+        supportedCurrencies?: string[];
+      };
+
+      const withdrawalsByUidSnap = await adminDb
+        .collection('withdrawal_requests')
+        .where('userId', '==', uid)
+        .get()
+        .catch((error) => {
+          console.error('Could not query withdrawals by user ID.', error);
+          throw new Error('Could not load withdrawal history.');
+        });
+
+      const docsById = new Map(withdrawalsByUidSnap.docs.map((doc) => [doc.id, doc]));
+      if (normalizedUserEmail) {
+        const exactEmailSnap = await adminDb
+          .collection('withdrawal_requests')
+          .where('userEmail', '==', userEmail)
+          .get();
+        exactEmailSnap.docs.forEach((doc) => docsById.set(doc.id, doc));
+
+        if (withdrawalsByUidSnap.empty && exactEmailSnap.empty) {
+          const allWithdrawals = await adminDb.collection('withdrawal_requests').get();
+          allWithdrawals.docs.forEach((doc) => {
+            const recordEmail = String(doc.data()?.userEmail || '').trim().toLowerCase();
+            if (recordEmail === normalizedUserEmail) docsById.set(doc.id, doc);
+          });
+        }
+      }
+
+      const toIsoString = (value: any) => {
+        if (!value) return null;
+        if (typeof value.toDate === 'function') return value.toDate().toISOString();
+        if (typeof value === 'string') return value;
+        if (typeof value._seconds === 'number') return new Date(value._seconds * 1000).toISOString();
+        return null;
+      };
+
+      const [depositsSnap, purchasesSnap] = await Promise.all([
+        adminDb.collection('deposits').where('userId', '==', uid).get(),
+        adminDb.collection('package_purchases').where('userId', '==', uid).get(),
+      ]);
+
+      const deposits = depositsSnap.docs
+        .map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            userId: String(data.userId || uid),
+            amount: Number(data.amount || 0),
+            amountInCurrency: Number(data.amountInCurrency || 0),
+            amountCurrency: String(data.amountCurrency || 'USD'),
+            amountUsd: Number(data.amountUsd || data.amount || 0),
+            fxRateToUsd: Number(data.fxRateToUsd || 0),
+            fxBaseCurrency: String(data.fxBaseCurrency || 'USD'),
+            fxFetchedAtIso: data.fxFetchedAtIso ? String(data.fxFetchedAtIso) : undefined,
+            method: String(data.method || 'Deposit method'),
+            status: String(data.status || 'pending'),
+            depositMethodId: data.depositMethodId ? String(data.depositMethodId) : undefined,
+            depositMethodProvider: data.depositMethodProvider ? String(data.depositMethodProvider) : undefined,
+            createdAt: toIsoString(data.createdAt),
+            processedAt: toIsoString(data.processedAt),
+          };
+        })
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+      const packagePurchases = purchasesSnap.docs
+        .map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            userId: String(data.userId || uid),
+            packageId: String(data.packageId || ''),
+            packageName: String(data.packageName || 'Subscription'),
+            amount: Number(data.amount || 0),
+            amountCurrency: String(data.amountCurrency || 'USD'),
+            amountUsd: Number(data.amountUsd || data.amount || 0),
+            status: 'completed' as const,
+            source: 'deposit_balance' as const,
+            createdAt: toIsoString(data.createdAt),
+          };
+        })
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+      const withdrawals = Array.from(docsById.values())
+        .map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            userId: String(data.userId || uid),
+            userName: String(data.userName || ''),
+            userEmail: String(data.userEmail || userEmail),
+            amount: Number(data.amount || 0),
+            withdrawalMethodId: data.withdrawalMethodId ? String(data.withdrawalMethodId) : undefined,
+            paymentMethod: String(data.paymentMethod || 'Withdrawal method'),
+            paymentDetails: String(data.paymentDetails || ''),
+            fieldValues: data.fieldValues && typeof data.fieldValues === 'object' ? data.fieldValues : {},
+            status: String(data.status || 'pending'),
+            requestedAt: toIsoString(data.requestedAt),
+            processedAt: toIsoString(data.processedAt),
+          };
+        })
+        .sort((a, b) => {
+          const timeA = new Date(a.requestedAt || 0).getTime();
+          const timeB = new Date(b.requestedAt || 0).getTime();
+          return timeB - timeA;
+        });
+
+      let packageMin = 0;
+      let packageMax = 0;
+      let packageAllowsWithdrawals = true;
+      const packageId = String(userData.packageId || '').trim();
+      if (packageId) {
+        const packageSnap = await adminDb.collection('packages').doc(packageId).get();
+        if (packageSnap.exists) {
+          const packageData = packageSnap.data() || {};
+          packageMin = Number(packageData.withdrawalMinimumAmount || 0);
+          packageMax = Number(packageData.withdrawalMaximumAmount || 0);
+          packageAllowsWithdrawals = packageData.allowWithdrawals !== false;
+        }
+      }
+
+      const globalMin = Number(settingsData.withdrawalMinimumAmount || 0);
+      const globalMax = Number(settingsData.withdrawalMaximumAmount || 0);
+      const effectiveMin = Math.max(globalMin > 0 ? globalMin : 0, packageMin > 0 ? packageMin : 0);
+      const hasGlobalMax = globalMax > 0;
+      const hasPackageMax = packageMax > 0;
+      const effectiveMax = hasGlobalMax && hasPackageMax
+        ? Math.min(globalMax, packageMax)
+        : hasGlobalMax
+          ? globalMax
+          : hasPackageMax
+            ? packageMax
+            : 0;
+
+      const safeDepositMethods = (settingsData.depositMethods || []).map((method) => ({
+        id: String(method.id || ''),
+        name: String(method.name || ''),
+        provider: method.provider,
+        enabled: method.enabled !== false,
+        processingMode: method.processingMode,
+        minimumAmount: Number.isFinite(Number(method.minimumAmount)) ? Number(method.minimumAmount) : undefined,
+        maximumAmount: Number.isFinite(Number(method.maximumAmount)) ? Number(method.maximumAmount) : undefined,
+        description: method.description || '',
+        customFields: Array.isArray(method.customFields) ? method.customFields : [],
+      }));
+
+      const safeWithdrawalMethods = (settingsData.withdrawalMethods || []).map((method) => ({
+        id: String(method.id || ''),
+        name: String(method.name || ''),
+        provider: method.provider,
+        enabled: method.enabled !== false,
+        processingMode: method.processingMode,
+        minimumAmount: Number.isFinite(Number(method.minimumAmount)) ? Number(method.minimumAmount) : undefined,
+        maximumAmount: Number.isFinite(Number(method.maximumAmount)) ? Number(method.maximumAmount) : undefined,
+        description: method.description || '',
+        customFields: Array.isArray(method.customFields) ? method.customFields : [],
+      }));
+
+      return {
+        success: true,
+        balances: {
+          earnings: Number(userData.earningsBalance || 0),
+          deposits: Number(userData.depositBalance || 0),
+          referrals: Number(userData.referralBalance || 0),
+        },
+        settings: {
+          paymentMethods: Array.isArray(settingsData.paymentMethods) ? settingsData.paymentMethods : [],
+          depositMethods: safeDepositMethods,
+          withdrawalMethods: safeWithdrawalMethods,
+          withdrawalScheduleInfo: String(settingsData.withdrawalScheduleInfo || ''),
+          processingTimeZone: settingsData.processingTimeZone ? String(settingsData.processingTimeZone) : undefined,
+          withdrawalDays: Array.isArray(settingsData.withdrawalDays) ? settingsData.withdrawalDays.map(String) : [],
+          withdrawalMinimumAmount: Number(settingsData.withdrawalMinimumAmount || 0),
+          withdrawalMaximumAmount: Number(settingsData.withdrawalMaximumAmount || 0),
+          defaultCurrency: settingsData.defaultCurrency ? String(settingsData.defaultCurrency) : undefined,
+          supportedCurrencies: Array.isArray(settingsData.supportedCurrencies)
+            ? settingsData.supportedCurrencies.map(String)
+            : undefined,
+        },
+        withdrawalLimits: {
+          min: effectiveMin,
+          max: effectiveMax,
+          allowed: packageAllowsWithdrawals,
+        },
+        deposits,
+        withdrawals,
+        packagePurchases,
+      };
     }
 
     case 'getUserWithdrawalHistory': {
@@ -1416,17 +1686,53 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       if (!country || paymentMethods.length === 0 || !reason || workingDays.length === 0) throw new Error('Country, payment methods, reason, and working days are required.');
       if (Array.isArray(settings.partnerSupportedCountries) && settings.partnerSupportedCountries.length > 0 && !settings.partnerSupportedCountries.includes(country)) throw new Error('The selected country is not currently supported.');
       const user = userData;
-      const applicationRef = adminDb.collection('partner_applications').doc();
-      await applicationRef.set({ userId: uid, name: user.name || 'User', email: user.email || '', country, paymentMethods, reason, workingDays, workingHours, extraInformation: String(payload.extraInformation || '').trim(), status: 'pending', createdAt: Timestamp.now() });
-      return { success: true, message: 'Partner application submitted for review.', applicationId: applicationRef.id };
+      const lockRef = adminDb.collection('partner_application_locks').doc(uid);
+      let createdApplicationId = '';
+
+      await adminDb.runTransaction(async (transaction) => {
+        const lockSnap = await transaction.get(lockRef);
+        if (lockSnap.exists && lockSnap.data()?.status === 'pending') {
+          throw new Error('You already have a pending partner application under review.');
+        }
+
+        const applicationRef = adminDb.collection('partner_applications').doc();
+        createdApplicationId = applicationRef.id;
+        const now = Timestamp.now();
+
+        transaction.set(applicationRef, {
+          userId: uid,
+          name: user.name || 'User',
+          email: user.email || '',
+          country,
+          paymentMethods,
+          reason,
+          workingDays,
+          workingHours,
+          extraInformation: String(payload.extraInformation || '').trim(),
+          status: 'pending',
+          createdAt: now,
+        });
+
+        transaction.set(lockRef, {
+          userId: uid,
+          status: 'pending',
+          applicationId: applicationRef.id,
+          createdAt: now,
+          updatedAt: now,
+        });
+      });
+
+      return { success: true, message: 'Partner application submitted for review.', applicationId: createdApplicationId };
     }
 
     case 'createPartnerTransaction': {
       const type = String(payload.type || '');
       const partnerId = String(payload.partnerId || '');
       const amount = Number(payload.amount);
+      const transactionCurrency = normalizeCurrencyCode(payload.currency || 'USD', 'USD');
       const paymentMethod = String(payload.paymentMethod || '').trim();
       if (!['deposit', 'withdrawal'].includes(type) || !partnerId || !Number.isFinite(amount) || amount <= 0 || !paymentMethod) throw new Error('Invalid partner transaction request.');
+      const normalizedAmount = await normalizeToUsdAmount(amount, transactionCurrency);
       const transactionRef = adminDb.collection('partner_transactions').doc();
       await adminDb.runTransaction(async (transaction) => {
         const userRef = adminDb.collection('users').doc(uid);
@@ -1440,11 +1746,33 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         if (type === 'withdrawal' && partner.permissions?.withdrawals === false) throw new Error('This partner cannot process withdrawals.');
         if (user.country && partner.country !== user.country) throw new Error('Select a partner assigned to your country.');
         const limit = type === 'deposit' ? Number(partner.depositLimit || 0) : Number(partner.withdrawalLimit || 0);
-        if (limit > 0 && amount > limit) throw new Error(`The partner transaction limit is $${limit.toFixed(2)}.`);
-        if (type === 'deposit' && Number(partner.partnerWalletBalance || 0) - amount < Number(partner.minimumWalletBalance || 0)) throw new Error('The partner does not have enough available wallet capacity.');
-        if (type === 'withdrawal' && Number(user.earningsBalance || 0) < amount) throw new Error('Insufficient earnings balance.');
-        if (type === 'withdrawal') transaction.update(userRef, { earningsBalance: Number(user.earningsBalance || 0) - amount });
-        transaction.set(transactionRef, { type, userId: uid, userName: user.name || 'User', userEmail: user.email || '', partnerId, partnerUserId: partner.userId, partnerName: partner.name || 'Partner', country: partner.country, amount, paymentMethod, paymentInstructions: String(payload.paymentInstructions || ''), status: type === 'deposit' ? 'awaiting_payment' : 'pending', notes: [], createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
+        if (limit > 0 && normalizedAmount.amountUsd > limit) throw new Error(`The partner transaction limit is $${limit.toFixed(2)}.`);
+        if (type === 'deposit' && Number(partner.partnerWalletBalance || 0) - normalizedAmount.amountUsd < Number(partner.minimumWalletBalance || 0)) throw new Error('The partner does not have enough available wallet capacity.');
+        if (type === 'withdrawal' && Number(user.earningsBalance || 0) < normalizedAmount.amountUsd) throw new Error('Insufficient earnings balance.');
+        if (type === 'withdrawal') transaction.update(userRef, { earningsBalance: Number(user.earningsBalance || 0) - normalizedAmount.amountUsd });
+        transaction.set(transactionRef, {
+          type,
+          userId: uid,
+          userName: user.name || 'User',
+          userEmail: user.email || '',
+          partnerId,
+          partnerUserId: partner.userId,
+          partnerName: partner.name || 'Partner',
+          country: partner.country,
+          amount: normalizedAmount.amountUsd,
+          amountInCurrency: normalizedAmount.amountInCurrency,
+          amountCurrency: normalizedAmount.amountCurrency,
+          amountUsd: normalizedAmount.amountUsd,
+          fxRateToUsd: normalizedAmount.fxRateToUsd,
+          fxBaseCurrency: normalizedAmount.fxBaseCurrency,
+          fxFetchedAtIso: normalizedAmount.fxFetchedAtIso || null,
+          paymentMethod,
+          paymentInstructions: String(payload.paymentInstructions || ''),
+          status: type === 'deposit' ? 'awaiting_payment' : 'pending',
+          notes: [],
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
       });
       return { success: true, message: 'Partner transaction request created.', transactionId: transactionRef.id };
     }
@@ -1581,6 +1909,7 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
     case 'requestPartnerWithdrawal': {
       const amount = Number(payload.amount);
+      const requestedCurrency = normalizeCurrencyCode(payload.currency || 'USD', 'USD');
       const methodId = String(payload.methodId || payload.paymentMethod || '').trim();
       const fieldValues = payload.fieldValues && typeof payload.fieldValues === 'object'
         ? (payload.fieldValues as Record<string, string>)
@@ -1590,6 +1919,8 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       if (!Number.isFinite(amount) || amount <= 0 || !methodId) {
         throw new Error('Invalid withdrawal payload.');
       }
+
+      const normalizedAmount = await normalizeToUsdAmount(amount, requestedCurrency);
 
       await adminDb.runTransaction(async (transaction) => {
         const settingsRef = adminDb.collection('settings').doc('main');
@@ -1659,15 +1990,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           throw new Error('Withdrawal limits are misconfigured. Please contact support.');
         }
 
-        if (amount < effectiveMin) {
+        if (normalizedAmount.amountUsd < effectiveMin) {
           throw new Error(`Minimum withdrawal amount is $${effectiveMin.toFixed(2)}.`);
         }
-        if (effectiveMax > 0 && amount > effectiveMax) {
+        if (effectiveMax > 0 && normalizedAmount.amountUsd > effectiveMax) {
           throw new Error(`Maximum withdrawal amount is $${effectiveMax.toFixed(2)}.`);
         }
 
         const currentBalance = Number(partnerSnap.data()?.partnerWalletBalance || 0);
-        if (currentBalance < amount) {
+        if (currentBalance < normalizedAmount.amountUsd) {
           throw new Error('Insufficient partner wallet balance.');
         }
 
@@ -1690,13 +2021,19 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           throw new Error('Payment details are required.');
         }
 
-        transaction.update(partnerRef, { partnerWalletBalance: currentBalance - amount });
+        transaction.update(partnerRef, { partnerWalletBalance: currentBalance - normalizedAmount.amountUsd });
         const withdrawalRef = adminDb.collection('withdrawal_requests').doc();
         transaction.set(withdrawalRef, {
           userId: uid,
           userName: partnerSnap.data()?.name || 'Partner',
           userEmail: partnerSnap.data()?.email || '',
-          amount,
+          amount: normalizedAmount.amountUsd,
+          amountInCurrency: normalizedAmount.amountInCurrency,
+          amountCurrency: normalizedAmount.amountCurrency,
+          amountUsd: normalizedAmount.amountUsd,
+          fxRateToUsd: normalizedAmount.fxRateToUsd,
+          fxBaseCurrency: normalizedAmount.fxBaseCurrency,
+          fxFetchedAtIso: normalizedAmount.fxFetchedAtIso || null,
           withdrawalMethodId: selectedMethod.id,
           paymentMethod: selectedMethod.name,
           paymentDetails,
@@ -1739,7 +2076,22 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           const depositRef = adminDb.collection('deposits').doc(`partner_${transactionId}`);
           transaction.update(partnerRef, { partnerWalletBalance: Number(partner.partnerWalletBalance || 0) - Number(item.amount) });
           transaction.update(userRef, { depositBalance: Number(userSnap.data()?.depositBalance || 0) + Number(item.amount) });
-          transaction.set(depositRef, { userId: item.userId, amount: Number(item.amount), method: `Partner: ${item.partnerName}`, partnerId: item.partnerId, partnerTransactionId: transactionId, status: 'completed', createdAt: Timestamp.now(), processedAt: Timestamp.now() });
+          transaction.set(depositRef, {
+            userId: item.userId,
+            amount: Number(item.amount),
+            amountInCurrency: Number(item.amountInCurrency || item.amount || 0),
+            amountCurrency: String(item.amountCurrency || 'USD'),
+            amountUsd: Number(item.amountUsd || item.amount || 0),
+            fxRateToUsd: Number(item.fxRateToUsd || 1),
+            fxBaseCurrency: String(item.fxBaseCurrency || 'USD'),
+            fxFetchedAtIso: item.fxFetchedAtIso || null,
+            method: `Partner: ${item.partnerName}`,
+            partnerId: item.partnerId,
+            partnerTransactionId: transactionId,
+            status: 'completed',
+            createdAt: Timestamp.now(),
+            processedAt: Timestamp.now(),
+          });
           transaction.update(requestRef, { status: 'completed', completedAt: Timestamp.now(), updatedAt: Timestamp.now() });
           completedDepositId = depositRef.id; return;
         }
@@ -1783,6 +2135,7 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
     case 'initiateDeposit': {
       const amount = Number(payload.amount);
+      const requestedCurrency = normalizeCurrencyCode(payload.currency || 'USD', 'USD');
       const methodId = String(payload.methodId || '');
       const fieldValues = payload.fieldValues && typeof payload.fieldValues === 'object'
         ? (payload.fieldValues as Record<string, string>)
@@ -1791,6 +2144,8 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       if (!Number.isFinite(amount) || amount <= 0 || !methodId) {
         throw new Error('Invalid deposit payload.');
       }
+
+      const normalizedAmount = await normalizeToUsdAmount(amount, requestedCurrency);
 
       const settingsSnap = await adminDb.collection('settings').doc('main').get();
       const settings = (settingsSnap.data() || {}) as {
@@ -1808,15 +2163,40 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
       const minimumAmount = Number(method.minimumAmount || 0);
       const maximumAmount = Number(method.maximumAmount || 0);
-      if (Number.isFinite(minimumAmount) && minimumAmount > 0 && amount < minimumAmount) {
+      if (Number.isFinite(minimumAmount) && minimumAmount > 0 && normalizedAmount.amountUsd < minimumAmount) {
         throw new Error(`The minimum deposit amount for ${method.name} is $${minimumAmount.toFixed(2)}.`);
       }
-      if (Number.isFinite(maximumAmount) && maximumAmount > 0 && amount > maximumAmount) {
+      if (Number.isFinite(maximumAmount) && maximumAmount > 0 && normalizedAmount.amountUsd > maximumAmount) {
         throw new Error(`The maximum deposit amount for ${method.name} is $${maximumAmount.toFixed(2)}.`);
       }
 
       const processingMode = method.processingMode || (method.provider === 'plisio' ? 'automatic' : 'admin_verified');
       const isAdminVerified = processingMode === 'admin_verified';
+      const depositTransactionIdentifier = getDepositTransactionIdentifier(method, fieldValues);
+
+      if (depositTransactionIdentifier) {
+        const duplicateByIdentifierSnap = await adminDb
+          .collection('deposits')
+          .where('depositMethodId', '==', method.id)
+          .where('transactionIdentifierNormalized', '==', depositTransactionIdentifier.normalized)
+          .limit(1)
+          .get();
+
+        if (!duplicateByIdentifierSnap.empty) {
+          throw new Error('A deposit with this transaction ID already exists.');
+        }
+
+        const duplicateByFieldValueSnap = await adminDb
+          .collection('deposits')
+          .where('depositMethodId', '==', method.id)
+          .where(`fieldValues.${depositTransactionIdentifier.key}`, '==', depositTransactionIdentifier.value)
+          .limit(1)
+          .get();
+
+        if (!duplicateByFieldValueSnap.empty) {
+          throw new Error('A deposit with this transaction ID already exists.');
+        }
+      }
 
       if (method.provider === 'plisio') {
         const userSnap = await adminDb.collection('users').doc(uid).get();
@@ -1837,7 +2217,7 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
         const invoice = await createPlisioInvoice({
           apiKey: plisioApiKey,
-          amountUsd: amount,
+          amountUsd: normalizedAmount.amountUsd,
           orderNumber,
           orderName: `Wallet deposit (${uid})`,
           callbackUrl,
@@ -1848,7 +2228,13 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
         await adminDb.collection('deposits').add({
           userId: uid,
-          amount,
+          amount: normalizedAmount.amountUsd,
+          amountInCurrency: normalizedAmount.amountInCurrency,
+          amountCurrency: normalizedAmount.amountCurrency,
+          amountUsd: normalizedAmount.amountUsd,
+          fxRateToUsd: normalizedAmount.fxRateToUsd,
+          fxBaseCurrency: normalizedAmount.fxBaseCurrency,
+          fxFetchedAtIso: normalizedAmount.fxFetchedAtIso || null,
           method: method.name,
           depositMethodId: method.id,
           depositMethodProvider: method.provider,
@@ -1857,6 +2243,8 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           externalTxnId: invoice.txnId,
           externalOrderNumber: orderNumber,
           externalInvoiceUrl: invoice.invoiceUrl,
+          transactionIdentifier: depositTransactionIdentifier?.value || null,
+          transactionIdentifierNormalized: depositTransactionIdentifier?.normalized || null,
           fieldValues,
           createdAt: Timestamp.now(),
         });
@@ -1871,11 +2259,19 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       if (method.provider === 'custom') {
         await adminDb.collection('deposits').add({
           userId: uid,
-          amount,
+          amount: normalizedAmount.amountUsd,
+          amountInCurrency: normalizedAmount.amountInCurrency,
+          amountCurrency: normalizedAmount.amountCurrency,
+          amountUsd: normalizedAmount.amountUsd,
+          fxRateToUsd: normalizedAmount.fxRateToUsd,
+          fxBaseCurrency: normalizedAmount.fxBaseCurrency,
+          fxFetchedAtIso: normalizedAmount.fxFetchedAtIso || null,
           method: method.name,
           depositMethodId: method.id,
           depositMethodProvider: method.provider,
           status: 'pending',
+          transactionIdentifier: depositTransactionIdentifier?.value || null,
+          transactionIdentifierNormalized: depositTransactionIdentifier?.normalized || null,
           fieldValues,
           createdAt: Timestamp.now(),
         });
@@ -1894,15 +2290,23 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         completedDepositId = depositRef.id;
         transaction.set(depositRef, {
           userId: uid,
-          amount,
+          amount: normalizedAmount.amountUsd,
+          amountInCurrency: normalizedAmount.amountInCurrency,
+          amountCurrency: normalizedAmount.amountCurrency,
+          amountUsd: normalizedAmount.amountUsd,
+          fxRateToUsd: normalizedAmount.fxRateToUsd,
+          fxBaseCurrency: normalizedAmount.fxBaseCurrency,
+          fxFetchedAtIso: normalizedAmount.fxFetchedAtIso || null,
           method,
           status: isAdminVerified ? 'pending' : 'completed',
+          transactionIdentifier: depositTransactionIdentifier?.value || null,
+          transactionIdentifierNormalized: depositTransactionIdentifier?.normalized || null,
           createdAt: Timestamp.now(),
         });
 
         if (!isAdminVerified) {
           const currentBalance = (userSnap.data()?.depositBalance || 0) as number;
-          transaction.update(userRef, { depositBalance: currentBalance + amount });
+          transaction.update(userRef, { depositBalance: currentBalance + normalizedAmount.amountUsd });
         }
       });
 
@@ -1937,31 +2341,42 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         if (!packageSnap.exists) throw new Error('Package not found.');
         if (!userSnap.exists) throw new Error('User not found.');
 
-        const pkg = packageSnap.data() as { price: string; expiryPeriod: string };
+        const pkg = packageSnap.data() as PackagePricingDoc & { expiryPeriod: string };
         const user = userSnap.data() as { depositBalance?: number; accountExpiresAt?: any; packageId?: string | null };
+        const selectedMoney = getPackageMoney({
+          price: String(pkg.price || ''),
+          priceAmount: Number(pkg.priceAmount),
+          priceCurrency: pkg.priceCurrency,
+          priceBillingPeriod: pkg.priceBillingPeriod,
+        });
 
         if (user.packageId) {
           const currentPackageRef = adminDb.collection('packages').doc(user.packageId);
           const currentPackageSnap = await transaction.get(currentPackageRef);
           if (currentPackageSnap.exists) {
-            const currentPackage = currentPackageSnap.data() as { price?: string };
-            const currentPrice = parsePackagePrice(String(currentPackage.price || 'free'));
-            const selectedPrice = parsePackagePrice(String(pkg.price || 'free'));
+            const currentPackage = currentPackageSnap.data() as PackagePricingDoc;
+            const currentMoney = getPackageMoney({
+              price: String(currentPackage.price || ''),
+              priceAmount: Number(currentPackage.priceAmount),
+              priceCurrency: currentPackage.priceCurrency,
+              priceBillingPeriod: currentPackage.priceBillingPeriod,
+            });
+            const currentPrice = await toLedgerUsd(currentMoney.amount, currentMoney.currency);
+            const selectedPrice = await toLedgerUsd(selectedMoney.amount, selectedMoney.currency);
             if (selectedPrice < currentPrice) {
               throw new Error('Downgrading to a lower-priced package is not allowed.');
             }
           }
         }
 
-        let price = 0;
-        if (pkg.price?.toLowerCase() !== 'free' && pkg.price?.startsWith('$')) {
-          price = parseFloat(pkg.price.substring(1));
-        }
+        const price = await toLedgerUsd(selectedMoney.amount, selectedMoney.currency);
 
         const userDepositBalance = user.depositBalance || 0;
         if (userDepositBalance < price) {
-          throw new Error('Insufficient deposit balance. Please add funds to your wallet.');
+          throw new Error('Sorry, you have insufficient balance to purchase this subscription, kindly top up and try again');
         }
+
+        const purchaseRef = adminDb.collection('package_purchases').doc();
 
         const currentExpiry = user.accountExpiresAt?.toDate ? user.accountExpiresAt.toDate() : new Date(0);
         const now = new Date();
@@ -1983,6 +2398,18 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           packageImageGenerationCount: 0,
           packageVideoGenerationCount: 0,
           packageMusicGenerationCount: 0,
+        });
+
+        transaction.set(purchaseRef, {
+          userId: uid,
+          packageId,
+          packageName: String(pkgName),
+          amount: price,
+          amountCurrency: 'USD',
+          amountUsd: price,
+          status: 'completed',
+          source: 'deposit_balance',
+          createdAt: Timestamp.now(),
         });
       });
 

@@ -103,6 +103,11 @@ service cloud.firestore {
         allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
         allow update, delete: if isSignedIn() && isAdmin();
     }
+
+    match /package_purchases/{purchaseId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create, update, delete: if false;
+    }
     
     match /withdrawal_requests/{reqId} {
         allow create: if isSignedIn();

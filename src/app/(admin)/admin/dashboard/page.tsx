@@ -16,6 +16,7 @@ import { auth } from '@/lib/firebase';
 import { recordExpense } from '@/lib/admin-api';
 import { useToast } from '@/hooks/use-toast';
 import { onAuthStateChanged } from 'firebase/auth';
+import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description: string }) => (
     <Card className="border-border/60 bg-card/80 backdrop-blur-sm">
@@ -111,6 +112,7 @@ export default function AdminDashboardPage() {
     const [financeLoading, setFinanceLoading] = useState(true);
     const [financeRefreshToken, setFinanceRefreshToken] = useState(0);
     const [expenseAmount, setExpenseAmount] = useState('');
+    const [expenseCurrency, setExpenseCurrency] = useState('USD');
     const [expenseCategory, setExpenseCategory] = useState('');
     const [expenseNote, setExpenseNote] = useState('');
     const [recordingExpense, setRecordingExpense] = useState(false);
@@ -191,10 +193,11 @@ export default function AdminDashboardPage() {
 
         setRecordingExpense(true);
         try {
-            const result = await recordExpense({ amount, category, note });
+            const result = await recordExpense({ amount, category, note, currency: expenseCurrency });
             if (result.success) {
                 toast({ title: 'Expense recorded', description: result.message });
                 setExpenseAmount('');
+                setExpenseCurrency('USD');
                 setExpenseCategory('');
                 setExpenseNote('');
                 setFinanceRefreshToken((value) => value + 1);
@@ -412,14 +415,26 @@ export default function AdminDashboardPage() {
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="grid gap-3 pt-2">
-                                    <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="Amount"
-                                        value={expenseAmount}
-                                        onChange={(event) => setExpenseAmount(event.target.value)}
-                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="Amount"
+                                            value={expenseAmount}
+                                            onChange={(event) => setExpenseAmount(event.target.value)}
+                                        />
+                                        <Select value={expenseCurrency} onValueChange={setExpenseCurrency}>
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {SUPPORTED_CURRENCIES.map((currencyCode) => (
+                                                    <SelectItem key={currencyCode} value={currencyCode}>{currencyCode}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                     <Input
                                         placeholder="Category"
                                         value={expenseCategory}

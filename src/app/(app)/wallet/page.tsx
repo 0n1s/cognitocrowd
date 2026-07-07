@@ -6,15 +6,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { getUserData, getAppSettings, getDepositHistory, getPackage } from '@/lib/database';
 import { Download, Gift, Upload } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
-import { AppSettings, Deposit, Package, WithdrawalRequest } from '@/lib/types';
+import { AppSettings, Deposit, PackagePurchase, WithdrawalRequest } from '@/lib/types';
 import { DepositDialog } from './deposit-dialog';
 import { WithdrawalForm } from './withdrawal-form';
-import { getUserWithdrawalHistory } from '@/lib/user-api';
+import { getWalletData } from '@/lib/user-api';
 import { useToast } from '@/hooks/use-toast';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 
 function WalletPageLoadingSkeleton() {
     return (
@@ -30,9 +30,11 @@ function WalletPageLoadingSkeleton() {
 }
 
 export default function WalletPage() {
+  const { formatAmount } = useDisplayCurrency();
   const [balances, setBalances] = useState<{ earnings: number; deposits: number; referrals: number } | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [packagePurchases, setPackagePurchases] = useState<PackagePurchase[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [minWithdrawalAmount, setMinWithdrawalAmount] = useState(0);
   const [maxWithdrawalAmount, setMaxWithdrawalAmount] = useState(0);
@@ -58,11 +60,6 @@ export default function WalletPage() {
     return 'N/A';
   };
 
-  const formatAmount = (value: unknown) => {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric.toFixed(2) : '0.00';
-  };
-
   const fetchWalletData = async () => {
       if (!user) {
         setLoading(false);
@@ -71,57 +68,19 @@ export default function WalletPage() {
       setLoading(true);
       setHistoryError(null);
       try {
-        const [userData, appSettings, depositHistory, withdrawalResult] = await Promise.all([
-            getUserData(user.uid),
-            getAppSettings(),
-            getDepositHistory(user.uid),
-          getUserWithdrawalHistory(user.uid),
-        ]);
-        if (userData) {
-          setBalances({
-            earnings: userData.earningsBalance || 0,
-            deposits: userData.depositBalance || 0,
-            referrals: userData.referralBalance || 0,
-          });
-
-          const globalMin = Number(appSettings.withdrawalMinimumAmount || 0);
-          const globalMax = Number(appSettings.withdrawalMaximumAmount || 0);
-
-          let packageMin = 0;
-          let packageMax = 0;
-          let packageAllowsWithdrawals = true;
-          if (userData.packageId) {
-            const userPackage: Package | null = await getPackage(userData.packageId);
-            packageMin = Number(userPackage?.withdrawalMinimumAmount || 0);
-            packageMax = Number(userPackage?.withdrawalMaximumAmount || 0);
-            packageAllowsWithdrawals = userPackage?.allowWithdrawals !== false;
-          }
-
-          const effectiveMin = Math.max(globalMin > 0 ? globalMin : 0, packageMin > 0 ? packageMin : 0);
-          const hasGlobalMax = globalMax > 0;
-          const hasPackageMax = packageMax > 0;
-          const effectiveMax = hasGlobalMax && hasPackageMax
-            ? Math.min(globalMax, packageMax)
-            : hasGlobalMax
-              ? globalMax
-              : hasPackageMax
-                ? packageMax
-                : 0;
-
-          setMinWithdrawalAmount(effectiveMin);
-          setMaxWithdrawalAmount(effectiveMax);
-          setWithdrawalsAllowed(packageAllowsWithdrawals);
-        } else {
-          setMinWithdrawalAmount(0);
-          setMaxWithdrawalAmount(0);
-          setWithdrawalsAllowed(true);
+        const walletResult = await getWalletData(user.uid);
+        if (!walletResult.success) {
+          throw new Error(walletResult.message || 'Could not load wallet history.');
         }
-        setSettings(appSettings);
-        setDeposits(depositHistory);
-        if (!withdrawalResult.success) {
-          throw new Error(withdrawalResult.message || 'Could not load withdrawal history.');
-        }
-        setWithdrawals((withdrawalResult.withdrawals || []) as WithdrawalRequest[]);
+
+        setBalances(walletResult.balances || { earnings: 0, deposits: 0, referrals: 0 });
+        setSettings((walletResult.settings || {}) as AppSettings);
+        setDeposits((walletResult.deposits || []) as Deposit[]);
+        setPackagePurchases((walletResult.packagePurchases || []) as PackagePurchase[]);
+        setWithdrawals((walletResult.withdrawals || []) as WithdrawalRequest[]);
+        setMinWithdrawalAmount(Number(walletResult.withdrawalLimits?.min || 0));
+        setMaxWithdrawalAmount(Number(walletResult.withdrawalLimits?.max || 0));
+        setWithdrawalsAllowed(walletResult.withdrawalLimits?.allowed !== false);
       } catch (error) {
         console.error("Failed to fetch wallet data:", error);
         const message = error instanceof Error ? error.message : 'Could not load wallet history.';
@@ -160,7 +119,7 @@ export default function WalletPage() {
                 </div>
                 <div>
                     <CardDescription>Earnings Balance</CardDescription>
-                    <CardTitle className="text-4xl">${balances.earnings.toFixed(2)}</CardTitle>
+                    <CardTitle className="text-4xl">{formatAmount(balances.earnings, 'USD')}</CardTitle>
                 </div>
             </div>
           </CardHeader>
@@ -177,7 +136,7 @@ export default function WalletPage() {
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="rounded-full border border-violet-500/20 bg-violet-500/10 p-3"><Gift className="h-6 w-6 text-violet-600" /></div>
-              <div><CardDescription>Referral Balance</CardDescription><CardTitle className="text-4xl">${balances.referrals.toFixed(2)}</CardTitle></div>
+              <div><CardDescription>Referral Balance</CardDescription><CardTitle className="text-4xl">{formatAmount(balances.referrals, 'USD')}</CardTitle></div>
             </div>
           </CardHeader>
           <CardContent className="flex-grow"><p className="text-muted-foreground">Referral bonuses credited from eligible deposits. Credited bonuses are included in your earnings balance.</p></CardContent>
@@ -191,7 +150,7 @@ export default function WalletPage() {
                 </div>
                 <div>
                     <CardDescription>Deposit Balance</CardDescription>
-                    <CardTitle className="text-4xl">${balances.deposits.toFixed(2)}</CardTitle>
+                    <CardTitle className="text-4xl">{formatAmount(balances.deposits, 'USD')}</CardTitle>
                 </div>
             </div>
           </CardHeader>
@@ -245,7 +204,7 @@ export default function WalletPage() {
               {historyError}
               <Button type="button" variant="outline" size="sm" className="ml-3" onClick={fetchWalletData}>Try again</Button>
             </div>
-          ) : deposits.length === 0 && withdrawals.length === 0 ? (
+          ) : deposits.length === 0 && withdrawals.length === 0 && packagePurchases.length === 0 ? (
             <p className="text-muted-foreground">No transactions yet.</p>
           ) : (
             <div className="space-y-2">
@@ -266,6 +225,14 @@ export default function WalletPage() {
                   status: withdrawal.status,
                   date: withdrawal.requestedAt,
                 })),
+                ...packagePurchases.map((purchase) => ({
+                  id: `purchase-${purchase.id}`,
+                  type: 'Package purchase' as const,
+                  amount: Number(purchase.amountUsd || purchase.amount || 0),
+                  method: purchase.packageName || 'Subscription',
+                  status: purchase.status,
+                  date: purchase.createdAt,
+                })),
               ]
                 .sort((a, b) => {
                   const timeA = typeof a.date?.toDate === 'function' ? a.date.toDate().getTime() : new Date(a.date || 0).getTime();
@@ -275,7 +242,7 @@ export default function WalletPage() {
                 .map((tx, index) => (
                   <div key={`${tx.id}-${index}`} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="font-medium">{tx.type} • ${formatAmount(tx.amount)}</p>
+                      <p className="font-medium">{tx.type} • {formatAmount(Number(tx.amount || 0), 'USD')}</p>
                       <p className="text-sm text-muted-foreground">{tx.method} • {formatDate(tx.date)}</p>
                     </div>
                     <Badge className={getStatusClassName(tx.status)}>{tx.status}</Badge>

@@ -10,8 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
+import { useSessionCurrency } from '@/hooks/use-session-currency';
 
 export function PartnerTransactions({ onChanged }: { onChanged: () => void }) {
+  const { formatAmount } = useDisplayCurrency();
+  const { currency } = useSessionCurrency();
   const { toast } = useToast();
   const [data, setData] = useState<any>(null);
   const [form, setForm] = useState({
@@ -46,6 +50,7 @@ export function PartnerTransactions({ onChanged }: { onChanged: () => void }) {
     const result = await createPartnerTransaction({
       ...form,
       amount: Number(form.amount),
+      currency,
     });
 
     toast({
@@ -100,8 +105,8 @@ export function PartnerTransactions({ onChanged }: { onChanged: () => void }) {
                         </div>
                       </TableCell>
                       <TableCell>
-                        Deposit: ${Number(partner.depositLimit || 0).toFixed(2)}
-                        <div className="text-xs text-muted-foreground">Withdrawal: ${Number(partner.withdrawalLimit || 0).toFixed(2)}</div>
+                        Deposit: {formatAmount(Number(partner.depositLimit || 0), 'USD')}
+                        <div className="text-xs text-muted-foreground">Withdrawal: {formatAmount(Number(partner.withdrawalLimit || 0), 'USD')}</div>
                       </TableCell>
                     </TableRow>
                   );
@@ -185,7 +190,7 @@ export function PartnerTransactions({ onChanged }: { onChanged: () => void }) {
             <div key={item.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <span className="font-medium capitalize">{item.type}</span> through {item.partnerName} · ${Number(item.amount).toFixed(2)}
+                  <span className="font-medium capitalize">{item.type}</span> through {item.partnerName} · {formatAmount(Number(item.amount), item.amountCurrency || 'USD')}
                 </div>
                 <Badge variant="outline">{item.status}</Badge>
               </div>

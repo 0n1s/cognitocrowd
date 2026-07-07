@@ -140,7 +140,7 @@ export async function deleteQualificationQuestion(expertise: string, questionInd
   return runAdminAction('deleteQualificationQuestion', { expertise, questionIndex });
 }
 
-export async function recordExpense(data: { amount: number; category: string; note?: string }) {
+export async function recordExpense(data: { amount: number; category: string; note?: string; currency?: string }) {
   return runAdminAction('recordExpense', data);
 }
 

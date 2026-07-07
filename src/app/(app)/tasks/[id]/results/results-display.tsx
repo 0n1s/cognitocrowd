@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Badge } from "@/components/ui/badge";
 import { Star } from "lucide-react";
 import { useMemo } from "react";
+import { useDisplayCurrency } from "@/hooks/use-display-currency";
 
 // Helper function to format response data for display
 const formatResponseData = (responseData: Record<string, any>, taskType: Task['type']): string => {
@@ -40,6 +41,7 @@ const getOptionText = (option: TaskOption): string => {
 };
 
 const ResultsDisplay = ({ task, responses, userId }: { task: Task; responses: TaskResponse[]; userId: string }) => {
+    const { formatAmount } = useDisplayCurrency();
     const currentUserResponse = useMemo(() => responses.find(r => r.userId === userId), [responses, userId]);
 
     const aggregatedData = useMemo(() => {
@@ -160,7 +162,7 @@ const ResultsDisplay = ({ task, responses, userId }: { task: Task; responses: Ta
                                 </div>
                                 {typeof currentUserResponse.scorePercent === 'number' ? (
                                     <p className="text-xs text-muted-foreground">
-                                        Accuracy: {currentUserResponse.scorePercent}% | Amount earned: ${((currentUserResponse.pointsEarned || 0) / 100).toFixed(2)}
+                                        Accuracy: {currentUserResponse.scorePercent}% | Amount earned: {formatAmount((currentUserResponse.pointsEarned || 0) / 100, 'USD')}
                                     </p>
                                 ) : null}
                                 {currentUserResponse.verificationExplanation ? (

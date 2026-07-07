@@ -49,6 +49,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createAdminPackage, updateAdminPackage, deleteAdminPackage } from "@/lib/admin-api";
 import { getPackages } from "@/lib/database";
 import { Separator } from "@/components/ui/separator";
+import { formatPackageLegacyPrice, getPackageMoney, normalizeCurrencyCode, SUPPORTED_CURRENCIES } from "@/lib/currency";
 
 function buildAllowedModelTypesFromEntitlements(values: {
   allowChatNormal: boolean;
@@ -71,6 +72,11 @@ function buildAllowedModelTypesFromEntitlements(values: {
   return modelTypes;
 }
 
+function sanitizePriceAmount(amountText: string): number {
+  const parsed = Number.parseFloat(amountText);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 type AddPackageDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -80,7 +86,8 @@ type AddPackageDialogProps = {
 function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDialogProps) {
   const { toast } = useToast();
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
+  const [priceAmount, setPriceAmount] = useState("");
+  const [priceCurrency, setPriceCurrency] = useState<string>('USD');
   const [features, setFeatures] = useState<string[]>([""]);
   const [isPrimary, setIsPrimary] = useState(false);
   const [taskLimit, setTaskLimit] = useState("100");
@@ -129,7 +136,8 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
   
   const resetForm = () => {
     setName("");
-    setPrice("");
+    setPriceAmount("");
+    setPriceCurrency('USD');
     setFeatures([""]);
     setIsPrimary(false);
     setTaskLimit("100");
@@ -173,9 +181,13 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
       allowVideoGeneration,
       allowMusicGeneration,
     });
+    const normalizedPriceAmount = sanitizePriceAmount(priceAmount);
+    const normalizedPriceCurrency = normalizeCurrencyCode(priceCurrency, 'USD');
     const result = await createAdminPackage({
         name,
-        price,
+      price: formatPackageLegacyPrice(normalizedPriceAmount, normalizedPriceCurrency),
+        priceAmount: normalizedPriceAmount,
+        priceCurrency: normalizedPriceCurrency,
         features: features.filter(f => f.trim() !== ''),
         isPrimary,
         taskLimit: parseInt(taskLimit, 10) || 0,
@@ -237,7 +249,17 @@ function AddPackageDialog({ open, onOpenChange, onPackageCreated }: AddPackageDi
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="price" className="text-right">Price</Label>
-            <Input id="price" value={price} onChange={e => setPrice(e.target.value)} className="col-span-3" placeholder="e.g., $10/mo or Free" />
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+              <Input id="price" type="number" min="0" step="0.01" value={priceAmount} onChange={e => setPriceAmount(e.target.value)} placeholder="e.g., 10" />
+              <Select value={priceCurrency} onValueChange={setPriceCurrency}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map((currencyCode) => (
+                    <SelectItem key={currencyCode} value={currencyCode}>{currencyCode}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="taskLimit" className="text-right">Contribution Limit</Label>
@@ -466,9 +488,11 @@ type EditPackageDialogProps = {
 
 function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPackageDialogProps) {
     const { toast } = useToast();
+    const packageMoney = getPackageMoney(pkg);
 
     const [name, setName] = useState(pkg.name);
-    const [price, setPrice] = useState(pkg.price);
+  const [priceAmount, setPriceAmount] = useState(String(packageMoney.amount || 0));
+    const [priceCurrency, setPriceCurrency] = useState(packageMoney.currency || 'USD');
     const [features, setFeatures] = useState(pkg.features.length > 0 ? pkg.features : [""]);
     const [isPrimary, setIsPrimary] = useState(pkg.isPrimary || false);
     const [taskLimit, setTaskLimit] = useState(String(pkg.taskLimit || 100));
@@ -534,9 +558,13 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
         allowVideoGeneration,
         allowMusicGeneration,
       });
+        const normalizedPriceAmount = sanitizePriceAmount(priceAmount);
+        const normalizedPriceCurrency = normalizeCurrencyCode(priceCurrency, 'USD');
         const result = await updateAdminPackage(pkg.id, {
             name,
-            price,
+          price: formatPackageLegacyPrice(normalizedPriceAmount, normalizedPriceCurrency),
+            priceAmount: normalizedPriceAmount,
+            priceCurrency: normalizedPriceCurrency,
             features: features.filter(f => f.trim() !== ''),
             isPrimary,
             taskLimit: parseInt(taskLimit, 10) || 0,
@@ -597,7 +625,17 @@ function EditPackageDialog({ pkg, open, onOpenChange, onPackageUpdated }: EditPa
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="price-edit" className="text-right">Price</Label>
-            <Input id="price-edit" value={price} onChange={e => setPrice(e.target.value)} className="col-span-3" placeholder="e.g., $10/mo or Free" />
+            <div className="col-span-3 grid grid-cols-2 gap-2">
+              <Input id="price-edit" type="number" min="0" step="0.01" value={priceAmount} onChange={e => setPriceAmount(e.target.value)} placeholder="e.g., 10" />
+              <Select value={priceCurrency} onValueChange={setPriceCurrency}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map((currencyCode) => (
+                    <SelectItem key={currencyCode} value={currencyCode}>{currencyCode}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="taskLimit-edit" className="text-right">Contribution Limit</Label>

@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import { DailyLimitPopup } from '@/components/daily-limit-popup';
 import { Progress } from '@/components/ui/progress';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => {
   return (
@@ -52,6 +53,8 @@ type ServerClockState = {
 };
 
 function UserStats({ stats, loading }: { stats: UserStatsData | null, loading: boolean}) {
+  const { formatAmount } = useDisplayCurrency();
+
     if (loading) {
         return (
             <div className="grid gap-4 md:grid-cols-3">
@@ -68,7 +71,7 @@ function UserStats({ stats, loading }: { stats: UserStatsData | null, loading: b
         <div className="grid gap-4 md:grid-cols-3">
             <StatCard 
                 title="Earnings Balance" 
-                value={`$${stats.earningsBalance.toFixed(2)}`}
+            value={formatAmount(stats.earningsBalance, 'USD')}
                 icon={Award}
                 description="Balance earned from all contributions."
             />
@@ -89,6 +92,7 @@ function UserStats({ stats, loading }: { stats: UserStatsData | null, loading: b
 }
 
 function TaskGrid({ tasks }: { tasks: Task[] }) {
+  const { formatAmount } = useDisplayCurrency();
   
   if (tasks.length === 0) {
     return (
@@ -130,7 +134,7 @@ function TaskGrid({ tasks }: { tasks: Task[] }) {
             </p>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Reward</span>
-              <span className="font-semibold text-primary">${(task.points / 100).toFixed(2)}</span>
+              <span className="font-semibold text-primary">{formatAmount(task.points / 100, 'USD')}</span>
             </div>
           </CardHeader>
           <CardFooter>

@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { purchasePackage } from '@/lib/user-api';
 import { useRouter } from 'next/navigation';
 import { getAiWorkspaceFeatures } from '@/lib/package-workspace';
+import { getPackageMoney } from '@/lib/currency';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 
 function PackagesLoadingSkeleton() {
     return (
@@ -41,15 +43,8 @@ function PackagesLoadingSkeleton() {
     )
 }
 
-function parsePackagePrice(priceText: string): number {
-    const normalized = (priceText || '').trim().toLowerCase();
-    if (!normalized || normalized === 'free') return 0;
-    const match = normalized.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
-    const numeric = match ? Number(match[0]) : Number.NaN;
-    return Number.isFinite(numeric) ? numeric : Number.POSITIVE_INFINITY;
-}
-
 export default function PackagesPage() {
+    const { formatAmount } = useDisplayCurrency();
     const [packages, setPackages] = useState<Package[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
@@ -64,7 +59,7 @@ export default function PackagesPage() {
             try {
                 const fetchedPackages = await getPackages();
                 setPackages([...fetchedPackages].sort((a, b) => {
-                    const priceDifference = parsePackagePrice(a.price) - parsePackagePrice(b.price);
+                    const priceDifference = getPackageMoney(a).amount - getPackageMoney(b).amount;
                     return priceDifference || a.name.localeCompare(b.name);
                 }));
 
@@ -75,7 +70,7 @@ export default function PackagesPage() {
 
                     if (activePackageId) {
                         const activePackage = await getPackage(activePackageId);
-                        setCurrentPackagePrice(activePackage ? parsePackagePrice(activePackage.price) : null);
+                        setCurrentPackagePrice(activePackage ? getPackageMoney(activePackage).amount : null);
                     } else {
                         setCurrentPackagePrice(null);
                     }
@@ -126,8 +121,11 @@ export default function PackagesPage() {
                             {packages.map((pkg) => {
                                 const workspaceFeatures = getAiWorkspaceFeatures(pkg);
                                 const isCurrentPlan = currentPackageId === pkg.id;
-                                const packagePrice = parsePackagePrice(pkg.price);
-                                const isDowngrade = currentPackagePrice !== null && packagePrice < currentPackagePrice;
+                                const packageMoney = getPackageMoney(pkg);
+                                const displayPrice = packageMoney.isFree
+                                    ? 'Free'
+                                    : formatAmount(packageMoney.amount, packageMoney.currency);
+                                const isDowngrade = currentPackagePrice !== null && packageMoney.amount < currentPackagePrice;
                                 const isDisabled = !!isSubmitting || isCurrentPlan || isDowngrade;
                                 const buttonLabel = isCurrentPlan
                                     ? 'On this Plan'
@@ -141,14 +139,8 @@ export default function PackagesPage() {
                                     <CardHeader className="items-center text-center">
                                         <CardTitle className="text-2xl font-headline">{pkg.name}</CardTitle>
                                         <div className="text-4xl font-bold">
-                                            {pkg.price.startsWith('$') ? (
-                                                <>
-                                                    {pkg.price.split('/')[0]}
-                                                    <span className="text-sm font-normal text-muted-foreground">/{pkg.price.split('/')[1]}</span>
-                                                </>
-                                            ) : (
-                                                pkg.price
-                                            )}
+                                            {displayPrice}
+                                            {packageMoney.period && <span className="text-sm font-normal text-muted-foreground">/{packageMoney.period}</span>}
                                         </div>
                                     </CardHeader>
                                     <CardContent className="flex-grow">

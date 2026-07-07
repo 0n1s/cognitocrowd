@@ -1,9 +1,10 @@
 
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, Expense, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo, GeneratedMusic, DepositMethod, WithdrawalMethod } from './types';
+import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, Expense, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo, GeneratedMusic, DepositMethod, WithdrawalMethod, PackagePurchase } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
+import { getPackageMoney, normalizeCurrencyCode } from './currency';
 
 function fromDoc<T extends { id: string }>(doc: DocumentData): T {
     const data = doc.data();
@@ -67,6 +68,17 @@ function normalizeWithdrawalMethod(method: WithdrawalMethod | (Partial<Withdrawa
                 inputType: allowedInputTypes.has(field.inputType || 'text') ? (field.inputType || 'text') : 'text',
             }))
             : [],
+    };
+}
+
+function normalizePackagePricing(pkg: Package): Package {
+    const money = getPackageMoney(pkg);
+    return {
+        ...pkg,
+        priceAmount: Number.isFinite(money.amount) ? Number(money.amount) : 0,
+        priceCurrency: normalizeCurrencyCode(money.currency),
+        priceBillingPeriod: money.period || undefined,
+        price: pkg.price || (money.isFree ? 'Free' : `${money.currency} ${money.amount}`),
     };
 }
 
@@ -235,17 +247,17 @@ export async function getPackages(): Promise<Package[]> {
         await batch.commit();
         console.log('Packages database seeded.');
         const seededSnapshot = await getDocs(packagesCol);
-        return seededSnapshot.docs.map(d => fromDoc<Package>(d));
+        return seededSnapshot.docs.map(d => normalizePackagePricing(fromDoc<Package>(d)));
     }
 
-    return snapshot.docs.map(doc => fromDoc<Package>(doc));
+    return snapshot.docs.map(doc => normalizePackagePricing(fromDoc<Package>(doc)));
 }
 
 export async function getPackage(id: string): Promise<Package | null> {
     if (!db) return null;
     const docRef = doc(db, 'packages', id);
     const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? fromDoc<Package>(docSnap) : null;
+    return docSnap.exists() ? normalizePackagePricing(fromDoc<Package>(docSnap)) : null;
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
@@ -474,7 +486,7 @@ export async function getFinancialFlowAnalytics(rangeDays: number): Promise<Fina
         const point = points.get(bucketStart);
         if (!point) continue;
 
-        const amount = Number(deposit.amount || 0);
+        const amount = Number(deposit.amountUsd ?? deposit.amount ?? 0);
         if (!Number.isFinite(amount) || amount <= 0) continue;
 
         point.deposits += amount;
@@ -492,7 +504,7 @@ export async function getFinancialFlowAnalytics(rangeDays: number): Promise<Fina
         const point = points.get(bucketStart);
         if (!point) continue;
 
-        const amount = Number(withdrawal.amount || 0);
+        const amount = Number(withdrawal.amountUsd ?? withdrawal.amount ?? 0);
         if (!Number.isFinite(amount) || amount <= 0) continue;
 
         point.withdrawals += amount;
@@ -509,7 +521,7 @@ export async function getFinancialFlowAnalytics(rangeDays: number): Promise<Fina
         const point = points.get(bucketStart);
         if (!point) continue;
 
-        const amount = Number(expense.amount || 0);
+        const amount = Number(expense.amountUsd ?? expense.amount ?? 0);
         if (!Number.isFinite(amount) || amount <= 0) continue;
 
         point.expenses += amount;
@@ -548,6 +560,8 @@ export async function getAppSettings(): Promise<AppSettings> {
         withdrawalDays: [],
         withdrawalMinimumAmount: 0,
         withdrawalMaximumAmount: 0,
+        defaultCurrency: 'USD',
+        supportedCurrencies: ['USD', 'EUR', 'GBP', 'KES', 'NGN', 'GHS', 'ZAR', 'UGX', 'TZS'],
         defaultTextGenAiModel: '',
         defaultImageGenAiModel: '',
         defaultVideoGenAiModel: '',
@@ -687,6 +701,10 @@ export async function getAppSettings(): Promise<AppSettings> {
         mergedSettings.plisioApiKey = String(mergedSettings.plisioApiKey || '').trim();
         mergedSettings.plisioPublicBaseUrl = String(mergedSettings.plisioPublicBaseUrl || '').trim();
         mergedSettings.processingTimeZone = String(mergedSettings.processingTimeZone || defaultSettings.processingTimeZone || 'UTC').trim() || 'UTC';
+        mergedSettings.defaultCurrency = normalizeCurrencyCode(mergedSettings.defaultCurrency || defaultSettings.defaultCurrency || 'USD');
+        mergedSettings.supportedCurrencies = Array.isArray(mergedSettings.supportedCurrencies) && mergedSettings.supportedCurrencies.length > 0
+            ? mergedSettings.supportedCurrencies.map((code) => normalizeCurrencyCode(code)).filter((value, index, values) => values.indexOf(value) === index)
+            : defaultSettings.supportedCurrencies;
         mergedSettings.depositMethods = (mergedSettings.depositMethods || []).map((method) => normalizeDepositMethod(method as DepositMethod)).filter((method) => method.name.trim() !== '');
         const fallbackWithdrawalMethods = (mergedSettings.paymentMethods || []).map((method) => ({
             id: method.id,
@@ -816,6 +834,14 @@ export async function getDepositHistory(userId: string): Promise<Deposit[]> {
     const q = query(depositsCol, where('userId', '==', userId), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => fromDoc<Deposit>(d));
+}
+
+export async function getPackagePurchaseHistory(userId: string): Promise<PackagePurchase[]> {
+    if (!db) return [];
+    const purchasesCol = collection(db, 'package_purchases');
+    const q = query(purchasesCol, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => fromDoc<PackagePurchase>(d));
 }
 
 export async function getAllDeposits(): Promise<Deposit[]> {

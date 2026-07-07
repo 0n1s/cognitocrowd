@@ -16,6 +16,7 @@ import { useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
+import { useDisplayCurrency } from "@/hooks/use-display-currency";
 
 const AdditionalFeedback = ({ settings }: { settings?: TaskSettings }) => {
     if (!settings || (!settings.allow_comment && !settings.allow_confidence)) {
@@ -57,6 +58,7 @@ function getOptionText(option: TaskOption): string {
 
 export function TaskForms({ task }: { task: Task }) {
   const { toast } = useToast();
+  const { formatAmount } = useDisplayCurrency();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
@@ -206,7 +208,7 @@ export function TaskForms({ task }: { task: Task }) {
         : task.points / 100;
         toast({
             title: "Contribution Submitted!",
-        description: `Accuracy: ${scorePercent}%. Amount earned: $${amountEarned.toFixed(2)}. Loading next contribution...`,
+        description: `Accuracy: ${scorePercent}%. Amount earned: ${formatAmount(amountEarned, 'USD')}. Loading next contribution...`,
         });
 
         // Redirect to the next available task, or back to the list if none are left.

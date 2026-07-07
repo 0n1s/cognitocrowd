@@ -3,6 +3,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from '@/hooks/use-auth';
+import { SessionCurrencyProvider } from '@/hooks/use-session-currency';
 import { ThemeProvider } from "@/components/theme-provider";
 import { Roboto } from 'next/font/google';
 
@@ -16,6 +17,11 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: 'Trainly',
   description: 'Help train AI models by completing simple, gamified tasks.',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -32,9 +38,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <SessionCurrencyProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </SessionCurrencyProvider>
           <Toaster />
         </ThemeProvider>
       </body>
