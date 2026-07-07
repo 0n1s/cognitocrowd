@@ -589,6 +589,24 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         throw new Error('Your current package does not allow image generation.');
       }
 
+      const imageLimitType = userPackage?.imageGenerationLimitType || 'daily';
+      if (imageLimitType === 'lifetime') {
+        const lifetimeCount = userData.packageImageGenerationCount || 0;
+        if (lifetimeCount >= imageLimit) {
+          throw new Error('You have reached your image generation limit for this package.');
+        }
+      } else {
+        const lastResetDate = userData.lastImageGenerationReset?.toDate
+          ? userData.lastImageGenerationReset.toDate()
+          : new Date(0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dailyCount = lastResetDate < today ? 0 : userData.dailyImageGenerationCount || 0;
+        if (dailyCount >= imageLimit) {
+          throw new Error('You have reached your daily image generation limit for today.');
+        }
+      }
+
       const legacyTypes = userPackage?.allowedModelTypes || [];
       const hasLegacyType = (type: string) => legacyTypes.includes(type);
       const legacyFallbackEnabled = legacyTypes.length === 0;
@@ -773,6 +791,9 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
       const userData = userSnap.data() as {
         packageId?: string | null;
+        lastMusicGenerationReset?: any;
+        dailyMusicGenerationCount?: number;
+        packageMusicGenerationCount?: number;
       };
 
       let userPackage: {
@@ -799,6 +820,24 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       const musicLimit = userPackage?.musicGenerationLimit ?? 0;
       if (musicLimit <= 0) {
         throw new Error('Your current package has no music generation quota.');
+      }
+
+      const musicLimitType = userPackage?.musicGenerationLimitType || 'daily';
+      if (musicLimitType === 'lifetime') {
+        const lifetimeCount = userData.packageMusicGenerationCount || 0;
+        if (lifetimeCount >= musicLimit) {
+          throw new Error('You have reached your music generation limit for this package.');
+        }
+      } else {
+        const lastResetDate = userData.lastMusicGenerationReset?.toDate
+          ? userData.lastMusicGenerationReset.toDate()
+          : new Date(0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dailyCount = lastResetDate < today ? 0 : userData.dailyMusicGenerationCount || 0;
+        if (dailyCount >= musicLimit) {
+          throw new Error('You have reached your daily music generation limit for today.');
+        }
       }
 
       const { generateMusic } = await loadGenerateMusicFlow();

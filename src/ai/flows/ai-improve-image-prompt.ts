@@ -17,10 +17,9 @@ export async function improveImagePrompt(input: ImproveImagePromptInput): Promis
 const promptTemplate = `You are an expert prompt engineer for an AI image generator. 
 Your task is to take a user's basic prompt and expand it into a more detailed, descriptive, and visually rich prompt. 
 Add details about style (e.g., photorealistic, watercolor, anime), lighting, composition, and mood. 
-Return only the improved prompt as plain text.
 Do not return JSON.
 Do not return Markdown code fences.
-
+Return only the improved prompt as plain text without any additional commentary or explanation starting with "Generate an image of" and ending with a period.
 Original Prompt: "{{prompt}}"`;
 
 function extractImprovedPrompt(raw: string): string {
