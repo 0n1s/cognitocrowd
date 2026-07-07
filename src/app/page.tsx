@@ -145,8 +145,8 @@ export default async function Home() {
               <div className="absolute bottom-0 left-[-20%] right-0 top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--primary-rgb),0.15),rgba(255,255,255,0))]"></div>
               <div className="absolute bottom-0 right-[-20%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_farthest-side,rgba(var(--accent-rgb),0.15),rgba(255,255,255,0))]"></div>
               <Bot className="absolute h-8 w-8 text-primary/50 top-1/4 left-1/3 animate-float-1" />
-              <Bot className="absolute h-12 w-12 text-accent/40 bottom-1/4 right-1/3 animate-float-2" />
-              <Bot className="absolute h-6 w-6 text-primary/30 bottom-1/2 left-1/2 animate-float-3" />
+              <Bot className="absolute h-12 w-12 text-accent/40 bottom-1/4 right-1/3 animate-float-2 [animation-delay:1s]" />
+              <Bot className="absolute h-6 w-6 text-primary/30 bottom-1/2 left-1/2 animate-float-3 [animation-delay:2s]" />
             </div>
             <div className="container relative z-10">
                 <h1 className="font-headline text-5xl font-extrabold tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground to-muted-foreground">
