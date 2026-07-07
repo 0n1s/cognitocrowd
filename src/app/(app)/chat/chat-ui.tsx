@@ -1,15 +1,20 @@
 
 "use client";
 
-import { useRef, useEffect } from "react";
+import { Fragment } from "react";
+import { useRef, useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Sparkles, Flame, Code2, TerminalSquare, Loader2, Trash2 } from "lucide-react";
+import { Send, Sparkles, Flame, Code2, TerminalSquare, Loader2, Trash2, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
     Select,
     SelectContent,
@@ -132,6 +137,244 @@ export type Message = {
     text: string;
     sender: "user" | "ai";
 };
+
+type ContentSegment =
+    | { type: "text"; value: string }
+    | { type: "code"; value: string; language: string }
+    | { type: "json"; value: string }
+    | { type: "html"; value: string };
+
+function isLikelyHtml(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed.startsWith("<") || !trimmed.endsWith(">")) return false;
+    return /<\/?[a-z][\w-]*\b[^>]*>/i.test(trimmed);
+}
+
+function tryFormatJson(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return null;
+    try {
+        const parsed = JSON.parse(trimmed);
+        return JSON.stringify(parsed, null, 2);
+    } catch {
+        return null;
+    }
+}
+
+function sanitizeHtml(html: string): string {
+    if (typeof window === "undefined") return html;
+
+    const parser = new DOMParser();
+    const document = parser.parseFromString(html, "text/html");
+
+    document.querySelectorAll("script, style, iframe, object, embed, link, meta").forEach((node) => node.remove());
+
+    document.querySelectorAll("*").forEach((element) => {
+        Array.from(element.attributes).forEach((attribute) => {
+            const name = attribute.name.toLowerCase();
+            const value = attribute.value;
+
+            if (name.startsWith("on") || name === "srcdoc") {
+                element.removeAttribute(attribute.name);
+                return;
+            }
+
+            if ((name === "href" || name === "src") && /^\s*javascript:/i.test(value)) {
+                element.removeAttribute(attribute.name);
+            }
+        });
+    });
+
+    return document.body.innerHTML;
+}
+
+function splitMessageContent(value: string): ContentSegment[] {
+    const codeFenceRegex = /```([a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g;
+    const segments: ContentSegment[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = codeFenceRegex.exec(value)) !== null) {
+        const [fullMatch, language = "", codeBody = ""] = match;
+        const index = match.index;
+
+        if (index > lastIndex) {
+            const textBefore = value.slice(lastIndex, index);
+            const maybeJson = tryFormatJson(textBefore);
+            if (maybeJson) {
+                segments.push({ type: "json", value: maybeJson });
+            } else if (isLikelyHtml(textBefore)) {
+                segments.push({ type: "html", value: textBefore });
+            } else {
+                segments.push({ type: "text", value: textBefore });
+            }
+        }
+
+        segments.push({ type: "code", value: codeBody.trimEnd(), language: language.toLowerCase() || "code" });
+        lastIndex = index + fullMatch.length;
+    }
+
+    if (lastIndex < value.length) {
+        const textAfter = value.slice(lastIndex);
+        const maybeJson = tryFormatJson(textAfter);
+        if (maybeJson) {
+            segments.push({ type: "json", value: maybeJson });
+        } else if (isLikelyHtml(textAfter)) {
+            segments.push({ type: "html", value: textAfter });
+        } else {
+            segments.push({ type: "text", value: textAfter });
+        }
+    }
+
+    return segments;
+}
+
+function shouldRenderMarkdown(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    if (/\[render:markdown\]/i.test(trimmed)) return true;
+
+    return (
+        /^#{1,6}\s/m.test(trimmed)
+        || /^\s*[-*+]\s+/m.test(trimmed)
+        || /^\s*\d+\.\s+/m.test(trimmed)
+        || /\|.+\|/.test(trimmed)
+        || /```/.test(trimmed)
+        || /\*\*[^*]+\*\*/.test(trimmed)
+        || /`[^`]+`/.test(trimmed)
+        || /\[[^\]]+\]\([^\)]+\)/.test(trimmed)
+    );
+}
+
+function cleanMarkdownRequestMarker(value: string) {
+    return value.replace(/\[render:markdown\]/gi, "").trim();
+}
+
+function renderCodeBlock({
+    key,
+    label,
+    value,
+    copied,
+    onCopy,
+}: {
+    key: string;
+    label: string;
+    value: string;
+    copied: boolean;
+    onCopy: () => void;
+}) {
+    return (
+        <div key={key} className="overflow-hidden rounded-lg border bg-zinc-950 text-zinc-100">
+            <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
+                <span>{label}</span>
+                <button
+                    type="button"
+                    onClick={onCopy}
+                    className="inline-flex items-center gap-1 rounded border border-white/15 px-1.5 py-0.5 text-[10px] normal-case text-zinc-200 hover:bg-white/10"
+                    aria-label={`Copy ${label} block`}
+                >
+                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    {copied ? "Copied" : "Copy"}
+                </button>
+            </div>
+            <div className="text-xs leading-relaxed break-words">
+                <SyntaxHighlighter
+                    language={label === "json" ? "json" : label}
+                    style={oneDark}
+                    customStyle={{
+                        margin: 0,
+                        padding: "0.75rem",
+                        background: "transparent",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        overflowWrap: "anywhere",
+                    }}
+                    wrapLongLines
+                >
+                    {value}
+                </SyntaxHighlighter>
+            </div>
+        </div>
+    );
+}
+
+function MessageContent({ text }: { text: string }) {
+    const segments = splitMessageContent(text);
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+    const handleCopy = async (value: string, key: string) => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopiedKey(key);
+            window.setTimeout(() => {
+                setCopiedKey((current) => (current === key ? null : current));
+            }, 1200);
+        } catch {
+            setCopiedKey(null);
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            {segments.map((segment, index) => {
+                if (segment.type === "code") {
+                    const key = `segment-${index}`;
+                    return renderCodeBlock({
+                        key,
+                        label: segment.language,
+                        value: segment.value,
+                        copied: copiedKey === key,
+                        onCopy: () => void handleCopy(segment.value, key),
+                    });
+                }
+
+                if (segment.type === "json") {
+                    const key = `segment-${index}`;
+                    return renderCodeBlock({
+                        key,
+                        label: "json",
+                        value: segment.value,
+                        copied: copiedKey === key,
+                        onCopy: () => void handleCopy(segment.value, key),
+                    });
+                }
+
+                if (segment.type === "html") {
+                    return (
+                        <div
+                            key={`segment-${index}`}
+                            className="prose prose-sm max-w-none rounded-lg border bg-background/70 p-3 text-foreground dark:prose-invert"
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.value) }}
+                        />
+                    );
+                }
+
+                if (!segment.value.trim()) {
+                    return <Fragment key={`segment-${index}`} />;
+                }
+
+                const markdownRequested = shouldRenderMarkdown(segment.value);
+                if (markdownRequested) {
+                    const markdown = cleanMarkdownRequestMarker(segment.value);
+                    return (
+                        <div key={`segment-${index}`} className="prose prose-sm max-w-none break-words dark:prose-invert prose-pre:rounded-lg prose-pre:border prose-pre:bg-zinc-950 prose-pre:text-zinc-100 prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:[overflow-wrap:anywhere] prose-code:break-words prose-code:[overflow-wrap:anywhere] prose-code:text-emerald-400">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {markdown}
+                            </ReactMarkdown>
+                        </div>
+                    );
+                }
+
+                return (
+                    <p key={`segment-${index}`} className="break-words whitespace-pre-wrap leading-relaxed">
+                        {segment.value}
+                    </p>
+                );
+            })}
+        </div>
+    );
+}
 
 type ChatUIProps = {
     messages: Message[];
@@ -355,7 +598,7 @@ export function ChatUI({
                                                 : cn("border bg-card rounded-bl-md", persona.aiBubble)
                                         )}
                                     >
-                                        <p className="break-words whitespace-pre-wrap leading-relaxed">{message.text}</p>
+                                        <MessageContent text={message.text} />
                                     </div>
                                     {message.sender === "user" && (
                                         <Avatar className="hidden h-8 w-8 border bg-background sm:flex">

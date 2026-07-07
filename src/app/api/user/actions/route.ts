@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { evaluateQualificationTest } from '@/ai/flows/ai-qualification-test';
-import { generateImage } from '@/ai/flows/ai-generate-image';
-import { improveImagePrompt as improveImagePromptFlow } from '@/ai/flows/ai-improve-image-prompt';
-import { generateMusic } from '@/ai/flows/ai-generate-music';
-import { improveMusicLyrics as improveMusicLyricsFlow } from '@/ai/flows/ai-improve-music-lyrics';
-import { improveMusicCaption as improveMusicCaptionFlow } from '@/ai/flows/ai-improve-music-caption';
-import { improveMusicIdea as improveMusicIdeaFlow } from '@/ai/flows/ai-improve-music-idea';
-import { suggestMusicDuration as suggestMusicDurationFlow } from '@/ai/flows/ai-suggest-music-duration';
-import { checkImagePromptSafety } from '@/ai/flows/ai-check-image-prompt-safety';
 import { adminAuth, adminDb, adminStorage } from '@/lib/firebase-admin';
 import type { DepositMethod, WithdrawalMethod } from '@/lib/types';
 import { logJsonEvent } from '@/lib/json-logger';
 import { awardReferralBonusForDeposit } from '@/lib/referrals-admin';
 
+export const runtime = 'nodejs';
+
 type UserActionPayload = {
   action: string;
   payload?: Record<string, any>;
 };
+
+const loadQualificationFlow = () => import('@/ai/flows/ai-qualification-test');
+const loadGenerateImageFlow = () => import('@/ai/flows/ai-generate-image');
+const loadImproveImagePromptFlow = () => import('@/ai/flows/ai-improve-image-prompt');
+const loadGenerateMusicFlow = () => import('@/ai/flows/ai-generate-music');
+const loadImproveMusicLyricsFlow = () => import('@/ai/flows/ai-improve-music-lyrics');
+const loadImproveMusicCaptionFlow = () => import('@/ai/flows/ai-improve-music-caption');
+const loadImproveMusicIdeaFlow = () => import('@/ai/flows/ai-improve-music-idea');
+const loadSuggestMusicDurationFlow = () => import('@/ai/flows/ai-suggest-music-duration');
+const loadImagePromptSafetyFlow = () => import('@/ai/flows/ai-check-image-prompt-safety');
 
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -505,12 +508,14 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
       }
 
       if (imageModel === 'normal') {
+        const { checkImagePromptSafety } = await loadImagePromptSafetyFlow();
         const safety = await checkImagePromptSafety({ prompt });
         if (!safety.isSafe) {
           throw new Error(safety.reason || 'This prompt is not safe for work and cannot be generated in normal mode.');
         }
       }
 
+      const { generateImage } = await loadGenerateImageFlow();
       const genResult = await generateImage({ prompt, imageModel });
       if (!genResult.imageDataUri) {
         throw new Error('AI failed to generate an image.');
@@ -643,6 +648,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
         throw new Error('Prompt is required.');
       }
 
+      const { improveImagePrompt: improveImagePromptFlow } = await loadImproveImagePromptFlow();
       const result = await improveImagePromptFlow({ prompt });
       const improvedPrompt = String(result.improvedPrompt || '').trim();
       if (!improvedPrompt) {
@@ -700,6 +706,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
         throw new Error('Your current package has no music generation quota.');
       }
 
+      const { generateMusic } = await loadGenerateMusicFlow();
       const genResult = await generateMusic({
         prompt,
         altPrompt: altPrompt || undefined,
@@ -864,6 +871,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
         throw new Error('Prompt is required.');
       }
 
+      const { improveMusicLyrics: improveMusicLyricsFlow } = await loadImproveMusicLyricsFlow();
       const result = await improveMusicLyricsFlow({ prompt });
       const improvedPrompt = String(result.improvedPrompt || '').trim();
       if (!improvedPrompt) {
@@ -878,6 +886,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
       const prompt = String(payload.prompt || '').trim();
       if (!prompt) throw new Error('Song description is required.');
 
+      const { improveMusicIdea: improveMusicIdeaFlow } = await loadImproveMusicIdeaFlow();
       const result = await improveMusicIdeaFlow({ prompt });
       const improvedPrompt = String(result.improvedPrompt || '').trim();
       if (!improvedPrompt) throw new Error('AI did not return a song description.');
@@ -887,6 +896,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
     case 'generateRandomMusicIdea': {
       await verifyMusicGenerationAssist(uid);
       const styleCaption = String(payload.styleCaption || '').trim();
+      const { improveMusicIdea: improveMusicIdeaFlow } = await loadImproveMusicIdeaFlow();
       const result = await improveMusicIdeaFlow({
         prompt: styleCaption
           ? `Invent a completely random, original song concept that strictly fits this saved music style: ${styleCaption}. Surprise me with the story and message while preserving the genre, mood, instrumentation, vocal approach, and production identity.`
@@ -904,6 +914,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
         throw new Error('Prompt is required.');
       }
 
+      const { improveMusicCaption: improveMusicCaptionFlow } = await loadImproveMusicCaptionFlow();
       const result = await improveMusicCaptionFlow({ prompt });
       const improvedPrompt = String(result.improvedPrompt || '').trim();
       if (!improvedPrompt) {
@@ -919,6 +930,7 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
       const caption = String(payload.caption || '').trim();
       if (!lyrics) throw new Error('Lyrics are required to suggest a duration.');
 
+      const { suggestMusicDuration: suggestMusicDurationFlow } = await loadSuggestMusicDurationFlow();
       const result = await suggestMusicDurationFlow({ lyrics, caption: caption || undefined });
       return { success: true, durationSeconds: result.durationSeconds };
     }
@@ -2065,7 +2077,10 @@ async function handleUserAction(request: NextRequest, uid: string, action: strin
             correctCount: 0,
             totalCount: submissions.length,
           }
-        : await evaluateQualificationTest({ submissions, expertise });
+        : await (async () => {
+            const { evaluateQualificationTest } = await loadQualificationFlow();
+            return evaluateQualificationTest({ submissions, expertise });
+          })();
 
       const settingsSnap = await adminDb.collection('settings').doc('main').get();
       const settings = settingsSnap.data() as {
