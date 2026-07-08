@@ -1,6 +1,43 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth, adminStorage } from '@/lib/firebase-admin';
+import { adminStorage } from '@/lib/firebase-admin';
+
+export const runtime = 'nodejs';
+
+type VerifiedUser = {
+  uid: string;
+};
+
+async function verifyUser(request: NextRequest): Promise<VerifiedUser> {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const idToken = authHeader.slice('Bearer '.length).trim();
+  const apiKey = process.env.FIREBASE_WEB_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    cache: 'no-store',
+  });
+
+  const body = (await response.json().catch(() => ({}))) as {
+    users?: Array<{ localId?: string }>;
+  };
+  const user = Array.isArray(body.users) ? body.users[0] : undefined;
+
+  if (!response.ok || !user?.localId) {
+    throw new Error('Unauthorized request.');
+  }
+
+  return { uid: String(user.localId) };
+}
 
 const ALLOWED_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
@@ -49,13 +86,7 @@ function resolveBucketCandidates() {
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized request.' }, { status: 401 });
-    }
-
-    const idToken = authHeader.slice('Bearer '.length).trim();
-    const decoded = await adminAuth.verifyIdToken(idToken);
+    const verifiedUser = await verifyUser(request);
 
     const formData = await request.formData();
     const purpose = String(formData.get('purpose') || '');
@@ -84,8 +115,8 @@ export async function POST(request: NextRequest) {
 
     const extension = getFileExtension(contentType);
     const objectPath = purpose === 'deposit-receipt'
-      ? `deposit-receipts/${decoded.uid}-${randomUUID()}.${extension}`
-      : `profile-pictures/${decoded.uid}-${randomUUID()}.${extension}`;
+      ? `deposit-receipts/${verifiedUser.uid}-${randomUUID()}.${extension}`
+      : `profile-pictures/${verifiedUser.uid}-${randomUUID()}.${extension}`;
 
     let downloadUrl: string | null = null;
     let lastErrorMessage = '';
