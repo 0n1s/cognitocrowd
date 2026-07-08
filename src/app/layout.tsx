@@ -14,13 +14,15 @@ const roboto = Roboto({
   variable: '--font-roboto',
 });
 
+const FAVICON_VERSION = '20260708-1';
+
 export const metadata: Metadata = {
   title: 'Trainly',
   description: 'Help train AI models by completing simple, gamified tasks.',
   icons: {
-    icon: '/icon.svg',
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    icon: [`/favicon.ico?v=${FAVICON_VERSION}`, `/icon.svg?v=${FAVICON_VERSION}`],
+    shortcut: `/favicon.ico?v=${FAVICON_VERSION}`,
+    apple: `/icon.svg?v=${FAVICON_VERSION}`,
   },
 };
 

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
 import { rankTaskResponse } from '@/ai/flows/ai-rank-response';
 import { logJsonEvent } from '@/lib/json-logger';
+
+export const runtime = 'nodejs';
 
 const submitTaskSchema = z.object({
   taskId: z.string().min(1),
@@ -39,6 +41,41 @@ type PackageDoc = {
   taskLimit?: unknown;
   aiRankedPayoutEnabled?: unknown;
 };
+
+type VerifiedUser = {
+  uid: string;
+};
+
+async function verifyUser(request: NextRequest): Promise<VerifiedUser> {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const idToken = authHeader.slice('Bearer '.length).trim();
+  const apiKey = process.env.FIREBASE_WEB_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    cache: 'no-store',
+  });
+
+  const body = (await response.json().catch(() => ({}))) as {
+    users?: Array<{ localId?: string }>;
+  };
+  const user = Array.isArray(body.users) ? body.users[0] : undefined;
+
+  if (!response.ok || !user?.localId) {
+    throw new Error('Unauthorized request.');
+  }
+
+  return { uid: String(user.localId) };
+}
 
 function toDate(value: unknown): Date {
   if (!value) return new Date(0);
@@ -92,14 +129,8 @@ async function getNextTaskIdForUser(userId: string, completedTaskIds: string[], 
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized request.' }, { status: 401 });
-    }
-
-    const idToken = authHeader.slice('Bearer '.length).trim();
-    const decoded = await adminAuth.verifyIdToken(idToken);
-    const userId = decoded.uid;
+    const verifiedUser = await verifyUser(request);
+    const userId = verifiedUser.uid;
 
     const parsedBody = submitTaskSchema.safeParse(await request.json());
     if (!parsedBody.success) {
