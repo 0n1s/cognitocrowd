@@ -12,6 +12,7 @@ import { createUserWithEmailAndPassword, deleteUser, updateProfile } from 'fireb
 import { auth } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import { setupNewUser } from '@/lib/user-api';
+import { LocalCaptcha } from '@/components/security/local-captcha';
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -28,6 +29,8 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -45,8 +48,28 @@ export default function SignupPage() {
         });
         return;
     }
+
+    if (!captchaToken || !captchaAnswer.trim()) {
+      toast({
+        title: 'Captcha Required',
+        description: 'Please complete the captcha before creating your account.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
+      const captchaResponse = await fetch('/api/security/captcha/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: captchaToken, answer: captchaAnswer, action: 'signup' }),
+      });
+      const captchaResult = await captchaResponse.json().catch(() => ({ success: false }));
+      if (!captchaResponse.ok || !captchaResult.success) {
+        throw new Error(captchaResult.message || 'Captcha verification failed.');
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
         await updateProfile(userCredential.user, { 
@@ -81,6 +104,8 @@ export default function SignupPage() {
         description,
         variant: "destructive",
       });
+      setCaptchaToken('');
+      setCaptchaAnswer('');
     } finally {
       setIsLoading(false);
     }
@@ -139,6 +164,13 @@ export default function SignupPage() {
             disabled={isLoading}
           />
         </div>
+        <LocalCaptcha
+          disabled={isLoading}
+          onChange={({ token, answer }) => {
+            setCaptchaToken(token);
+            setCaptchaAnswer(answer);
+          }}
+        />
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Create account

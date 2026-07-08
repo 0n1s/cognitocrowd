@@ -241,9 +241,10 @@ const LoadingSkeleton = () => (
         <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+        <TableHead>Country</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Package</TableHead>
-              <TableHead>Earnings</TableHead>
+        <TableHead>Balances</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -252,9 +253,14 @@ const LoadingSkeleton = () => (
             {[...Array(5)].map((_, i) => (
                 <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+          <TableCell className="space-y-1">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-24" />
+          </TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
                 </TableRow>
@@ -304,6 +310,15 @@ export function UserList() {
     const formatDate = (dateString: string | undefined) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString();
+    };
+
+    const formatExpiryDate = (value: any) => {
+      if (!value) return 'N/A';
+      if (typeof value?.toDate === 'function') {
+        return value.toDate().toLocaleDateString();
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleDateString();
     };
 
   const filteredUsers = useMemo(() => {
@@ -452,9 +467,10 @@ export function UserList() {
                 <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Country</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Package</TableHead>
-                      <TableHead>Earnings</TableHead>
+                      <TableHead>Balances</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -469,11 +485,19 @@ export function UserList() {
                             <div className="text-xs text-muted-foreground">{user.email}</div>
                           <div className="text-xs text-muted-foreground">Reg IP: {user.registrationIp || user.ipAddress || 'N/A'}</div>
                         </TableCell>
+                        <TableCell>{user.country || 'N/A'}</TableCell>
                         <TableCell>
                             <Badge variant={user.role === 'admin' ? "default" : "secondary"}>{user.role === 'super_user_alpha_7' ? 'Admin' : 'User'}</Badge>
                         </TableCell>
-                        <TableCell>{user.packageName}</TableCell>
-                        <TableCell>${user.earningsBalance.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <div>{user.packageName || 'No Package'}</div>
+                          <div className="text-xs text-muted-foreground">Expires: {formatExpiryDate(user.accountExpiresAt)}</div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <div>Earnings: ${Number(user.earningsBalance || 0).toFixed(2)}</div>
+                          <div>Deposits: ${Number(user.depositBalance || 0).toFixed(2)}</div>
+                          <div>Referrals: ${Number(user.referralBalance || 0).toFixed(2)}</div>
+                        </TableCell>
                         <TableCell>{formatDate(user.createdAt)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end items-center gap-2">

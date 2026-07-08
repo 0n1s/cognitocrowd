@@ -2,12 +2,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { adminDb } from '@/lib/firebase-admin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Award, CheckCircle, Package, Calendar } from 'lucide-react';
+import { Award, CheckCircle, Package, Calendar, WalletCards, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { WithdrawalRequest, Deposit, AdminUser, Task, User, Package as TPackage } from '@/lib/types';
+import { WithdrawalRequest, Deposit, AdminUser, Task, User, Package as TPackage, PackagePurchase, TaskResponse } from '@/lib/types';
 import { UserPageHeader } from './user-details';
-import { CompletedTasksTable } from './completed-tasks-table';
+import { UserActivityTables } from './user-activity-tables';
 
 
 const StatCard = ({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) => (
@@ -25,6 +25,13 @@ const StatCard = ({ title, value, icon: Icon }: { title: string, value: string |
 const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
+};
+
+const formatDateTime = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return 'N/A';
+    return parsed.toLocaleString();
 };
 
 function serializeFirestoreValue(value: unknown): unknown {
@@ -63,9 +70,11 @@ async function getAdminPackages(): Promise<TPackage[]> {
 async function getAdminUserDetailById(userId: string): Promise<{
     user: User;
     completedTasks: Task[];
+    taskResponses: TaskResponse[];
     withdrawalRequests: WithdrawalRequest[];
     package: TPackage | null;
     depositHistory: Deposit[];
+    packagePurchases: PackagePurchase[];
     referrals: Array<{ id: string; name: string; email: string; packageName: string; firstDepositAmount: number | null; bonus: number; status: string; signupDate: string | null; suspicious: boolean }>;
     referralTransactions: Array<{ id: string; depositAmount: number; totalBonus: number; status: string; reason: string; createdAt: string | null }>;
 } | null> {
@@ -89,9 +98,11 @@ async function getAdminUserDetailById(userId: string): Promise<{
         });
     }
 
-    const [withdrawalsSnap, depositsSnap, packageSnap, referredSnap, referralLogsSnap] = await Promise.all([
+    const [withdrawalsSnap, depositsSnap, packagePurchasesSnap, taskResponsesSnap, packageSnap, referredSnap, referralLogsSnap] = await Promise.all([
         adminDb.collection('withdrawal_requests').where('userId', '==', userId).get(),
         adminDb.collection('deposits').where('userId', '==', userId).get(),
+        adminDb.collection('package_purchases').where('userId', '==', userId).get(),
+        adminDb.collection('task_responses').where('userId', '==', userId).get(),
         user.packageId ? adminDb.collection('packages').doc(user.packageId).get() : Promise.resolve(null),
         adminDb.collection('users').where('referredBy', '==', userId).get(),
         adminDb.collection('referral_transactions').where('referrerUserId', '==', userId).get(),
@@ -103,6 +114,12 @@ async function getAdminUserDetailById(userId: string): Promise<{
     const depositHistory = depositsSnap.docs
         .map((doc) => fromAdminDoc<Deposit>(doc.id, doc.data() || {}))
         .sort((a, b) => new Date(String(b.createdAt || 0)).getTime() - new Date(String(a.createdAt || 0)).getTime());
+    const packagePurchases = packagePurchasesSnap.docs
+        .map((doc) => fromAdminDoc<PackagePurchase>(doc.id, doc.data() || {}))
+        .sort((a, b) => new Date(String(b.createdAt || 0)).getTime() - new Date(String(a.createdAt || 0)).getTime());
+    const taskResponses = taskResponsesSnap.docs
+        .map((doc) => fromAdminDoc<TaskResponse>(doc.id, doc.data() || {}))
+        .sort((a, b) => new Date(String(b.submittedAt || 0)).getTime() - new Date(String(a.submittedAt || 0)).getTime());
 
     const userPackage = packageSnap && packageSnap.exists
         ? fromAdminDoc<TPackage>(packageSnap.id, packageSnap.data() || {})
@@ -150,13 +167,134 @@ async function getAdminUserDetailById(userId: string): Promise<{
     return {
         user,
         completedTasks,
+        taskResponses,
         withdrawalRequests,
         package: userPackage,
         depositHistory,
+        packagePurchases,
         referrals,
         referralTransactions,
     };
 }
+
+type FinancialTransaction = {
+    id: string;
+    type: 'deposit' | 'withdrawal' | 'package_purchase' | 'referral_bonus' | 'contribution_reward';
+    description: string;
+    amountUsd: number;
+    status: string;
+    createdAt: string | null;
+};
+
+const FinancialTransactionsTable = ({
+    deposits,
+    withdrawals,
+    packagePurchases,
+    referralTransactions,
+    taskResponses,
+}: {
+    deposits: Deposit[];
+    withdrawals: WithdrawalRequest[];
+    packagePurchases: PackagePurchase[];
+    referralTransactions: Array<{ id: string; depositAmount: number; totalBonus: number; status: string; reason: string; createdAt: string | null }>;
+    taskResponses: TaskResponse[];
+}) => {
+    const rows: FinancialTransaction[] = [
+        ...deposits.map((item) => ({
+            id: `dep_${item.id}`,
+            type: 'deposit' as const,
+            description: `Deposit via ${item.method}`,
+            amountUsd: Number(item.amountUsd ?? item.amount ?? 0),
+            status: String(item.status || 'pending'),
+            createdAt: item.createdAt ? String(item.createdAt) : null,
+        })),
+        ...withdrawals.map((item) => ({
+            id: `wd_${item.id}`,
+            type: 'withdrawal' as const,
+            description: `Withdrawal via ${item.paymentMethod}`,
+            amountUsd: -Math.abs(Number(item.amountUsd ?? item.amount ?? 0)),
+            status: String(item.status || 'pending'),
+            createdAt: item.requestedAt ? String(item.requestedAt) : null,
+        })),
+        ...packagePurchases.map((item) => ({
+            id: `pkg_${item.id}`,
+            type: 'package_purchase' as const,
+            description: `Package purchase: ${item.packageName}`,
+            amountUsd: -Math.abs(Number(item.amountUsd ?? item.amount ?? 0)),
+            status: String(item.status || 'completed'),
+            createdAt: item.createdAt ? String(item.createdAt) : null,
+        })),
+        ...referralTransactions.map((item) => ({
+            id: `ref_${item.id}`,
+            type: 'referral_bonus' as const,
+            description: item.reason || 'Referral bonus',
+            amountUsd: Number(item.totalBonus || 0),
+            status: String(item.status || 'pending'),
+            createdAt: item.createdAt,
+        })),
+        ...taskResponses.map((item) => ({
+            id: `task_${item.id}`,
+            type: 'contribution_reward' as const,
+            description: 'Contribution reward',
+            amountUsd: Number(item.pointsEarned || 0) / 100,
+            status: 'completed',
+            createdAt: item.submittedAt ? String(item.submittedAt) : null,
+        })),
+    ].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+    const getTypeLabel = (type: FinancialTransaction['type']) => {
+        if (type === 'deposit') return 'Deposit';
+        if (type === 'withdrawal') return 'Withdrawal';
+        if (type === 'package_purchase') return 'Package Purchase';
+        if (type === 'referral_bonus') return 'Referral Bonus';
+        return 'Contribution Reward';
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>All Financial Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.length > 0 ? rows.map((item) => {
+                            const isCredit = item.amountUsd >= 0;
+                            return (
+                                <TableRow key={item.id}>
+                                    <TableCell>{formatDateTime(item.createdAt || undefined)}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">{getTypeLabel(item.type)}</Badge>
+                                    </TableCell>
+                                    <TableCell>{item.description}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={item.status === 'completed' || item.status === 'credited' ? 'secondary' : 'outline'}>{item.status}</Badge>
+                                    </TableCell>
+                                    <TableCell className={`text-right font-semibold ${isCredit ? 'text-green-600' : 'text-red-600'}`}>
+                                        {isCredit ? '+' : '-'}${Math.abs(item.amountUsd).toFixed(2)}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        }) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center">No transactions found.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+};
 
 const ReferralHistoryCard = ({ user, referrals, referralTransactions, userPackage }: { user: User; referrals: Array<{ id: string; name: string; email: string; packageName: string; firstDepositAmount: number | null; bonus: number; status: string; signupDate: string | null; suspicious: boolean }>; referralTransactions: Array<{ id: string; depositAmount: number; totalBonus: number; status: string; reason: string; createdAt: string | null }>; userPackage: TPackage | null }) => (
     <Card>
@@ -266,33 +404,59 @@ const DepositHistoryTable = ({ deposits }: { deposits: Deposit[] }) => {
 }
 
 const IdentitySecurityCard = ({ user }: { user: User }) => {
-    const ipHistory = Array.isArray(user.ipHistory) ? user.ipHistory.filter(Boolean) : [];
+    const ipHistory = Array.isArray(user.ipHistory) ? Array.from(new Set(user.ipHistory.filter(Boolean))) : [];
+    const visibleIpHistory = ipHistory.slice(0, 6);
+    const hiddenIpCount = Math.max(0, ipHistory.length - visibleIpHistory.length);
+    const renderField = (label: string, value: string | number | null | undefined, longValue = false) => {
+        const displayValue = value === null || value === undefined || value === '' ? 'N/A' : String(value);
+
+        return (
+            <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground">{label}</p>
+                <p
+                    className={`font-medium leading-tight ${longValue ? 'truncate' : ''}`}
+                    title={longValue ? displayValue : undefined}
+                >
+                    {displayValue}
+                </p>
+            </div>
+        );
+    };
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Identity & Security</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-                <p><span className="font-medium">Registration IP:</span> {user.registrationIp || 'N/A'}</p>
-                <p><span className="font-medium">Latest IP:</span> {user.ipAddress || 'N/A'}</p>
-                <p><span className="font-medium">Registration Fingerprint:</span> {user.registrationFingerprint || 'N/A'}</p>
-                <p><span className="font-medium">Current Fingerprint:</span> {user.browserFingerprint || 'N/A'}</p>
-                <p><span className="font-medium">Copy Attempts (Qualification):</span> {user.qualificationCopyAttemptCount || 0}</p>
-                <p><span className="font-medium">Last Copy Attempt:</span> {formatDate(user.qualificationLastCopyAttemptAt)}</p>
-                <div>
-                    <p className="font-medium">IP History</p>
-                    {ipHistory.length > 0 ? (
-                        <ul className="list-disc pl-5 text-muted-foreground">
-                            {ipHistory.map((ip, index) => (
-                                <li key={`${ip}-${index}`}>{ip}</li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-muted-foreground">No IP history available.</p>
-                    )}
-                </div>
-            </CardContent>
+            <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-4 [&::-webkit-details-marker]:hidden">
+                    <span className="text-base font-semibold leading-none tracking-tight">Identity & Security</span>
+                    <span className="text-xs text-muted-foreground group-open:hidden">Show</span>
+                    <span className="hidden text-xs text-muted-foreground group-open:inline">Hide</span>
+                </summary>
+                <CardContent className="space-y-2.5 pt-0 text-sm">
+                    <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {renderField('Registration IP', user.registrationIp, true)}
+                        {renderField('Latest IP', user.ipAddress, true)}
+                        {renderField('Copy Attempts', user.qualificationCopyAttemptCount || 0)}
+                        {renderField('Last Copy Attempt', formatDate(user.qualificationLastCopyAttemptAt))}
+                        {renderField('Registration Fingerprint', user.registrationFingerprint, true)}
+                        {renderField('Current Fingerprint', user.browserFingerprint, true)}
+                    </div>
+                    <div>
+                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">IP History</p>
+                        {visibleIpHistory.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                                {visibleIpHistory.map((ip, index) => (
+                                    <Badge key={`${ip}-${index}`} variant="outline" className="font-mono text-[10px] leading-4">{ip}</Badge>
+                                ))}
+                                {hiddenIpCount > 0 && (
+                                    <Badge variant="secondary" className="text-[10px] leading-4">+{hiddenIpCount} more</Badge>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-[11px] text-muted-foreground">No IP history available.</p>
+                        )}
+                    </div>
+                </CardContent>
+            </details>
         </Card>
     );
 }
@@ -309,6 +473,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
     }
 
     const { user, completedTasks, withdrawalRequests, depositHistory, referrals, referralTransactions, package: userPackage } = data;
+    const { packagePurchases, taskResponses } = data;
+
+    const earningsBalance = Number(user.earningsBalance || 0);
+    const depositBalance = Number(user.depositBalance || 0);
+    const referralBalance = Number(user.referralBalance || 0);
+    const totalBalance = earningsBalance + depositBalance + referralBalance;
 
     const adminUser: AdminUser = {
         ...user,
@@ -321,9 +491,24 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-8 mb-8">
                 <StatCard 
-                    title="Total Earnings" 
-                    value={`$${user.earningsBalance.toFixed(2)}`}
+                    title="Earnings Balance" 
+                    value={`$${earningsBalance.toFixed(2)}`}
                     icon={Award}
+                />
+                <StatCard 
+                    title="Deposit Balance" 
+                    value={`$${depositBalance.toFixed(2)}`}
+                    icon={ArrowDownCircle}
+                />
+                <StatCard 
+                    title="Referral Balance" 
+                    value={`$${referralBalance.toFixed(2)}`}
+                    icon={ArrowUpCircle}
+                />
+                <StatCard 
+                    title="Total Wallet Balance" 
+                    value={`$${totalBalance.toFixed(2)}`}
+                    icon={WalletCards}
                 />
                 <StatCard 
                     title="Contributions Completed" 
@@ -344,10 +529,15 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
             <div className="space-y-8">
                 <IdentitySecurityCard user={user} />
-                <ReferralHistoryCard user={user} referrals={referrals} referralTransactions={referralTransactions} userPackage={userPackage} />
-                <WithdrawalHistoryTable requests={withdrawalRequests} />
-                <DepositHistoryTable deposits={depositHistory} />
-                <CompletedTasksTable tasks={completedTasks} />
+                <UserActivityTables
+                    deposits={depositHistory}
+                    withdrawals={withdrawalRequests}
+                    packagePurchases={packagePurchases}
+                    referralTransactions={referralTransactions}
+                    taskResponses={taskResponses}
+                    referrals={referrals}
+                    completedTasks={completedTasks}
+                />
             </div>
         </div>
     );

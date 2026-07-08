@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
+import { LocalCaptcha } from '@/components/security/local-captcha';
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -25,6 +26,8 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,17 +40,39 @@ export default function LoginPage() {
         });
         return;
     }
+
+    if (!captchaToken || !captchaAnswer.trim()) {
+      toast({
+        title: 'Captcha Required',
+        description: 'Please complete the captcha before signing in.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
+      const captchaResponse = await fetch('/api/security/captcha/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: captchaToken, answer: captchaAnswer, action: 'login' }),
+      });
+      const captchaResult = await captchaResponse.json().catch(() => ({ success: false }));
+      if (!captchaResponse.ok || !captchaResult.success) {
+        throw new Error(captchaResult.message || 'Captcha verification failed.');
+      }
+
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       toast({
         title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
+        description: error instanceof Error ? error.message : "Invalid email or password. Please try again.",
         variant: "destructive",
       });
+      setCaptchaToken('');
+      setCaptchaAnswer('');
     } finally {
       setIsLoading(false);
     }
@@ -93,6 +118,13 @@ export default function LoginPage() {
             disabled={isLoading}
           />
         </div>
+        <LocalCaptcha
+          disabled={isLoading}
+          onChange={({ token, answer }) => {
+            setCaptchaToken(token);
+            setCaptchaAnswer(answer);
+          }}
+        />
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Login

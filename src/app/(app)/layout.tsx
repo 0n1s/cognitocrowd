@@ -50,7 +50,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
-import { getPackage, getUserData } from "@/lib/database";
+import { getAppSettings, getPackage, getUserData } from "@/lib/database";
 import { setupNewUser } from "@/lib/user-api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SessionCurrencyPicker } from "@/components/session-currency-picker";
@@ -129,6 +129,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState<string>('user');
   const [userPackage, setUserPackage] = useState<UserPackage | null>(null);
+  const [leaderboardEnabled, setLeaderboardEnabled] = useState(true);
   const legacyTypes = userPackage?.allowedModelTypes || [];
   const hasLegacyType = (type: string) => legacyTypes.includes(type);
   const legacyFallbackEnabled = legacyTypes.length === 0;
@@ -205,6 +206,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     // If there is a user, check their status in the database.
     async function checkUserStatus() {
+      const settings = await getAppSettings().catch(() => null);
+      setLeaderboardEnabled(settings?.leaderboardEnabled !== false);
+
         let userData = await getUserData(user!.uid);
 
         // If the user exists in Auth but not in our database, create the user record.
@@ -270,6 +274,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const visibleNavItems = navItems.filter((item) => {
+    if (item.href === '/leaderboard' && !leaderboardEnabled) {
+      return false;
+    }
     if (item.href === '/partner') {
       return userRole === 'country_partner';
     }

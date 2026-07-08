@@ -62,6 +62,7 @@ export async function getReferralDashboard() {
     referralCode?: string;
     referralBalance?: number;
     totalEarnings?: number;
+    referredByName?: string | null;
     referredUsers?: Array<Record<string, any>>;
     transactions?: Array<Record<string, any>>;
     hasReferrer?: boolean;
@@ -97,6 +98,20 @@ export async function addPartnerTransactionNote(transactionId: string, message: 
 
 export async function purchasePackage(_userId: string, packageId: string) {
   return runUserAction('purchasePackage', { packageId });
+}
+
+export async function getPackageUpgradeQuotes(_userId: string, packageIds: string[]) {
+  return runUserAction<{
+    quotes?: Record<string, {
+      packageId: string;
+      selectedPriceUsd: number;
+      creditUsd: number;
+      finalPriceUsd: number;
+      remainingDays: number;
+      eligible: boolean;
+      reason: 'upgrade' | 'same_package' | 'same_price' | 'downgrade' | 'no_current_package';
+    } | null>;
+  }>('getPackageUpgradeQuotes', { packageIds });
 }
 
 export async function updateUserOnboardingProfile(_userId: string, data: { country: string; languages: string[] }) {

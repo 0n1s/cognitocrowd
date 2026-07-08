@@ -6,11 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Award } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { getUserData, getCompletedTaskDetails, getUserTaskResponses } from '@/lib/database';
 import { Task, TaskResponse } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
+
+type RewardsDatePreset = 'all' | 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_year';
 
 function RewardsPageLoadingSkeleton() {
     return (
@@ -33,6 +36,7 @@ export default function RewardsPage() {
   const [earningsBalance, setEarningsBalance] = useState(0);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [taskResponses, setTaskResponses] = useState<TaskResponse[]>([]);
+  const [datePreset, setDatePreset] = useState<RewardsDatePreset>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,7 +75,88 @@ export default function RewardsPage() {
   }
 
   const responsesByTaskId = new Map(taskResponses.map((response) => [response.taskId, response]));
-  const totalAwarded = taskResponses.reduce((total, response) => total + Number(response.pointsEarned || 0), 0) / 100;
+
+  const getResponseDate = (response?: TaskResponse) => {
+    const raw = response?.submittedAt;
+    if (!raw) {
+      return null;
+    }
+
+    if (typeof raw?.toDate === 'function') {
+      return raw.toDate() as Date;
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const getPresetBoundaries = (preset: RewardsDatePreset) => {
+    const now = new Date();
+
+    if (preset === 'all') {
+      return { start: null as Date | null, end: null as Date | null };
+    }
+
+    if (preset === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      return { start, end };
+    }
+
+    if (preset === 'yesterday') {
+      const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      const start = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0, 0);
+      const end = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59, 999);
+      return { start, end };
+    }
+
+    if (preset === 'this_week') {
+      const day = now.getDay();
+      const daysSinceMonday = (day + 6) % 7;
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday, 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      return { start, end };
+    }
+
+    if (preset === 'this_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      return { start, end };
+    }
+
+    const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return { start, end };
+  };
+
+  const { start: startBoundary, end: endBoundary } = getPresetBoundaries(datePreset);
+
+  const filteredTasks = completedTasks.filter((task) => {
+    if (!startBoundary && !endBoundary) {
+      return true;
+    }
+
+    const responseDate = getResponseDate(responsesByTaskId.get(task.id));
+    if (!responseDate) {
+      return false;
+    }
+
+    if (startBoundary && responseDate < startBoundary) {
+      return false;
+    }
+
+    if (endBoundary && responseDate > endBoundary) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const filteredResponses = filteredTasks
+    .map((task) => responsesByTaskId.get(task.id))
+    .filter((response): response is TaskResponse => Boolean(response));
+
+  const totalAwarded = filteredResponses.reduce((total, response) => total + Number(response.pointsEarned || 0), 0) / 100;
 
   return (
     <div>
@@ -105,6 +190,14 @@ export default function RewardsPage() {
         <CardHeader>
           <CardTitle>Contribution History</CardTitle>
           <CardDescription>A log of all the contributions you have completed.</CardDescription>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant={datePreset === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('today')}>Today</Button>
+            <Button variant={datePreset === 'yesterday' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('yesterday')}>Yesterday</Button>
+            <Button variant={datePreset === 'this_week' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('this_week')}>This Week</Button>
+            <Button variant={datePreset === 'this_month' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('this_month')}>This Month</Button>
+            <Button variant={datePreset === 'this_year' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('this_year')}>This Year</Button>
+            <Button variant={datePreset === 'all' ? 'secondary' : 'ghost'} size="sm" onClick={() => setDatePreset('all')}>All Time</Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -112,19 +205,22 @@ export default function RewardsPage() {
               <TableRow>
                 <TableHead>Contribution</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>AI Review</TableHead>
                 <TableHead className="text-right">Maximum</TableHead>
                 <TableHead className="text-right">Actual Earned</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {completedTasks.length > 0 ? (
-                completedTasks.map((task) => {
+              {filteredTasks.length > 0 ? (
+                filteredTasks.map((task) => {
                   const response = responsesByTaskId.get(task.id);
+                  const responseDate = getResponseDate(response);
                   return (
                       <TableRow key={task.id}>
                       <TableCell className="font-medium">{task.title}</TableCell>
                       <TableCell>{task.type}</TableCell>
+                      <TableCell>{responseDate ? responseDate.toLocaleDateString() : 'N/A'}</TableCell>
                       <TableCell>
                         {typeof response?.scorePercent === 'number' ? (
                           <div className="flex flex-wrap items-center gap-2">
@@ -144,8 +240,8 @@ export default function RewardsPage() {
                 })
               ) : (
                 <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                        You haven't completed any contributions yet.
+                    <TableCell colSpan={6} className="h-24 text-center">
+                        {completedTasks.length > 0 ? 'No contributions match the selected date range.' : "You haven't completed any contributions yet."}
                     </TableCell>
                 </TableRow>
               )}

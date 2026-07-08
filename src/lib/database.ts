@@ -650,13 +650,38 @@ export async function getAppSettings(): Promise<AppSettings> {
         leaderboardEnabled: true,
     };
 
-    if (!db) return defaultSettings;
+    let data: Partial<AppSettings> | null = null;
 
-    const settingsDocRef = doc(db, 'settings', 'main');
-    const docSnap = await getDoc(settingsDocRef);
+    if (typeof window === 'undefined') {
+        try {
+            const { adminDb } = await import('@/lib/firebase-admin');
+            const serverSnap = await adminDb.collection('settings').doc('main').get();
+            if (serverSnap.exists) {
+                data = serverSnap.data() as Partial<AppSettings>;
+            }
+        } catch {
+            // Fall back to public settings read path when admin SDK is unavailable.
+        }
+    }
 
-    if (docSnap.exists()) {
-        const data = fromDoc<AppSettings>(docSnap);
+    if (!data) {
+        if (!db) return defaultSettings;
+        const publicSettingsRef = doc(db, 'settings', 'public');
+        const publicSnap = await getDoc(publicSettingsRef).catch(() => null);
+
+        if (publicSnap?.exists()) {
+            data = fromDoc<AppSettings>(publicSnap);
+        } else {
+            // Backward compatibility while migrating from settings/main to settings/public.
+            const legacyMainRef = doc(db, 'settings', 'main');
+            const legacyMainSnap = await getDoc(legacyMainRef).catch(() => null);
+            if (legacyMainSnap?.exists()) {
+                data = fromDoc<AppSettings>(legacyMainSnap);
+            }
+        }
+    }
+
+    if (data) {
         // Deep merge for nested landingPageContent
         const mergedSettings = { 
             ...defaultSettings, 
@@ -733,10 +758,9 @@ export async function getAppSettings(): Promise<AppSettings> {
             ? Math.max(1, Math.floor(configuredQuestionLimit))
             : defaultSettings.qualificationTestQuestionLimit;
         return mergedSettings;
-    } else {
-        await setDoc(settingsDocRef, defaultSettings);
-        return defaultSettings;
     }
+
+    return defaultSettings;
 }
 
 export async function getWithdrawalRequests(): Promise<WithdrawalRequest[]> {

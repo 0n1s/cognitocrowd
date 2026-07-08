@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,33 @@ export default function OnboardingProfilePage() {
     const [country, setCountry] = useState("");
     const [languages, setLanguages] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const autoSelectCountry = async () => {
+            try {
+                const response = await fetch('/api/geo/currency', { cache: 'no-store' });
+                if (!response.ok) return;
+                const payload = await response.json().catch(() => null) as { countryCode?: string | null } | null;
+                const countryCode = String(payload?.countryCode || '').trim().toUpperCase();
+                if (!countryCode) return;
+
+                const matchedCountry = COUNTRIES.find((item) => item.code === countryCode);
+                if (!cancelled && matchedCountry) {
+                    setCountry((current) => current || matchedCountry.name);
+                }
+            } catch {
+                // Country auto-detection is best-effort only.
+            }
+        };
+
+        void autoSelectCountry();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

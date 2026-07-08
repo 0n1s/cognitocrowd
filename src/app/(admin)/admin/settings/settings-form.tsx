@@ -13,9 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Trash2, Loader2, GripVertical, RefreshCw, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { discoverOpenAiCompatibleModels } from "@/lib/actions";
-import { getAppSettings } from "@/lib/database";
 import { auth } from "@/lib/firebase";
-import { testAdminModel } from "@/lib/admin-api";
+import { getAdminAppSettings, testAdminModel } from "@/lib/admin-api";
 import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -269,7 +268,11 @@ export function SettingsForm() {
         const fetchSettings = async () => {
             setLoading(true);
             try {
-                const fetchedSettings = await getAppSettings();
+                const result = await getAdminAppSettings();
+                if (!result.success || !result.settings) {
+                    throw new Error(result.message || 'Failed to load settings.');
+                }
+                const fetchedSettings = result.settings;
                 if (fetchedSettings.onboardingCourseSteps && !fetchedSettings.onboardingCourseSteps.every(s => s.id)) {
                     fetchedSettings.onboardingCourseSteps = fetchedSettings.onboardingCourseSteps.map(s => ({...s, id: uuidv4()}));
                 }

@@ -18,7 +18,50 @@ type UserActionPayload = {
 type VerifiedUser = {
   uid: string;
   emailVerified: boolean;
+  email?: string;
+  displayName?: string;
 };
+
+const USER_ACTION_RATE_LIMIT_WINDOW_MS = 60_000;
+
+function getUserActionRateLimit(action: string) {
+  if (['generateAndSaveImage', 'generateAndSaveMusic', 'generateAndSaveVideo'].includes(action)) {
+    return 10;
+  }
+  if (['improveImagePrompt', 'improveMusicLyrics', 'improveMusicCaption', 'improveMusicIdea', 'generateRandomMusicIdea', 'suggestMusicDuration'].includes(action)) {
+    return 30;
+  }
+  if (['initiateDeposit', 'requestWithdrawal', 'purchasePackage'].includes(action)) {
+    return 20;
+  }
+  return 120;
+}
+
+async function enforceUserActionRateLimit(uid: string, action: string) {
+  const nowMs = Date.now();
+  const windowStartMs = nowMs - (nowMs % USER_ACTION_RATE_LIMIT_WINDOW_MS);
+  const key = `user:${uid}:${action}:${windowStartMs}`;
+  const limitRef = adminDb.collection('api_rate_limits').doc(key);
+  const maxRequests = getUserActionRateLimit(action);
+
+  await adminDb.runTransaction(async (transaction) => {
+    const snap = await transaction.get(limitRef);
+    const currentCount = Number(snap.data()?.count || 0);
+    if (currentCount >= maxRequests) {
+      throw new Error('Too many requests. Please try again shortly.');
+    }
+
+    transaction.set(limitRef, {
+      scope: 'user',
+      userId: uid,
+      action,
+      windowStartMs,
+      count: currentCount + 1,
+      updatedAt: Timestamp.now(),
+      expiresAt: Timestamp.fromMillis(windowStartMs + USER_ACTION_RATE_LIMIT_WINDOW_MS * 2),
+    }, { merge: true });
+  });
+}
 
 function pickRandomItems<T>(items: T[], limit: number): T[] {
   if (limit >= items.length) {
@@ -64,7 +107,7 @@ async function verifyUser(request: NextRequest): Promise<VerifiedUser> {
   });
 
   const body = (await response.json().catch(() => ({}))) as {
-    users?: Array<{ localId?: string; emailVerified?: boolean }>;
+    users?: Array<{ localId?: string; emailVerified?: boolean; email?: string; displayName?: string }>;
   };
   const user = Array.isArray(body.users) ? body.users[0] : undefined;
 
@@ -75,6 +118,8 @@ async function verifyUser(request: NextRequest): Promise<VerifiedUser> {
   return {
     uid: String(user.localId),
     emailVerified: Boolean(user.emailVerified),
+    email: user.email ? String(user.email).trim() : undefined,
+    displayName: user.displayName ? String(user.displayName).trim() : undefined,
   };
 }
 
@@ -83,6 +128,17 @@ type PackagePricingDoc = {
   priceAmount?: number;
   priceCurrency?: string;
   priceBillingPeriod?: string;
+  expiryPeriod?: string;
+};
+
+type UpgradeQuote = {
+  packageId: string;
+  selectedPriceUsd: number;
+  creditUsd: number;
+  finalPriceUsd: number;
+  remainingDays: number;
+  eligible: boolean;
+  reason: 'upgrade' | 'same_package' | 'same_price' | 'downgrade' | 'no_current_package';
 };
 
 async function toLedgerUsd(amount: number, currency: string) {
@@ -97,6 +153,138 @@ async function toLedgerUsd(amount: number, currency: string) {
 
   const normalized = await normalizeToUsdAmount(normalizedAmount, currency);
   return normalized.amountUsd;
+}
+
+function parseExpiryPeriodToDays(expiryPeriod: string | undefined): number {
+  const raw = String(expiryPeriod || '30 days').trim().toLowerCase();
+  const match = raw.match(/^(\d+)\s*([a-z]+)/);
+  if (!match) {
+    return 30;
+  }
+
+  const value = Math.max(1, Number.parseInt(match[1], 10) || 30);
+  const unit = match[2];
+
+  if (unit.startsWith('day')) return value;
+  if (unit.startsWith('week')) return value * 7;
+  if (unit.startsWith('month')) return value * 30;
+  if (unit.startsWith('year')) return value * 365;
+  return 30;
+}
+
+function getRemainingDays(accountExpiresAt: any, now = new Date()): number {
+  const expiryDate = accountExpiresAt?.toDate ? accountExpiresAt.toDate() : null;
+  if (!expiryDate || Number.isNaN(expiryDate.getTime()) || expiryDate <= now) {
+    return 0;
+  }
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / msPerDay));
+}
+
+function roundMoney(value: number): number {
+  return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
+}
+
+async function buildUpgradeQuote(params: {
+  targetPackageId: string;
+  targetPackage: PackagePricingDoc;
+  currentPackageId?: string | null;
+  accountExpiresAt?: any;
+  getCurrentPackageById: (id: string) => Promise<PackagePricingDoc | null>;
+}): Promise<UpgradeQuote> {
+  const selectedMoney = getPackageMoney({
+    price: String(params.targetPackage.price || ''),
+    priceAmount: Number(params.targetPackage.priceAmount),
+    priceCurrency: params.targetPackage.priceCurrency,
+    priceBillingPeriod: params.targetPackage.priceBillingPeriod,
+  });
+  const selectedPriceUsd = roundMoney(await toLedgerUsd(selectedMoney.amount, selectedMoney.currency));
+
+  if (!params.currentPackageId) {
+    return {
+      packageId: params.targetPackageId,
+      selectedPriceUsd,
+      creditUsd: 0,
+      finalPriceUsd: selectedPriceUsd,
+      remainingDays: 0,
+      eligible: false,
+      reason: 'no_current_package',
+    };
+  }
+
+  if (params.currentPackageId === params.targetPackageId) {
+    return {
+      packageId: params.targetPackageId,
+      selectedPriceUsd,
+      creditUsd: 0,
+      finalPriceUsd: selectedPriceUsd,
+      remainingDays: 0,
+      eligible: false,
+      reason: 'same_package',
+    };
+  }
+
+  const currentPackage = await params.getCurrentPackageById(params.currentPackageId);
+  if (!currentPackage) {
+    return {
+      packageId: params.targetPackageId,
+      selectedPriceUsd,
+      creditUsd: 0,
+      finalPriceUsd: selectedPriceUsd,
+      remainingDays: 0,
+      eligible: false,
+      reason: 'no_current_package',
+    };
+  }
+
+  const currentMoney = getPackageMoney({
+    price: String(currentPackage.price || ''),
+    priceAmount: Number(currentPackage.priceAmount),
+    priceCurrency: currentPackage.priceCurrency,
+    priceBillingPeriod: currentPackage.priceBillingPeriod,
+  });
+  const currentPriceUsd = roundMoney(await toLedgerUsd(currentMoney.amount, currentMoney.currency));
+
+  if (selectedPriceUsd < currentPriceUsd) {
+    return {
+      packageId: params.targetPackageId,
+      selectedPriceUsd,
+      creditUsd: 0,
+      finalPriceUsd: selectedPriceUsd,
+      remainingDays: 0,
+      eligible: false,
+      reason: 'downgrade',
+    };
+  }
+
+  if (selectedPriceUsd === currentPriceUsd) {
+    return {
+      packageId: params.targetPackageId,
+      selectedPriceUsd,
+      creditUsd: 0,
+      finalPriceUsd: selectedPriceUsd,
+      remainingDays: 0,
+      eligible: false,
+      reason: 'same_price',
+    };
+  }
+
+  const cycleDays = parseExpiryPeriodToDays(currentPackage.expiryPeriod);
+  const remainingDays = getRemainingDays(params.accountExpiresAt);
+  const dailyValueUsd = cycleDays > 0 ? currentPriceUsd / cycleDays : 0;
+  const creditUsd = roundMoney(Math.min(selectedPriceUsd, dailyValueUsd * remainingDays));
+  const finalPriceUsd = roundMoney(Math.max(0, selectedPriceUsd - creditUsd));
+
+  return {
+    packageId: params.targetPackageId,
+    selectedPriceUsd,
+    creditUsd,
+    finalPriceUsd,
+    remainingDays,
+    eligible: creditUsd > 0,
+    reason: 'upgrade',
+  };
 }
 
 function normalizeWeekday(value: string) {
@@ -173,6 +361,17 @@ function getAppBaseUrl(request: NextRequest, configuredBaseUrl?: string) {
     throw new Error('Unable to determine app base URL for Plisio callback.');
   }
   return `${proto}://${host}`;
+}
+
+async function generateUniqueReferralCode(maxAttempts = 8) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const candidate = randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase();
+    const existingCode = await adminDb.collection('users').where('referralCode', '==', candidate).limit(1).get();
+    if (existingCode.empty) {
+      return candidate;
+    }
+  }
+  throw new Error('Could not generate a unique referral code.');
 }
 
 async function createPlisioInvoice(params: {
@@ -1518,6 +1717,22 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       const userSnap = await adminDb.collection('users').doc(uid).get();
       if (!userSnap.exists) throw new Error('User not found.');
       const userData = userSnap.data() || {};
+
+      let referralCode = String(userData.referralCode || '').trim().toUpperCase();
+      if (!referralCode) {
+        referralCode = await generateUniqueReferralCode();
+        await userSnap.ref.update({ referralCode });
+      }
+
+      let referredByName: string | null = null;
+      if (userData.referredBy) {
+        const referrerSnap = await adminDb.collection('users').doc(String(userData.referredBy)).get();
+        if (referrerSnap.exists) {
+          const referrer = referrerSnap.data() || {};
+          referredByName = String(referrer.name || referrer.email || '').trim() || null;
+        }
+      }
+
       const [referredSnap, transactionSnap] = await Promise.all([
         adminDb.collection('users').where('referredBy', '==', uid).get(),
         adminDb.collection('referral_transactions').where('referrerUserId', '==', uid).get(),
@@ -1559,11 +1774,12 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
       return {
         success: true,
-        referralCode: String(userData.referralCode || ''),
+        referralCode,
         referralBalance: Number(userData.referralBalance || 0),
         totalEarnings: Number(userData.referralEarningsTotal || 0),
         referredUsers,
         transactions,
+        referredByName,
         hasReferrer: Boolean(userData.referredBy),
         canCompleteReferral: !userData.referredBy && Boolean(userData.createdAt?.toDate?.() && Date.now() - userData.createdAt.toDate().getTime() <= 24 * 60 * 60 * 1000),
       };
@@ -2382,33 +2598,26 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
         const pkg = packageSnap.data() as PackagePricingDoc & { expiryPeriod: string };
         const user = userSnap.data() as { depositBalance?: number; accountExpiresAt?: any; packageId?: string | null };
-        const selectedMoney = getPackageMoney({
-          price: String(pkg.price || ''),
-          priceAmount: Number(pkg.priceAmount),
-          priceCurrency: pkg.priceCurrency,
-          priceBillingPeriod: pkg.priceBillingPeriod,
+        const upgradeQuote = await buildUpgradeQuote({
+          targetPackageId: packageId,
+          targetPackage: pkg,
+          currentPackageId: user.packageId || null,
+          accountExpiresAt: user.accountExpiresAt,
+          getCurrentPackageById: async (currentPackageId) => {
+            const currentPackageRef = adminDb.collection('packages').doc(currentPackageId);
+            const currentPackageSnap = await transaction.get(currentPackageRef);
+            if (!currentPackageSnap.exists) {
+              return null;
+            }
+            return currentPackageSnap.data() as PackagePricingDoc;
+          },
         });
 
-        if (user.packageId) {
-          const currentPackageRef = adminDb.collection('packages').doc(user.packageId);
-          const currentPackageSnap = await transaction.get(currentPackageRef);
-          if (currentPackageSnap.exists) {
-            const currentPackage = currentPackageSnap.data() as PackagePricingDoc;
-            const currentMoney = getPackageMoney({
-              price: String(currentPackage.price || ''),
-              priceAmount: Number(currentPackage.priceAmount),
-              priceCurrency: currentPackage.priceCurrency,
-              priceBillingPeriod: currentPackage.priceBillingPeriod,
-            });
-            const currentPrice = await toLedgerUsd(currentMoney.amount, currentMoney.currency);
-            const selectedPrice = await toLedgerUsd(selectedMoney.amount, selectedMoney.currency);
-            if (selectedPrice < currentPrice) {
-              throw new Error('Downgrading to a lower-priced package is not allowed.');
-            }
-          }
+        if (upgradeQuote.reason === 'downgrade') {
+          throw new Error('Downgrading to a lower-priced package is not allowed.');
         }
 
-        const price = await toLedgerUsd(selectedMoney.amount, selectedMoney.currency);
+        const price = upgradeQuote.finalPriceUsd;
 
         const userDepositBalance = user.depositBalance || 0;
         if (userDepositBalance < price) {
@@ -2419,7 +2628,11 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
         const currentExpiry = user.accountExpiresAt?.toDate ? user.accountExpiresAt.toDate() : new Date(0);
         const now = new Date();
-        const baseDate = currentExpiry > now ? currentExpiry : now;
+        const baseDate = upgradeQuote.reason === 'upgrade'
+          ? now
+          : currentExpiry > now
+            ? currentExpiry
+            : now;
 
         const [valueStr, unit] = String(pkg.expiryPeriod || '1 month').split(' ');
         const value = Number.parseInt(valueStr || '1', 10) || 1;
@@ -2446,6 +2659,9 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           amount: price,
           amountCurrency: 'USD',
           amountUsd: price,
+          fullAmountUsd: upgradeQuote.selectedPriceUsd,
+          creditAppliedUsd: upgradeQuote.creditUsd,
+          creditRemainingDays: upgradeQuote.remainingDays,
           status: 'completed',
           source: 'deposit_balance',
           createdAt: Timestamp.now(),
@@ -2453,6 +2669,64 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       });
 
       return { success: true, message: `Successfully subscribed to the ${pkgName} package!` };
+    }
+
+    case 'getPackageUpgradeQuotes': {
+      const packageIds = Array.isArray(payload.packageIds)
+        ? payload.packageIds.map((value) => String(value || '').trim()).filter(Boolean)
+        : [];
+
+      if (packageIds.length === 0) {
+        return { success: true, quotes: {} };
+      }
+
+      const userSnap = await adminDb.collection('users').doc(uid).get();
+      if (!userSnap.exists) {
+        throw new Error('User not found.');
+      }
+
+      const userData = userSnap.data() as { packageId?: string | null; accountExpiresAt?: any };
+      const uniqueIds = Array.from(new Set(packageIds));
+      const packageSnaps = await Promise.all(uniqueIds.map((id) => adminDb.collection('packages').doc(id).get()));
+      const packageMap = new Map<string, PackagePricingDoc>();
+      packageSnaps.forEach((snap) => {
+        if (snap.exists) {
+          packageMap.set(snap.id, snap.data() as PackagePricingDoc);
+        }
+      });
+
+      const currentPackageCache = new Map<string, PackagePricingDoc | null>();
+      const quotesEntries = await Promise.all(uniqueIds.map(async (id) => {
+        const targetPackage = packageMap.get(id);
+        if (!targetPackage) {
+          return [id, null] as const;
+        }
+
+        const quote = await buildUpgradeQuote({
+          targetPackageId: id,
+          targetPackage,
+          currentPackageId: userData.packageId || null,
+          accountExpiresAt: userData.accountExpiresAt,
+          getCurrentPackageById: async (currentPackageId) => {
+            if (currentPackageCache.has(currentPackageId)) {
+              return currentPackageCache.get(currentPackageId) || null;
+            }
+            const currentSnap = await adminDb.collection('packages').doc(currentPackageId).get();
+            const currentPkg = currentSnap.exists ? (currentSnap.data() as PackagePricingDoc) : null;
+            currentPackageCache.set(currentPackageId, currentPkg);
+            return currentPkg;
+          },
+        });
+
+        return [id, quote] as const;
+      }));
+
+      const quotes: Record<string, UpgradeQuote | null> = {};
+      quotesEntries.forEach(([id, quote]) => {
+        quotes[id] = quote;
+      });
+
+      return { success: true, quotes };
     }
 
     case 'updateUserOnboardingProfile': {
@@ -2644,16 +2918,42 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
     }
 
     case 'setupNewUser': {
-      const name = String(payload.name || '').trim() || 'New User';
-      const email = String(payload.email || '').trim();
+      const payloadName = String(payload.name || '').trim();
+      const payloadEmail = String(payload.email || '').trim();
+      const trustedEmail = String(authUser.email || payloadEmail).trim();
+      const trustedName = String(payloadName || authUser.displayName || '').trim();
       const referralCode = payload.referralCode ? String(payload.referralCode).trim().toUpperCase() : undefined;
       const registrationIp = request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? 'unknown';
       const userAgent = request.headers.get('user-agent') ?? 'unknown';
+
+      if (!trustedEmail || !trustedEmail.includes('@')) {
+        throw new Error('A verified account email is required before setup.');
+      }
+
+      const nameFromEmail = trustedEmail.split('@')[0]?.trim() || 'User';
+      const name = (trustedName || nameFromEmail).slice(0, 80);
+      const email = trustedEmail;
 
       const userRef = adminDb.collection('users').doc(uid);
       const existingUser = await userRef.get();
       if (existingUser.exists) {
         const existingData = existingUser.data() || {};
+        const healingUpdates: Record<string, any> = {};
+        if (!String(existingData.name || '').trim()) {
+          healingUpdates.name = name;
+        }
+        if (!String(existingData.email || '').trim()) {
+          healingUpdates.email = email;
+        }
+
+        if (!String(existingData.referralCode || '').trim()) {
+          healingUpdates.referralCode = await generateUniqueReferralCode();
+        }
+
+        if (Object.keys(healingUpdates).length > 0) {
+          await userRef.set(healingUpdates, { merge: true });
+        }
+
         if (referralCode && !existingData.referredBy) {
           const createdAt = existingData.createdAt?.toDate?.() as Date | undefined;
           const isRecent = createdAt && Date.now() - createdAt.getTime() <= 10 * 60 * 1000;
@@ -2682,23 +2982,36 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         .limit(1)
         .get();
 
-      const packageId = freePackageSnap.empty ? null : freePackageSnap.docs[0].id;
+      let packageId = freePackageSnap.empty ? '' : freePackageSnap.docs[0].id;
+      if (!packageId) {
+        const fallbackPackages = await adminDb.collection('packages').get();
+        if (!fallbackPackages.empty) {
+          const best = fallbackPackages.docs
+            .map((doc) => {
+              const data = doc.data() || {};
+              const money = getPackageMoney({
+                price: String(data.price || ''),
+                priceAmount: Number(data.priceAmount),
+                priceCurrency: String(data.priceCurrency || ''),
+                priceBillingPeriod: String(data.priceBillingPeriod || ''),
+              });
+              return { id: doc.id, amount: Number(money.amount || 0) };
+            })
+            .sort((a, b) => a.amount - b.amount)[0];
+          packageId = best?.id || '';
+        }
+      }
+
+      if (!packageId) {
+        throw new Error('No default package is configured. Please contact support.');
+      }
       const now = Timestamp.now();
       const twoWeeksInSeconds = 14 * 24 * 60 * 60;
       const expiryTimestamp = new Timestamp(now.seconds + twoWeeksInSeconds, now.nanoseconds);
       const generatedFingerprint = createHash('sha256')
         .update(`${uid}:${registrationIp}:${userAgent}:${randomUUID()}`)
         .digest('hex');
-      let generatedReferralCode = '';
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const candidate = randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase();
-        const existingCode = await adminDb.collection('users').where('referralCode', '==', candidate).limit(1).get();
-        if (existingCode.empty) {
-          generatedReferralCode = candidate;
-          break;
-        }
-      }
-      if (!generatedReferralCode) throw new Error('Could not generate a unique referral code.');
+      const generatedReferralCode = await generateUniqueReferralCode();
 
       const newUserDoc: Record<string, any> = {
         name,
@@ -2864,11 +3177,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Action is required.' }, { status: 400 });
     }
 
+    await enforceUserActionRateLimit(authUser.uid, body.action);
+
     const result = await handleUserAction(request, authUser, body.action, body.payload || {});
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-    const status = message === 'Unauthorized request.' ? 401 : 400;
+    const status = message === 'Unauthorized request.' ? 401 : message.startsWith('Too many requests.') ? 429 : 400;
     return NextResponse.json({ success: false, message }, { status });
   }
 }

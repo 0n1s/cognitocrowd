@@ -11,8 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateAppSettings } from "@/lib/admin-api";
-import { getAppSettings } from "@/lib/database";
+import { getAdminAppSettings, updateAppSettings } from "@/lib/admin-api";
 import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -51,7 +50,11 @@ export function SettingsForm() {
         const fetchSettings = async () => {
             setLoading(true);
             try {
-                const fetchedSettings = await getAppSettings();
+                const result = await getAdminAppSettings();
+                if (!result.success || !result.settings) {
+                    throw new Error(result.message || 'Failed to load settings.');
+                }
+                const fetchedSettings = result.settings;
                 fetchedSettings.withdrawalMinimumAmount = Number(fetchedSettings.withdrawalMinimumAmount || 0);
                 fetchedSettings.withdrawalMaximumAmount = Number(fetchedSettings.withdrawalMaximumAmount || 0);
                 setSettings(fetchedSettings);

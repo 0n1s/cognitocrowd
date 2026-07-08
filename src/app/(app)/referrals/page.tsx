@@ -23,7 +23,7 @@ export default function ReferralsPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<{ referralCode: string; referralBalance: number; totalEarnings: number; referredUsers: ReferredUser[] } | null>(null);
+  const [data, setData] = useState<{ referralCode: string; referralBalance: number; totalEarnings: number; referredUsers: ReferredUser[]; referredByName: string | null } | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -35,6 +35,7 @@ export default function ReferralsPage() {
         referralBalance: Number(result.referralBalance || 0),
         totalEarnings: Number(result.totalEarnings || 0),
         referredUsers: (result.referredUsers || []) as ReferredUser[],
+        referredByName: result.referredByName ? String(result.referredByName) : null,
       });
     }).catch((error) => {
       toast({ title: 'Referral data unavailable', description: error instanceof Error ? error.message : 'Please try again.', variant: 'destructive' });
@@ -66,7 +67,12 @@ export default function ReferralsPage() {
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Bonus status</CardTitle></CardHeader><CardContent className="text-sm"><span className="font-semibold">{credited}</span> credited · <span className="font-semibold">{pending}</span> pending</CardContent></Card>
       </div>
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5" /> Share your invitation</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5" /> Share your invitation</CardTitle>
+          {data.referredByName && (
+            <p className="text-xs text-muted-foreground">Referred by {data.referredByName}</p>
+          )}
+        </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2"><label className="text-sm font-medium">Referral code</label><div className="flex gap-2"><Input readOnly value={data.referralCode} /><Button variant="outline" size="icon" onClick={() => copy(data.referralCode, 'Code')}><Copy className="h-4 w-4" /></Button></div></div>
           <div className="space-y-2"><label className="text-sm font-medium">Referral link</label><div className="flex gap-2"><Input readOnly value={referralLink} /><Button variant="outline" size="icon" onClick={() => copy(referralLink, 'Link')}><LinkIcon className="h-4 w-4" /></Button></div></div>

@@ -64,6 +64,41 @@ type AdminActionPayload = {
   payload?: Record<string, any>;
 };
 
+const ADMIN_ACTION_RATE_LIMIT_WINDOW_MS = 60_000;
+
+function getAdminActionRateLimit(action: string) {
+  if (['bulkCreateAdminTasks', 'testAdminModel'].includes(action)) {
+    return 20;
+  }
+  return 60;
+}
+
+async function enforceAdminActionRateLimit(uid: string, action: string) {
+  const nowMs = Date.now();
+  const windowStartMs = nowMs - (nowMs % ADMIN_ACTION_RATE_LIMIT_WINDOW_MS);
+  const key = `admin:${uid}:${action}:${windowStartMs}`;
+  const limitRef = adminDb.collection('api_rate_limits').doc(key);
+  const maxRequests = getAdminActionRateLimit(action);
+
+  await adminDb.runTransaction(async (transaction) => {
+    const snap = await transaction.get(limitRef);
+    const currentCount = Number(snap.data()?.count || 0);
+    if (currentCount >= maxRequests) {
+      throw new Error('Too many requests. Please try again shortly.');
+    }
+
+    transaction.set(limitRef, {
+      scope: 'admin',
+      userId: uid,
+      action,
+      windowStartMs,
+      count: currentCount + 1,
+      updatedAt: Timestamp.now(),
+      expiresAt: Timestamp.fromMillis(windowStartMs + ADMIN_ACTION_RATE_LIMIT_WINDOW_MS * 2),
+    }, { merge: true });
+  });
+}
+
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -95,6 +130,8 @@ async function verifyAdmin(request: NextRequest) {
   if (!userDoc.exists || userDoc.data()?.role !== 'super_user_alpha_7') {
     throw new Error('Forbidden.');
   }
+
+  return uid;
 }
 
 async function handleAction(action: string, payload: Record<string, any>) {
@@ -942,18 +979,20 @@ async function handleAction(action: string, payload: Record<string, any>) {
 
 export async function POST(request: NextRequest) {
   try {
-    await verifyAdmin(request);
+    const adminUid = await verifyAdmin(request);
 
     const body = (await request.json()) as AdminActionPayload;
     if (!body?.action) {
       return NextResponse.json({ success: false, message: 'Action is required.' }, { status: 400 });
     }
 
+    await enforceAdminActionRateLimit(adminUid, body.action);
+
     const result = await handleAction(body.action, body.payload || {});
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-    const status = message === 'Unauthorized request.' ? 401 : message === 'Forbidden.' ? 403 : 400;
+    const status = message === 'Unauthorized request.' ? 401 : message === 'Forbidden.' ? 403 : message.startsWith('Too many requests.') ? 429 : 400;
     return NextResponse.json({ success: false, message }, { status });
   }
 }

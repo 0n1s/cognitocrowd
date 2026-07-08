@@ -167,6 +167,27 @@ export async function updateAppSettings(data: AppSettings) {
   return result;
 }
 
+export async function getAdminAppSettings() {
+  if (!auth?.currentUser) {
+    return { success: false, message: 'You must be logged in as admin.' };
+  }
+
+  const idToken = await auth.currentUser.getIdToken();
+  const response = await fetch('/api/admin/settings', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+    },
+  });
+
+  const result = await response.json().catch(() => ({ success: false, message: 'Invalid server response.' }));
+  if (!response.ok && result.success !== false) {
+    return { success: false, message: 'Failed to load settings.' };
+  }
+
+  return result as { success: boolean; message?: string; settings?: AppSettings };
+}
+
 export async function testAdminModel(modality: ModelModality, model: string) {
   return runAdminAction('testAdminModel', { modality, model });
 }

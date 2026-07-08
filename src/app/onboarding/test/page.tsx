@@ -279,9 +279,10 @@ function TestGenerator() {
                         <div>
                             <CardTitle className="font-headline text-2xl">Qualification Test</CardTitle>
                             <CardDescription>Please complete this timed test to demonstrate your skills. Your response will be reviewed by our team.</CardDescription>
+                            
+                            
                             {antiCopyEnabled && (
                                 <p className="mt-2 text-xs text-destructive">
-                                    Copying is disabled. More than {copyAttemptLimit} copy attempts will automatically fail this test.
                                 </p>
                             )}
                         </div>

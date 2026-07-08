@@ -24,7 +24,7 @@ service cloud.firestore {
 
     // Settings collection: Public read for app configuration, admin-only write.
     match /settings/{settingId} {
-      allow read: if true;
+      allow read: if settingId == 'public' || (isSignedIn() && isAdmin());
       allow write: if isSignedIn() && isAdmin();
     }
     

@@ -44,6 +44,25 @@ Now you can run the app:
 npm run dev
 ```
 
+## Captcha Configuration
+
+Sign-up and login now use a captcha check.
+
+Default setup (no external domain registration required):
+
+```dotenv
+CAPTCHA_PROVIDER=local
+LOCAL_CAPTCHA_SECRET=replace-with-a-strong-random-secret
+```
+
+Optional Cloudflare Turnstile setup:
+
+```dotenv
+CAPTCHA_PROVIDER=turnstile
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-site-key
+TURNSTILE_SECRET_KEY=your-secret-key
+```
+
 ## Exchange Rates (Open Exchange Rates)
 
 The project now includes a server-side hourly exchange-rate sync foundation.
