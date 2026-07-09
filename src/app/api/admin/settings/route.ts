@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
+
+export const runtime = 'nodejs';
 
 function sanitizeSettingsPayload(payload: Record<string, unknown>) {
   // Drop client-injected document id overrides if present.
@@ -36,9 +38,27 @@ async function verifyAdminFromRequest(request: NextRequest) {
   }
 
   const idToken = authHeader.slice('Bearer '.length).trim();
-  const decoded = await adminAuth.verifyIdToken(idToken);
+  const apiKey = process.env.FIREBASE_WEB_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Unauthorized request.');
+  }
 
-  const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    cache: 'no-store',
+  });
+
+  const body = (await response.json().catch(() => ({}))) as {
+    users?: Array<{ localId?: string }>;
+  };
+  const uid = Array.isArray(body.users) ? body.users[0]?.localId : undefined;
+  if (!response.ok || !uid) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const userDoc = await adminDb.collection('users').doc(String(uid)).get();
   const role = userDoc.data()?.role;
   if (role !== 'super_user_alpha_7') {
     throw new Error('Forbidden.');

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
 import type { Deposit, Expense, WithdrawalRequest } from '@/lib/types';
+
+export const runtime = 'nodejs';
 
 type FinanceRange = 'today' | '7d' | '30d' | '90d' | '365d';
 type FinanceGranularity = 'day' | 'week' | 'month';
@@ -107,8 +109,27 @@ async function verifyAdmin(request: NextRequest) {
   }
 
   const idToken = authHeader.slice('Bearer '.length).trim();
-  const decoded = await adminAuth.verifyIdToken(idToken);
-  const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
+  const apiKey = process.env.FIREBASE_WEB_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    cache: 'no-store',
+  });
+
+  const body = (await response.json().catch(() => ({}))) as {
+    users?: Array<{ localId?: string }>;
+  };
+  const uid = Array.isArray(body.users) ? String(body.users[0]?.localId || '') : '';
+  if (!response.ok || !uid) {
+    throw new Error('Unauthorized request.');
+  }
+
+  const userDoc = await adminDb.collection('users').doc(uid).get();
   if (!userDoc.exists || userDoc.data()?.role !== 'super_user_alpha_7') {
     throw new Error('Forbidden.');
   }

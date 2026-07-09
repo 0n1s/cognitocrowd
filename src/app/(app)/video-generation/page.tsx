@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { generateAndSaveVideo } from '@/lib/video-actions';
+import { generateAndSaveVideo } from '@/lib/user-api';
 import { getUserData, getUserGeneratedVideos, getPackage } from '@/lib/database';
 import type { GeneratedVideo, Package, User } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Wand2, Loader2, Download, Eye, ChevronLeft, ChevronRight, Video } from 'lucide-react';
 import NextImage from 'next/image';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Timestamp } from 'firebase/firestore';
 
 function VideoGallery({ videos }: { videos: GeneratedVideo[] }) {
     const [isOpen, setIsOpen] = useState(false);

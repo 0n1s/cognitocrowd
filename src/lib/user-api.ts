@@ -1,5 +1,5 @@
 import { auth } from '@/lib/firebase';
-import type { GeneratedImage, GeneratedMusic, LeaderboardEntry, MusicStyleProfile } from '@/lib/types';
+import type { GeneratedImage, GeneratedMusic, GeneratedVideo, LeaderboardEntry, MusicStyleProfile } from '@/lib/types';
 
 type ApiResult<T = Record<string, unknown>> = T & {
   success: boolean;
@@ -220,6 +220,10 @@ export async function generateAndSaveMusic(
       createdAt: string;
     };
   }>('generateAndSaveMusic', payload);
+}
+
+export async function generateAndSaveVideo(_userId: string, prompt: string) {
+  return runUserAction<{ video?: GeneratedVideo }>('generateAndSaveVideo', { prompt });
 }
 
 export async function getUserGeneratedMusic(_userId: string) {

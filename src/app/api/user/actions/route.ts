@@ -81,6 +81,7 @@ const loadQualificationFlow = () => import('@/ai/flows/ai-qualification-test');
 const loadGenerateImageFlow = () => import('@/ai/flows/ai-generate-image');
 const loadImproveImagePromptFlow = () => import('@/ai/flows/ai-improve-image-prompt');
 const loadGenerateMusicFlow = () => import('@/ai/flows/ai-generate-music');
+const loadGenerateVideoFlow = () => import('@/ai/flows/ai-generate-video');
 const loadImproveMusicLyricsFlow = () => import('@/ai/flows/ai-improve-music-lyrics');
 const loadImproveMusicCaptionFlow = () => import('@/ai/flows/ai-improve-music-caption');
 const loadImproveMusicIdeaFlow = () => import('@/ai/flows/ai-improve-music-idea');
@@ -1192,6 +1193,171 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           durationSeconds,
           audioUrl: storedAudioUrl,
           storagePath: objectPath,
+          createdAt: createdAtIso,
+        },
+      };
+    }
+
+    case 'generateAndSaveVideo': {
+      const prompt = String(payload.prompt || '').trim();
+      if (!prompt) {
+        throw new Error('Prompt is required.');
+      }
+
+      const userRef = adminDb.collection('users').doc(uid);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        throw new Error('User not found.');
+      }
+
+      const userData = userSnap.data() as {
+        packageId?: string | null;
+        lastVideoGenerationReset?: any;
+        dailyVideoGenerationCount?: number;
+        packageVideoGenerationCount?: number;
+      };
+
+      let userPackage: {
+        videoGenerationLimit?: number;
+        videoGenerationLimitType?: 'daily' | 'lifetime';
+        allowVideoGeneration?: boolean;
+      } | null = null;
+
+      if (userData.packageId) {
+        const packageSnap = await adminDb.collection('packages').doc(userData.packageId).get();
+        if (packageSnap.exists) {
+          userPackage = packageSnap.data() as {
+            videoGenerationLimit?: number;
+            videoGenerationLimitType?: 'daily' | 'lifetime';
+            allowVideoGeneration?: boolean;
+          };
+        }
+      }
+
+      if (userPackage?.allowVideoGeneration === false) {
+        throw new Error('Your current package does not allow video generation.');
+      }
+
+      const videoLimit = userPackage?.videoGenerationLimit ?? 0;
+      if (videoLimit <= 0) {
+        throw new Error('Your current package does not allow video generation.');
+      }
+
+      const videoLimitType = userPackage?.videoGenerationLimitType || 'daily';
+      if (videoLimitType === 'lifetime') {
+        const lifetimeCount = userData.packageVideoGenerationCount || 0;
+        if (lifetimeCount >= videoLimit) {
+          throw new Error('You have reached your video generation limit for this package.');
+        }
+      } else {
+        const lastResetDate = userData.lastVideoGenerationReset?.toDate
+          ? userData.lastVideoGenerationReset.toDate()
+          : new Date(0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dailyCount = lastResetDate < today ? 0 : userData.dailyVideoGenerationCount || 0;
+        if (dailyCount >= videoLimit) {
+          throw new Error('You have reached your daily video generation limit for today.');
+        }
+      }
+
+      const { generateVideo } = await loadGenerateVideoFlow();
+      const genResult = await generateVideo({ prompt });
+      if (!genResult.videoUrl) {
+        throw new Error('AI failed to generate a video.');
+      }
+
+      const videoRef = adminDb.collection('generated_videos').doc();
+      let createdAtIso = new Date().toISOString();
+
+      await adminDb.runTransaction(async (transaction) => {
+        const freshUserSnap = await transaction.get(userRef);
+        if (!freshUserSnap.exists) {
+          throw new Error('User not found.');
+        }
+
+        const freshUser = freshUserSnap.data() as {
+          packageId?: string | null;
+          lastVideoGenerationReset?: any;
+          dailyVideoGenerationCount?: number;
+          packageVideoGenerationCount?: number;
+        };
+
+        let freshPackage: {
+          videoGenerationLimit?: number;
+          videoGenerationLimitType?: 'daily' | 'lifetime';
+          allowVideoGeneration?: boolean;
+        } | null = null;
+
+        if (freshUser.packageId) {
+          const packageRef = adminDb.collection('packages').doc(freshUser.packageId);
+          const packageSnap = await transaction.get(packageRef);
+          if (packageSnap.exists) {
+            freshPackage = packageSnap.data() as {
+              videoGenerationLimit?: number;
+              videoGenerationLimitType?: 'daily' | 'lifetime';
+              allowVideoGeneration?: boolean;
+            };
+          }
+        }
+
+        if (freshPackage?.allowVideoGeneration === false) {
+          throw new Error('Your current package does not allow video generation.');
+        }
+
+        const limit = freshPackage?.videoGenerationLimit ?? 0;
+        if (limit <= 0) {
+          throw new Error('Your current package does not allow video generation.');
+        }
+
+        const limitType = freshPackage?.videoGenerationLimitType || 'daily';
+        let updates: Record<string, any> = {};
+
+        if (limitType === 'lifetime') {
+          const lifetimeCount = freshUser.packageVideoGenerationCount || 0;
+          if (lifetimeCount >= limit) {
+            throw new Error('You have reached your video generation limit for this package.');
+          }
+          updates = { packageVideoGenerationCount: lifetimeCount + 1 };
+        } else {
+          const lastResetDate = freshUser.lastVideoGenerationReset?.toDate
+            ? freshUser.lastVideoGenerationReset.toDate()
+            : new Date(0);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const dailyCount = lastResetDate < today ? 0 : freshUser.dailyVideoGenerationCount || 0;
+
+          if (dailyCount >= limit) {
+            throw new Error('You have reached your daily video generation limit for today.');
+          }
+
+          updates = {
+            dailyVideoGenerationCount: dailyCount + 1,
+            lastVideoGenerationReset: Timestamp.now(),
+          };
+        }
+
+        const createdAt = Timestamp.now();
+        createdAtIso = createdAt.toDate().toISOString();
+        transaction.set(videoRef, {
+          userId: uid,
+          prompt,
+          videoUrl: genResult.videoUrl,
+          thumbnailUrl: genResult.thumbnailUrl || 'https://placehold.co/400x300.png',
+          createdAt,
+        });
+        transaction.update(userRef, updates);
+      });
+
+      return {
+        success: true,
+        message: 'Video generated successfully.',
+        video: {
+          id: videoRef.id,
+          userId: uid,
+          prompt,
+          videoUrl: genResult.videoUrl,
+          thumbnailUrl: genResult.thumbnailUrl || 'https://placehold.co/400x300.png',
           createdAt: createdAtIso,
         },
       };

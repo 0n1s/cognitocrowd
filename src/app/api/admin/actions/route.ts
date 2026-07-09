@@ -12,6 +12,8 @@ import { awardReferralBonusForDeposit, reverseReferralBonusForDeposit } from '@/
 import { normalizeCurrencyCode } from '@/lib/currency';
 import { normalizeToUsdAmount } from '@/lib/exchange-rates';
 
+export const runtime = 'nodejs';
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   try {
