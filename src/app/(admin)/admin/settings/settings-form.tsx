@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Trash2, Loader2, GripVertical, RefreshCw, Copy, Check } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, GripVertical, RefreshCw, Copy, Check, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { discoverOpenAiCompatibleModels } from "@/lib/actions";
 import { auth } from "@/lib/firebase";
@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AVAILABLE_MODELS, type ModelModality, type ModelOption } from "@/ai/models";
 import { DepositMethodsManager } from "@/components/admin/deposit-methods-manager";
 import { WithdrawalMethodsManager } from "@/components/admin/withdrawal-methods-manager";
@@ -179,6 +180,7 @@ export function SettingsForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [discoveringProviderId, setDiscoveringProviderId] = useState<string | null>(null);
     const [testingModality, setTestingModality] = useState<ModelModality | null>(null);
+    const [isOnboardingSettingsOpen, setIsOnboardingSettingsOpen] = useState(false);
     const [testResults, setTestResults] = useState<Record<ModelModality, {
         message?: string;
         text?: string;
@@ -880,10 +882,20 @@ export function SettingsForm() {
                     </div>
                 </div>
                 
-                 <div>
-                    <h3 className="text-lg font-semibold">Onboarding Course Settings</h3>
-                    <p className="text-sm text-muted-foreground">Configure the optional course for new users.</p>
-                    <div className="mt-6 space-y-6">
+                <Collapsible open={isOnboardingSettingsOpen} onOpenChange={setIsOnboardingSettingsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">Onboarding Course Settings</h3>
+                            <p className="text-sm text-muted-foreground">Configure the optional course for new users.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isOnboardingSettingsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isOnboardingSettingsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-6 space-y-6">
                         <div className="flex items-center space-x-2">
                             <Switch id="onboarding-enabled" checked={settings.onboardingCourseEnabled} onCheckedChange={(checked) => handleFieldChange('onboardingCourseEnabled', checked)} />
                             <Label htmlFor="onboarding-enabled">Enable Onboarding Course</Label>
@@ -920,8 +932,8 @@ export function SettingsForm() {
                                 </div>
                             </div>
                         )}
-                    </div>
-                </div>
+                    </CollapsibleContent>
+                </Collapsible>
 
                 <Separator />
                 
