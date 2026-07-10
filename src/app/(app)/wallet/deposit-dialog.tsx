@@ -133,6 +133,13 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
             return;
         }
 
+        const paymentWindow = selectedMethod.provider === 'plisio' && typeof window !== 'undefined'
+            ? window.open('about:blank', '_blank')
+            : null;
+        if (paymentWindow) {
+            paymentWindow.opener = null;
+        }
+
         setIsSubmitting(true);
         
         try {
@@ -141,16 +148,25 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
             if (result.success) {
                 toast({ title: "Success", description: result.message });
                  if (selectedMethod?.provider === 'plisio' && typeof (result as any).invoiceUrl === 'string') {
-                    toast({ title: "Redirecting...", description: `You will be redirected to Plisio to complete your deposit.` });
-                    window.location.href = (result as any).invoiceUrl;
+                    const invoiceUrl = (result as any).invoiceUrl;
+                    toast({ title: "Opening Plisio...", description: `Complete your deposit in the new tab.` });
+                    if (paymentWindow) {
+                        paymentWindow.location.href = invoiceUrl;
+                    } else {
+                        window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
+                    }
+                    onOpenChange(false);
                 } else {
+                    paymentWindow?.close();
                     onOpenChange(false);
                 }
                 onDeposit();
             } else {
+                paymentWindow?.close();
                 toast({ title: "Error", description: result.message, variant: "destructive" });
             }
         } catch (error) {
+            paymentWindow?.close();
             toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
         } finally {
             setIsSubmitting(false);

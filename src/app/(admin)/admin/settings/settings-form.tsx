@@ -181,6 +181,7 @@ export function SettingsForm() {
     const [discoveringProviderId, setDiscoveringProviderId] = useState<string | null>(null);
     const [testingModality, setTestingModality] = useState<ModelModality | null>(null);
     const [isOnboardingSettingsOpen, setIsOnboardingSettingsOpen] = useState(false);
+    const [isAiModelSettingsOpen, setIsAiModelSettingsOpen] = useState(false);
     const [testResults, setTestResults] = useState<Record<ModelModality, {
         message?: string;
         text?: string;
@@ -937,11 +938,20 @@ export function SettingsForm() {
 
                 <Separator />
                 
-                <div>
-                    <h3 className="text-lg font-semibold">AI Model Settings</h3>
-                    <p className="text-sm text-muted-foreground">Configure the default generative model for AI features.</p>
-                </div>
-                <div className="space-y-4">
+                <Collapsible open={isAiModelSettingsOpen} onOpenChange={setIsAiModelSettingsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">AI Model Settings</h3>
+                            <p className="text-sm text-muted-foreground">Configure the default generative model for AI features.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isAiModelSettingsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isAiModelSettingsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                <CollapsibleContent className="mt-6 space-y-4">
                     <p className="text-sm text-muted-foreground">
                         Add one or more OpenAI-compatible providers, set what each provider supports, discover models, then choose defaults per modality.
                     </p>
@@ -1217,7 +1227,8 @@ export function SettingsForm() {
                             />
                         </div>
                     </div>
-                </div>
+                </CollapsibleContent>
+                </Collapsible>
 
                 <Separator />
 
