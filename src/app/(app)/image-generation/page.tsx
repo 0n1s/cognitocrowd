@@ -1,17 +1,17 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { deleteGeneratedImage, deleteGeneratedImages, generateAndSaveImage, improveImagePrompt } from '@/lib/user-api';
+import { deleteGeneratedImage, deleteGeneratedImages, generateAndSaveImage, generateRandomImagePrompt, improveImagePrompt, refreshPendingImageGenerations } from '@/lib/user-api';
 import { getUserData, getUserGeneratedImages, getPackage } from '@/lib/database';
 import type { GeneratedImage, Package, User } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wand2, Loader2, Download, Eye, ChevronLeft, ChevronRight, Trash2, Sparkles, Image as ImageIcon, Flame } from 'lucide-react';
+import { Wand2, Loader2, Download, Eye, ChevronLeft, ChevronRight, Trash2, Sparkles, Image as ImageIcon, Flame, ImagePlus } from 'lucide-react';
 import NextImage from 'next/image';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,6 +36,23 @@ import { cn } from '@/lib/utils';
 
 type ImageModelKey = 'normal' | 'uncensored';
 const IMAGE_MODEL_STORAGE_KEY = 'trainly.image.selectedModel';
+const IMAGE_PLACEHOLDER_THUMBNAIL = 'https://placehold.co/400x400.png';
+
+function isImageFinished(image: GeneratedImage) {
+    return (image.status || 'completed') === 'completed' && Boolean(image.imageUrl);
+}
+
+function isImagePending(image: GeneratedImage) {
+    return ['submitting', 'queued', 'processing'].includes(image.status || '');
+}
+
+function getImageProgress(image: GeneratedImage) {
+    return Math.max(0, Math.min(100, Number(image.progress) || 0));
+}
+
+function hasUsableImageThumbnail(image: GeneratedImage) {
+    return Boolean(image.thumbnailUrl && image.thumbnailUrl !== IMAGE_PLACEHOLDER_THUMBNAIL && isImageFinished(image));
+}
 
 const IMAGE_MODEL_THEME = {
     normal: {
@@ -111,18 +128,27 @@ function ImageGallery({
     }, [images.length, currentIndex]);
 
     const openLightbox = (index: number) => {
+        if (!isImageFinished(images[index])) return;
         setCurrentIndex(index);
         setIsOpen(true);
     };
 
     const showNext = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
+        const finishedImages = images.map((image, index) => ({ image, index })).filter(({ image }) => isImageFinished(image));
+        if (finishedImages.length === 0) return;
+        const currentFinishedIndex = finishedImages.findIndex((item) => item.index === currentIndex);
+        const next = finishedImages[(currentFinishedIndex + 1 + finishedImages.length) % finishedImages.length];
+        setCurrentIndex(next.index);
     };
 
     const showPrev = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
+        const finishedImages = images.map((image, index) => ({ image, index })).filter(({ image }) => isImageFinished(image));
+        if (finishedImages.length === 0) return;
+        const currentFinishedIndex = finishedImages.findIndex((item) => item.index === currentIndex);
+        const prev = finishedImages[(currentFinishedIndex - 1 + finishedImages.length) % finishedImages.length];
+        setCurrentIndex(prev.index);
     };
 
     if (images.length === 0) {
@@ -135,14 +161,20 @@ function ImageGallery({
     }
 
     const currentImage = images[currentIndex];
+    const finishedImagesCount = images.filter(isImageFinished).length;
 
     return (
         <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {images.map((image, index) => (
+                {images.map((image, index) => {
+                    const pending = isImagePending(image);
+                    const failed = image.status === 'failed';
+                    const finished = isImageFinished(image);
+                    const progress = getImageProgress(image);
+                    return (
                     <Card
                         key={image.id}
-                        className={cn("group relative overflow-hidden", selectionMode && selectedImageIds.has(image.id) && "ring-2 ring-primary")}
+                        className={cn("group relative overflow-hidden border-border/70 bg-card", selectionMode && selectedImageIds.has(image.id) && "ring-2 ring-primary")}
                         onClick={() => {
                             if (selectionMode) {
                                 onToggleSelect(image.id);
@@ -176,32 +208,72 @@ function ImageGallery({
                             ) : (
                                 <Trash2 className="h-4 w-4" />
                             )}
-                            <span className="sr-only">Delete image</span>
+                                <span className="sr-only">Delete image</span>
                         </Button>
-                        <NextImage
-                            src={image.thumbnailUrl}
-                            alt={image.prompt}
-                            width={400}
-                            height={400}
-                            className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
-                        />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
-                            <Button variant="secondary" size="icon" className="pointer-events-none">
-                                <Eye className="h-5 w-5" />
-                                <span className="sr-only">View Image</span>
-                            </Button>
-                        </div>
+                        {hasUsableImageThumbnail(image) ? (
+                            <NextImage
+                                src={image.thumbnailUrl!}
+                                alt={image.prompt}
+                                width={400}
+                                height={400}
+                                className="aspect-square w-full cursor-pointer object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                        ) : (
+                            <div className={cn(
+                                "flex aspect-square w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-muted via-muted/70 to-background p-5 text-center",
+                                failed && "from-destructive/15 via-muted to-background"
+                            )}>
+                                <div className={cn(
+                                    "flex h-14 w-14 items-center justify-center rounded-full border bg-background/80",
+                                    pending && "border-primary/30 text-primary",
+                                    failed && "border-destructive/30 text-destructive"
+                                )}>
+                                    {pending ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImageIcon className="h-7 w-7" />}
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-semibold">
+                                        {failed ? 'Generation failed' : pending ? 'Generating image' : 'Image unavailable'}
+                                    </p>
+                                    <p className="line-clamp-2 text-xs text-muted-foreground">{failed ? image.errorMessage || 'Please try again.' : image.prompt}</p>
+                                </div>
+                                {pending && (
+                                    <div className="w-full max-w-[160px]">
+                                        <div className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15">
+                                            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(8, progress)}%` }} />
+                                        </div>
+                                        <p className="mt-1 text-[11px] text-muted-foreground">{progress}%</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {finished && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 p-4 opacity-0 transition-opacity group-hover:opacity-100">
+                                <Button variant="secondary" size="icon" className="pointer-events-none">
+                                    <Eye className="h-5 w-5" />
+                                    <span className="sr-only">View Image</span>
+                                </Button>
+                            </div>
+                        )}
+                        {(pending || failed) && (
+                            <div className={cn(
+                                "absolute left-2 top-2 rounded-full px-2 py-1 text-[11px] font-semibold",
+                                failed ? "bg-destructive text-destructive-foreground" : "bg-background/90 text-foreground"
+                            )}>
+                                {failed ? 'Failed' : image.status === 'queued' ? 'Queued' : 'Processing'}
+                            </div>
+                        )}
                     </Card>
-                ))}
+                    );
+                })}
             </div>
             
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent className="max-w-4xl p-4 sm:p-6">
                     <DialogTitle className="sr-only">Generated Image Preview</DialogTitle>
-                    {currentImage && (
+                    {currentImage && currentImage.imageUrl && (
                         <div className="flex flex-col gap-4 max-h-[85vh] overflow-y-auto pr-2">
                             <div className="relative aspect-square w-full">
-                                {images.length > 1 && (
+                                {finishedImagesCount > 1 && (
                                     <>
                                         <Button
                                             variant="ghost"
@@ -294,7 +366,10 @@ export default function ImageGenerationPage() {
     const [images, setImages] = useState<GeneratedImage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isImprovingPrompt, setIsImprovingPrompt] = useState(false);
+    const [isGeneratingRandomPrompt, setIsGeneratingRandomPrompt] = useState(false);
     const [isPageLoading, setIsPageLoading] = useState(true);
+    const [isRefreshingPendingImages, setIsRefreshingPendingImages] = useState(false);
+    const isRefreshingPendingImagesRef = useRef(false);
     const [deletingImageIds, setDeletingImageIds] = useState<Set<string>>(new Set());
     const [pendingDeleteImageId, setPendingDeleteImageId] = useState<string | null>(null);
     const [pendingBulkDeleteType, setPendingBulkDeleteType] = useState<'all' | 'selected' | null>(null);
@@ -393,6 +468,36 @@ export default function ImageGenerationPage() {
         }
     }, [user, authLoading]);
 
+    const refreshPendingImages = useCallback(async () => {
+        if (!user || isRefreshingPendingImagesRef.current) return;
+        const hasPendingImages = images.some(isImagePending);
+        if (!hasPendingImages) return;
+
+        isRefreshingPendingImagesRef.current = true;
+        setIsRefreshingPendingImages(true);
+        try {
+            await refreshPendingImageGenerations(user.uid);
+            const generatedImages = await getUserGeneratedImages(user.uid);
+            setImages(generatedImages);
+        } catch {
+            // Refresh is opportunistic; individual failures stay visible on the next successful poll.
+        } finally {
+            isRefreshingPendingImagesRef.current = false;
+            setIsRefreshingPendingImages(false);
+        }
+    }, [images, user]);
+
+    useEffect(() => {
+        if (!user || !images.some(isImagePending)) return;
+
+        void refreshPendingImages();
+        const interval = window.setInterval(() => {
+            void refreshPendingImages();
+        }, 15000);
+
+        return () => window.clearInterval(interval);
+    }, [images, refreshPendingImages, user]);
+
     const handleGenerate = async () => {
         if (!user) {
             toast({ title: "Not Authenticated", variant: "destructive" });
@@ -407,7 +512,11 @@ export default function ImageGenerationPage() {
         try {
             const result = await generateAndSaveImage(user.uid, prompt, selectedImageModel);
             if (result.success && result.image) {
-                toast({ title: "Success!", description: "Your image has been generated." });
+                const finished = isImageFinished(result.image);
+                toast({
+                    title: finished ? "Success!" : "Image queued",
+                    description: finished ? "Your image has been generated." : "Your image is being generated in the background.",
+                });
                 setImages(prev => [result.image!, ...prev]);
                 setCount(prev => prev + 1);
                 setPrompt("");
@@ -435,8 +544,9 @@ export default function ImageGenerationPage() {
         setIsImprovingPrompt(true);
         try {
             const result = await improveImagePrompt(user.uid, prompt);
-            if (result.success && result.improvedPrompt) {
-                setPrompt(result.improvedPrompt);
+            const improvedPrompt = String(result.improvedPrompt || '').trim();
+            if (result.success && improvedPrompt) {
+                setPrompt(improvedPrompt);
                 toast({ title: "Prompt improved", description: "AI refined your prompt using the normal chat model." });
             } else {
                 toast({ title: "Could not improve prompt", description: result.message || "Try again in a moment.", variant: "destructive" });
@@ -446,6 +556,30 @@ export default function ImageGenerationPage() {
             toast({ title: "Error", description: errorMessage, variant: "destructive" });
         } finally {
             setIsImprovingPrompt(false);
+        }
+    };
+
+    const handleRandomPrompt = async () => {
+        if (!user) {
+            toast({ title: "Not Authenticated", variant: "destructive" });
+            return;
+        }
+
+        setIsGeneratingRandomPrompt(true);
+        try {
+            const result = await generateRandomImagePrompt(user.uid);
+            const randomPrompt = String(result.improvedPrompt || '').trim();
+            if (result.success && randomPrompt) {
+                setPrompt(randomPrompt);
+                toast({ title: "Random idea ready", description: "A fresh image prompt has been added." });
+            } else {
+                toast({ title: "Could not generate idea", description: result.message || "Try again in a moment.", variant: "destructive" });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            toast({ title: "Error", description: errorMessage, variant: "destructive" });
+        } finally {
+            setIsGeneratingRandomPrompt(false);
         }
     };
 
@@ -487,6 +621,9 @@ export default function ImageGenerationPage() {
     const canGenerate = count < limit && allowedImageModels.includes(selectedImageModel);
     const totalPages = Math.max(1, Math.ceil(images.length / pageSize));
     const paginatedImages = images.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const pendingImageCount = images.filter(isImagePending).length;
+    const downloadableImageCount = images.filter(isImageFinished).length;
+    const selectedDownloadableCount = images.filter((img) => selectedImageIds.has(img.id) && isImageFinished(img)).length;
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -519,12 +656,13 @@ export default function ImageGenerationPage() {
     };
 
     const handleDownloadImages = async (targetImages: GeneratedImage[]) => {
-        if (targetImages.length === 0 || isBulkDownloading) return;
+        const downloadableImages = targetImages.filter(isImageFinished);
+        if (downloadableImages.length === 0 || isBulkDownloading) return;
         setIsBulkDownloading(true);
         try {
-            for (const image of targetImages) {
+            for (const image of downloadableImages) {
                 try {
-                    const response = await fetch(image.imageUrl);
+                    const response = await fetch(image.imageUrl!);
                     if (!response.ok) {
                         throw new Error('Failed to fetch image blob');
                     }
@@ -539,7 +677,7 @@ export default function ImageGenerationPage() {
                     URL.revokeObjectURL(objectUrl);
                 } catch {
                     const link = document.createElement('a');
-                    link.href = image.imageUrl;
+                    link.href = image.imageUrl!;
                     link.download = `trainly-image-${image.id}.png`;
                     link.target = '_blank';
                     link.rel = 'noreferrer';
@@ -548,7 +686,7 @@ export default function ImageGenerationPage() {
                     link.remove();
                 }
             }
-            toast({ title: 'Download started', description: `Attempted ${targetImages.length} image downloads.` });
+            toast({ title: 'Download started', description: `Attempted ${downloadableImages.length} image downloads.` });
         } finally {
             setIsBulkDownloading(false);
         }
@@ -598,11 +736,11 @@ export default function ImageGenerationPage() {
     };
 
     const handleDownloadAll = async () => {
-        await handleDownloadImages(images);
+        await handleDownloadImages(images.filter(isImageFinished));
     };
 
     const handleDownloadSelected = async () => {
-        const selected = images.filter((img) => selectedImageIds.has(img.id));
+        const selected = images.filter((img) => selectedImageIds.has(img.id) && isImageFinished(img));
         await handleDownloadImages(selected);
     };
 
@@ -691,7 +829,7 @@ export default function ImageGenerationPage() {
                             placeholder={persona.placeholder}
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
-                            disabled={isLoading || isImprovingPrompt || !canGenerate}
+                            disabled={isLoading || isImprovingPrompt || isGeneratingRandomPrompt || !canGenerate}
                             rows={4}
                             className="resize-y min-h-[110px]"
                         />
@@ -699,15 +837,24 @@ export default function ImageGenerationPage() {
                             <Button
                                 onClick={handleImprovePrompt}
                                 variant="outline"
-                                disabled={isLoading || isImprovingPrompt || !prompt.trim()}
+                                disabled={isLoading || isImprovingPrompt || isGeneratingRandomPrompt || !prompt.trim()}
                                 className={cn("md:w-64", theme.improveButton)}
                             >
                                 {isImprovingPrompt ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 Improve Prompt with AI
                             </Button>
+                            <Button
+                                onClick={handleRandomPrompt}
+                                variant="outline"
+                                disabled={isLoading || isImprovingPrompt || isGeneratingRandomPrompt || !canGenerate}
+                                className={cn("md:w-48", theme.improveButton)}
+                            >
+                                {isGeneratingRandomPrompt ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
+                                Random Idea
+                            </Button>
                             <Button 
                                 onClick={handleGenerate} 
-                                disabled={isLoading || isImprovingPrompt || !canGenerate} 
+                                disabled={isLoading || isImprovingPrompt || isGeneratingRandomPrompt || !canGenerate} 
                                 className={cn("md:w-48", theme.generateButton)}
                             >
                                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
@@ -724,7 +871,11 @@ export default function ImageGenerationPage() {
             <h2 className="text-2xl font-bold font-headline">Your Gallery</h2>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <span>Page {currentPage} of {totalPages} • {images.length} total images</span>
+                    <span>
+                        Page {currentPage} of {totalPages} • {images.length} total images
+                        {pendingImageCount > 0 ? ` • ${pendingImageCount} generating` : ''}
+                        {isRefreshingPendingImages ? ' • checking...' : ''}
+                    </span>
                     <Select
                         value={String(pageSize)}
                         onValueChange={(value) => {
@@ -764,10 +915,10 @@ export default function ImageGenerationPage() {
                                 type="button"
                                 variant="outline"
                                 onClick={handleDownloadSelected}
-                                disabled={selectedImageIds.size === 0 || isBulkDownloading || isBulkDeleting}
+                                disabled={selectedDownloadableCount === 0 || isBulkDownloading || isBulkDeleting}
                             >
                                 {isBulkDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                                Download Selected ({selectedImageIds.size})
+                                Download Selected ({selectedDownloadableCount})
                             </Button>
                             <Button
                                 type="button"
@@ -784,7 +935,7 @@ export default function ImageGenerationPage() {
                         type="button"
                         variant="outline"
                         onClick={handleDownloadAll}
-                        disabled={images.length === 0 || isBulkDownloading || isBulkDeleting}
+                        disabled={downloadableImageCount === 0 || isBulkDownloading || isBulkDeleting}
                     >
                         {isBulkDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                         Download All

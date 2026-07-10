@@ -346,20 +346,31 @@ export async function discoverOpenAiCompatibleModels(input: {
     }
 
     try {
-        const response = await fetch(`${normalizedBaseUrl}/models`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-            },
-            cache: 'no-store',
-        });
+        const modelEndpoints = /\/v\d+$/i.test(normalizedBaseUrl) ? ['/models'] : ['/v1/models', '/models'];
+        let response: Response | null = null;
+        let lastErrorText = '';
 
-        if (!response.ok) {
-            const errorText = await response.text();
+        for (const endpoint of modelEndpoints) {
+            response = await fetch(`${normalizedBaseUrl}${endpoint}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+                },
+                cache: 'no-store',
+            });
+
+            if (response.ok) {
+                break;
+            }
+
+            lastErrorText = await response.text().catch(() => '');
+        }
+
+        if (!response?.ok) {
             return {
                 success: false,
-                message: `Model discovery failed (${response.status}): ${errorText || response.statusText}`,
+                message: `Model discovery failed (${response?.status || 'unknown'}): ${lastErrorText || response?.statusText || 'Unable to fetch models'}`,
                 models: [],
             };
         }

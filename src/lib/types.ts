@@ -519,18 +519,35 @@ export type GeneratedImage = {
   id: string;
   userId: string;
   prompt: string;
-  imageUrl: string;
-  thumbnailUrl: string;
+  imageModel?: 'normal' | 'uncensored';
+  status?: 'submitting' | 'queued' | 'processing' | 'completed' | 'failed';
+  progress?: number;
+  jobId?: string;
+  providerModel?: string;
+  errorMessage?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
   createdAt: any;
+  updatedAt?: any;
 };
 
 export type GeneratedVideo = {
   id: string;
   userId: string;
   prompt: string;
-  videoUrl: string;
-  thumbnailUrl: string;
+  rawIdea?: string;
+  durationSeconds?: number;
+  aspectRatio?: '9:16' | '16:9';
+  resolution?: '480x848' | '848x480' | '720x1280' | '1280x720';
+  status?: 'submitting' | 'queued' | 'processing' | 'completed' | 'failed';
+  progress?: number;
+  jobId?: string;
+  providerModel?: string;
+  errorMessage?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
   createdAt: any;
+  updatedAt?: any;
 };
 
 export type GeneratedMusic = {

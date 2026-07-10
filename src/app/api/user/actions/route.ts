@@ -28,7 +28,7 @@ function getUserActionRateLimit(action: string) {
   if (['generateAndSaveImage', 'generateAndSaveMusic', 'generateAndSaveVideo'].includes(action)) {
     return 10;
   }
-  if (['improveImagePrompt', 'improveMusicLyrics', 'improveMusicCaption', 'improveMusicIdea', 'generateRandomMusicIdea', 'suggestMusicDuration'].includes(action)) {
+  if (['improveImagePrompt', 'generateRandomImagePrompt', 'improveVideoIdea', 'generateRandomVideoIdea', 'improveVideoPrompt', 'improveMusicLyrics', 'improveMusicCaption', 'improveMusicIdea', 'generateRandomMusicIdea', 'suggestMusicDuration'].includes(action)) {
     return 30;
   }
   if (['initiateDeposit', 'requestWithdrawal', 'purchasePackage'].includes(action)) {
@@ -82,6 +82,9 @@ const loadGenerateImageFlow = () => import('@/ai/flows/ai-generate-image');
 const loadImproveImagePromptFlow = () => import('@/ai/flows/ai-improve-image-prompt');
 const loadGenerateMusicFlow = () => import('@/ai/flows/ai-generate-music');
 const loadGenerateVideoFlow = () => import('@/ai/flows/ai-generate-video');
+const loadImproveVideoIdeaFlow = () => import('@/ai/flows/ai-improve-video-idea');
+const loadGenerateRandomVideoIdeaFlow = () => import('@/ai/flows/ai-generate-random-video-idea');
+const loadImproveVideoPromptFlow = () => import('@/ai/flows/ai-improve-video-prompt');
 const loadImproveMusicLyricsFlow = () => import('@/ai/flows/ai-improve-music-lyrics');
 const loadImproveMusicCaptionFlow = () => import('@/ai/flows/ai-improve-music-caption');
 const loadImproveMusicIdeaFlow = () => import('@/ai/flows/ai-improve-music-idea');
@@ -470,6 +473,54 @@ async function deleteFileIfExists(bucketName: string, objectPath: string) {
   }
 }
 
+async function uploadGeneratedImage(uid: string, imageDataUriOrUrl: string) {
+  let imageBuffer: Buffer;
+  let contentType = 'image/png';
+
+  if (imageDataUriOrUrl.startsWith('data:')) {
+    const headerEnd = imageDataUriOrUrl.indexOf(',');
+    const header = imageDataUriOrUrl.slice(0, headerEnd);
+    const base64Data = imageDataUriOrUrl.slice(headerEnd + 1);
+    const headerContentType = header.match(/^data:([^;]+)/)?.[1];
+    if (headerContentType) {
+      contentType = headerContentType;
+    }
+    imageBuffer = Buffer.from(base64Data, 'base64');
+  } else {
+    const imageResponse = await fetch(imageDataUriOrUrl, { cache: 'no-store' });
+    if (!imageResponse.ok) {
+      throw new Error('Generated image URL could not be downloaded.');
+    }
+    contentType = imageResponse.headers.get('content-type')?.split(';')[0]?.trim() || contentType;
+    imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+  }
+
+  const extension = contentType.includes('jpeg') || contentType.includes('jpg')
+    ? 'jpg'
+    : contentType.includes('webp')
+      ? 'webp'
+      : 'png';
+  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
+  const bucket = bucketName ? adminStorage.bucket(bucketName) : adminStorage.bucket();
+  const objectPath = `generated-images/${uid}/${randomUUID()}.${extension}`;
+  const file = bucket.file(objectPath);
+
+  await file.save(imageBuffer, {
+    resumable: false,
+    contentType,
+    metadata: {
+      cacheControl: 'public, max-age=31536000',
+    },
+  });
+
+  const [downloadURL] = await file.getSignedUrl({
+    action: 'read',
+    expires: '2100-01-01',
+  });
+
+  return downloadURL;
+}
+
 async function verifyMusicGenerationAssist(uid: string) {
   const userSnap = await adminDb.collection('users').doc(uid).get();
   const packageId = userSnap.data()?.packageId;
@@ -828,43 +879,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         }
       }
 
-      const { generateImage } = await loadGenerateImageFlow();
-      const genResult = await generateImage({ prompt, imageModel });
-      if (!genResult.imageDataUri) {
-        throw new Error('AI failed to generate an image.');
-      }
-
-      let imageBuffer: Buffer;
-      const generated = genResult.imageDataUri;
-      if (generated.startsWith('data:')) {
-        const base64Data = generated.substring(generated.indexOf(',') + 1);
-        imageBuffer = Buffer.from(base64Data, 'base64');
-      } else {
-        const imageResponse = await fetch(generated, { cache: 'no-store' });
-        if (!imageResponse.ok) {
-          throw new Error('Generated image URL could not be downloaded.');
-        }
-        const arrayBuffer = await imageResponse.arrayBuffer();
-        imageBuffer = Buffer.from(arrayBuffer);
-      }
-
-      const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
-      const bucket = bucketName ? adminStorage.bucket(bucketName) : adminStorage.bucket();
-      const objectPath = `generated-images/${uid}/${randomUUID()}.png`;
-      const file = bucket.file(objectPath);
-
-      await file.save(imageBuffer, {
-        resumable: false,
-        contentType: 'image/png',
-        metadata: {
-          cacheControl: 'public, max-age=31536000',
-        },
-      });
-
-      const [downloadURL] = await file.getSignedUrl({
-        action: 'read',
-        expires: '2100-01-01',
-      });
+      const { submitImageGeneration } = await loadGenerateImageFlow();
+      const submitted = await submitImageGeneration({ prompt, imageModel });
+      const downloadURL = submitted.imageDataUri ? await uploadGeneratedImage(uid, submitted.imageDataUri) : '';
+      const submittedStatus = downloadURL
+        ? 'completed'
+        : submitted.status === 'processing'
+          ? 'processing'
+          : 'queued';
+      const submittedProgress = downloadURL ? 100 : Math.max(0, Math.min(99, Number(submitted.progress) || 0));
 
       const imageRef = adminDb.collection('generated_images').doc();
       let createdAtIso = new Date().toISOString();
@@ -934,25 +957,98 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         transaction.set(imageRef, {
           userId: uid,
           prompt,
+          imageModel,
+          status: submittedStatus,
+          progress: submittedProgress,
+          jobId: submitted.jobId,
+          providerModel: submitted.providerModel,
           imageUrl: downloadURL,
-          thumbnailUrl: downloadURL,
+          thumbnailUrl: downloadURL || 'https://placehold.co/400x400.png',
           createdAt,
+          updatedAt: createdAt,
         });
         transaction.update(userRef, updates);
       });
 
       return {
         success: true,
-        message: 'Image generated successfully.',
+        message: downloadURL ? 'Image generated successfully.' : 'Image generation has started.',
         image: {
           id: imageRef.id,
           userId: uid,
           prompt,
+          imageModel,
+          status: submittedStatus,
+          progress: submittedProgress,
+          jobId: submitted.jobId,
+          providerModel: submitted.providerModel,
           imageUrl: downloadURL,
-          thumbnailUrl: downloadURL,
+          thumbnailUrl: downloadURL || 'https://placehold.co/400x400.png',
           createdAt: createdAtIso,
         },
       };
+    }
+
+    case 'refreshPendingImageGenerations': {
+      const pendingSnap = await adminDb
+        .collection('generated_images')
+        .where('userId', '==', uid)
+        .where('status', 'in', ['submitting', 'queued', 'processing'])
+        .limit(10)
+        .get();
+
+      if (pendingSnap.empty) {
+        return { success: true, refreshed: 0 };
+      }
+
+      const { checkImageGenerationJob } = await loadGenerateImageFlow();
+      let refreshed = 0;
+
+      await Promise.all(pendingSnap.docs.map(async (doc) => {
+        const data = doc.data() as {
+          jobId?: string;
+          providerModel?: string;
+        };
+
+        if (!data.jobId || !data.providerModel) {
+          return;
+        }
+
+        try {
+          const checked = await checkImageGenerationJob({
+            jobId: data.jobId,
+            providerModel: data.providerModel,
+          });
+
+          if (checked.imageDataUri) {
+            const imageUrl = await uploadGeneratedImage(uid, checked.imageDataUri);
+            await doc.ref.update({
+              status: 'completed',
+              progress: 100,
+              imageUrl,
+              thumbnailUrl: imageUrl,
+              updatedAt: Timestamp.now(),
+            });
+          } else {
+            await doc.ref.update({
+              status: checked.status === 'queued' ? 'queued' : 'processing',
+              progress: Math.max(0, Math.min(99, Number(checked.progress) || 0)),
+              updatedAt: Timestamp.now(),
+            });
+          }
+          refreshed += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unable to refresh image generation status.';
+          await doc.ref.update({
+            status: 'failed',
+            errorMessage: message,
+            updatedAt: Timestamp.now(),
+          });
+          refreshed += 1;
+        }
+      }));
+
+      return { success: true, refreshed };
     }
 
     case 'improveImagePrompt': {
@@ -966,6 +1062,22 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       const improvedPrompt = String(result.improvedPrompt || '').trim();
       if (!improvedPrompt) {
         throw new Error('AI did not return an improved prompt.');
+      }
+
+      return {
+        success: true,
+        improvedPrompt,
+      };
+    }
+
+    case 'generateRandomImagePrompt': {
+      const { improveImagePrompt: improveImagePromptFlow } = await loadImproveImagePromptFlow();
+      const result = await improveImagePromptFlow({
+        prompt: 'Invent a completely random original image prompt. Make it visually specific, coherent, surprising, and ready for an image generator.',
+      });
+      const improvedPrompt = String(result.improvedPrompt || '').trim();
+      if (!improvedPrompt) {
+        throw new Error('AI did not return a random image prompt.');
       }
 
       return {
@@ -1200,6 +1312,16 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 
     case 'generateAndSaveVideo': {
       const prompt = String(payload.prompt || '').trim();
+      const rawIdea = String(payload.rawIdea || '').trim();
+      const durationSeconds = Math.max(1, Math.min(20, Number(payload.durationSeconds) || 10));
+      const aspectRatio = payload.aspectRatio === '16:9' ? '16:9' : '9:16';
+      const resolution = ['480x848', '848x480', '720x1280', '1280x720'].includes(String(payload.resolution || ''))
+        ? String(payload.resolution)
+        : aspectRatio === '16:9'
+          ? '848x480'
+          : '480x848';
+      const [width, height] = resolution.split('x').map((value) => Number.parseInt(value, 10));
+      const frames = Math.max(1, Math.min(720, durationSeconds * 24));
       if (!prompt) {
         throw new Error('Prompt is required.');
       }
@@ -1261,14 +1383,25 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         }
       }
 
-      const { generateVideo } = await loadGenerateVideoFlow();
-      const genResult = await generateVideo({ prompt });
-      if (!genResult.videoUrl) {
-        throw new Error('AI failed to generate a video.');
+      const { submitVideoGeneration } = await loadGenerateVideoFlow();
+      const submitted = await submitVideoGeneration({
+        prompt,
+        negativePrompt: '',
+        width,
+        height,
+        frames,
+        steps: 4,
+        guidance: 5,
+        seed: -1,
+      });
+      if (!submitted.jobId) {
+        throw new Error('AI failed to submit a video generation job.');
       }
 
       const videoRef = adminDb.collection('generated_videos').doc();
       let createdAtIso = new Date().toISOString();
+      const submittedStatus = submitted.videoUrl ? 'completed' : (submitted.status === 'processing' ? 'processing' : 'queued');
+      const submittedProgress = submitted.videoUrl ? 100 : Math.max(0, Math.min(99, Number(submitted.progress) || 0));
 
       await adminDb.runTransaction(async (transaction) => {
         const freshUserSnap = await transaction.get(userRef);
@@ -1342,25 +1475,148 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         transaction.set(videoRef, {
           userId: uid,
           prompt,
-          videoUrl: genResult.videoUrl,
-          thumbnailUrl: genResult.thumbnailUrl || 'https://placehold.co/400x300.png',
+          rawIdea: rawIdea || undefined,
+          durationSeconds,
+          aspectRatio,
+          resolution,
+          status: submittedStatus,
+          progress: submittedProgress,
+          jobId: submitted.jobId,
+          providerModel: submitted.providerModel,
+          videoUrl: submitted.videoUrl || '',
+          thumbnailUrl: submitted.thumbnailUrl || 'https://placehold.co/400x300.png',
           createdAt,
+          updatedAt: createdAt,
         });
         transaction.update(userRef, updates);
       });
 
       return {
         success: true,
-        message: 'Video generated successfully.',
+        message: submitted.videoUrl ? 'Video generated successfully.' : 'Video generation has started.',
         video: {
           id: videoRef.id,
           userId: uid,
           prompt,
-          videoUrl: genResult.videoUrl,
-          thumbnailUrl: genResult.thumbnailUrl || 'https://placehold.co/400x300.png',
+          rawIdea: rawIdea || undefined,
+          durationSeconds,
+          aspectRatio,
+          resolution,
+          status: submittedStatus,
+          progress: submittedProgress,
+          jobId: submitted.jobId,
+          providerModel: submitted.providerModel,
+          videoUrl: submitted.videoUrl || '',
+          thumbnailUrl: submitted.thumbnailUrl || 'https://placehold.co/400x300.png',
           createdAt: createdAtIso,
         },
       };
+    }
+
+    case 'refreshPendingVideoGenerations': {
+      const pendingSnap = await adminDb
+        .collection('generated_videos')
+        .where('userId', '==', uid)
+        .where('status', 'in', ['submitting', 'queued', 'processing'])
+        .limit(10)
+        .get();
+
+      if (pendingSnap.empty) {
+        return { success: true, refreshed: 0 };
+      }
+
+      const { checkVideoGenerationJob } = await loadGenerateVideoFlow();
+      let refreshed = 0;
+
+      await Promise.all(pendingSnap.docs.map(async (doc) => {
+        const data = doc.data() as {
+          jobId?: string;
+          providerModel?: string;
+          status?: string;
+        };
+
+        if (!data.jobId || !data.providerModel) {
+          return;
+        }
+
+        try {
+          const checked = await checkVideoGenerationJob({
+            jobId: data.jobId,
+            providerModel: data.providerModel,
+          });
+
+          const status = checked.videoUrl ? 'completed' : checked.status === 'queued' ? 'queued' : 'processing';
+          const progress = checked.videoUrl ? 100 : Math.max(0, Math.min(99, Number(checked.progress) || 0));
+          await doc.ref.update({
+            status,
+            progress,
+            ...(checked.videoUrl ? { videoUrl: checked.videoUrl } : {}),
+            ...(checked.thumbnailUrl ? { thumbnailUrl: checked.thumbnailUrl } : {}),
+            updatedAt: Timestamp.now(),
+          });
+          refreshed += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unable to refresh video generation status.';
+          await doc.ref.update({
+            status: 'failed',
+            errorMessage: message,
+            updatedAt: Timestamp.now(),
+          });
+          refreshed += 1;
+        }
+      }));
+
+      return { success: true, refreshed };
+    }
+
+    case 'improveVideoIdea': {
+      const prompt = String(payload.prompt || '').trim();
+      if (!prompt) {
+        throw new Error('Prompt is required.');
+      }
+
+      const { improveVideoIdea } = await loadImproveVideoIdeaFlow();
+      const result = await improveVideoIdea({ prompt });
+      const improvedPrompt = String(result.improvedPrompt || '').trim();
+      if (!improvedPrompt) {
+        throw new Error('AI did not return an improved video idea.');
+      }
+
+      return { success: true, improvedPrompt };
+    }
+
+    case 'generateRandomVideoIdea': {
+      const { generateRandomVideoIdea } = await loadGenerateRandomVideoIdeaFlow();
+      const result = await generateRandomVideoIdea({ prompt: 'Invent a completely random original video idea and describe the video itself with a clear scene, subject, action, motion, mood, and visual hook.' });
+      const improvedPrompt = String(result.improvedPrompt || '').trim();
+      if (!improvedPrompt) {
+        throw new Error('AI did not return a random video idea.');
+      }
+
+      return { success: true, improvedPrompt };
+    }
+
+    case 'improveVideoPrompt': {
+      const rawIdea = String(payload.rawIdea || '').trim();
+      const durationSeconds = Math.max(1, Math.min(20, Number(payload.durationSeconds) || 10));
+      const aspectRatio = payload.aspectRatio === '16:9' ? '16:9' : '9:16';
+      const resolution = ['480x848', '848x480', '720x1280', '1280x720'].includes(String(payload.resolution || ''))
+        ? (String(payload.resolution) as '480x848' | '848x480' | '720x1280' | '1280x720')
+        : aspectRatio === '16:9'
+          ? '848x480'
+          : '480x848';
+
+      if (!rawIdea) {
+        throw new Error('Raw idea is required.');
+      }
+
+      const { improveVideoPrompt } = await loadImproveVideoPromptFlow();
+      const result = await improveVideoPrompt({ rawIdea, durationSeconds, aspectRatio, resolution });
+      if (!result.improvedPrompt?.trim()) {
+        throw new Error('AI did not return an improved video prompt.');
+      }
+
+      return { success: true, improvedPrompt: result.improvedPrompt };
     }
 
     case 'improveMusicLyrics': {

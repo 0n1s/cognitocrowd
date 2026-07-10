@@ -6,6 +6,7 @@ import { getAiClient } from '@/ai/genkit';
 import type { ModelModality } from '@/ai/models';
 import type { AiProviderConfig } from '@/lib/types';
 import { validateModelAvailability } from '@/ai/model-resolver';
+import { generateOpenAiCompatibleImage } from '@/ai/openai-image';
 import { generateOpenAiCompatibleVideo } from '@/ai/openai-video';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { awardReferralBonusForDeposit, reverseReferralBonusForDeposit } from '@/lib/referrals-admin';
@@ -24,41 +25,11 @@ function getErrorMessage(error: unknown): string {
 }
 
 async function tryOpenAiCompatibleImageGeneration(provider: AiProviderConfig, modelId: string, prompt: string) {
-  const baseUrl = (provider.baseUrl || '').trim().replace(/\/+$/, '');
-  if (!baseUrl) return null;
-
-  const response = await fetch(`${baseUrl}/images/generations`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
-    },
-    body: JSON.stringify({
-      model: modelId,
-      prompt,
-      size: '1024x1024',
-    }),
-    cache: 'no-store',
+  return generateOpenAiCompatibleImage({
+    model: `${provider.id}/${modelId}`,
+    prompt,
+    providers: [provider],
   });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`OpenAI-compatible image endpoint failed (${response.status}): ${text || response.statusText}`);
-  }
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    data?: Array<{ url?: string; b64_json?: string }>;
-  };
-
-  const first = payload.data?.[0];
-  if (first?.url) {
-    return first.url;
-  }
-  if (first?.b64_json) {
-    return `data:image/png;base64,${first.b64_json}`;
-  }
-
-  throw new Error('OpenAI-compatible image endpoint returned no image data.');
 }
 
 type AdminActionPayload = {
@@ -687,6 +658,11 @@ async function handleAction(action: string, payload: Record<string, any>) {
       const maxPointsInput = Number(payload.maxPoints);
       const hasCustomRange = Number.isFinite(minPointsInput) && Number.isFinite(maxPointsInput);
 
+      const requestedCount = Number(count);
+      if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 10) {
+        throw new Error('Invalid count. You can generate between 1 and 10 contributions per request.');
+      }
+
       let minPoints = 0;
       let maxPoints = 0;
       if (hasCustomRange) {
@@ -697,13 +673,38 @@ async function handleAction(action: string, payload: Record<string, any>) {
         }
       }
 
-      const generatedData = await bulkGenerateTasks({ count, expertise, taskTypes, model: model || undefined });
-      if (!generatedData?.tasks?.length) {
-        throw new Error('AI failed to generate contributions. Please try again.');
+      const generationBatchSize = 2;
+      const batchCounts: number[] = [];
+      for (let remaining = requestedCount; remaining > 0; remaining -= generationBatchSize) {
+        batchCounts.push(Math.min(generationBatchSize, remaining));
+      }
+
+      const generationResults = await Promise.allSettled(
+        batchCounts.map((batchCount) =>
+          bulkGenerateTasks({
+            count: batchCount,
+            expertise,
+            taskTypes,
+            model: model || undefined,
+          })
+        )
+      );
+
+      const successfulGenerations = generationResults.filter(
+        (result): result is PromiseFulfilledResult<{ tasks: any[] }> =>
+          result.status === 'fulfilled'
+      );
+      const failedGenerations = generationResults.filter((result) => result.status === 'rejected');
+
+      const generatedTasks = successfulGenerations.flatMap((result) => result.value.tasks || []);
+      if (!generatedTasks.length) {
+        const firstError = failedGenerations[0]?.reason;
+        const firstErrorMessage = firstError instanceof Error ? firstError.message : 'AI generation failed for all chunks.';
+        throw new Error(firstErrorMessage);
       }
 
       const batch = adminDb.batch();
-      generatedData.tasks.forEach((task) => {
+      generatedTasks.forEach((task) => {
         const ref = adminDb.collection('tasks').doc();
         const generatedPoints = Number(task.points);
         const normalizedPoints = Number.isFinite(generatedPoints)
@@ -731,7 +732,85 @@ async function handleAction(action: string, payload: Record<string, any>) {
       });
       await batch.commit();
 
-      return { success: true, message: `${generatedData.tasks.length} contributions created successfully across selected expertises.` };
+      if (failedGenerations.length > 0) {
+        return {
+          success: true,
+          partial: true,
+          message: `${generatedTasks.length} contributions created successfully. ${failedGenerations.length} generation chunk${failedGenerations.length === 1 ? '' : 's'} failed.`,
+        };
+      }
+
+      return { success: true, message: `${generatedTasks.length} contributions created successfully across selected expertises.` };
+    }
+
+    case 'bulkCreateAdminTasksChunk': {
+      const { count, expertise, taskTypes } = payload;
+      const model = String(payload.model || '').trim();
+      const minPointsInput = Number(payload.minPoints);
+      const maxPointsInput = Number(payload.maxPoints);
+      const hasCustomRange = Number.isFinite(minPointsInput) && Number.isFinite(maxPointsInput);
+
+      const requestedCount = Number(count);
+      if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 2) {
+        throw new Error('Invalid chunk count. You can generate between 1 and 2 contributions per chunk request.');
+      }
+
+      let minPoints = 0;
+      let maxPoints = 0;
+      if (hasCustomRange) {
+        minPoints = Math.floor(minPointsInput);
+        maxPoints = Math.floor(maxPointsInput);
+        if (minPoints <= 0 || maxPoints <= 0 || minPoints > maxPoints) {
+          throw new Error('Invalid points range. Min points must be less than or equal to max points.');
+        }
+      }
+
+      const generatedData = await bulkGenerateTasks({
+        count: requestedCount,
+        expertise,
+        taskTypes,
+        model: model || undefined,
+      });
+
+      const generatedTasks = generatedData?.tasks || [];
+      if (!generatedTasks.length) {
+        throw new Error('AI failed to generate contributions for this chunk.');
+      }
+
+      const batch = adminDb.batch();
+      generatedTasks.forEach((task) => {
+        const ref = adminDb.collection('tasks').doc();
+        const generatedPoints = Number(task.points);
+        const normalizedPoints = Number.isFinite(generatedPoints)
+          ? Math.round(generatedPoints)
+          : 100;
+        const finalPoints = hasCustomRange
+          ? Math.min(maxPoints, Math.max(minPoints, normalizedPoints))
+          : normalizedPoints;
+
+        const taskToAdd: Record<string, any> = {
+          title: task.prompt,
+          description: task.description,
+          points: finalPoints,
+          type: task.taskType,
+          expertise: task.expertise || 'General',
+          status: 'Active',
+          difficulty: 'Medium',
+          createdAt: Timestamp.now(),
+        };
+        if (task.options) taskToAdd.options = task.options;
+        if (task.scale) taskToAdd.scale = task.scale;
+        if (task.settings) taskToAdd.settings = task.settings;
+        if (task.award_criteria) taskToAdd.award_criteria = task.award_criteria;
+        batch.set(ref, taskToAdd);
+      });
+      await batch.commit();
+
+      return {
+        success: true,
+        createdCount: generatedTasks.length,
+        message: `${generatedTasks.length} contribution${generatedTasks.length === 1 ? '' : 's'} created for this chunk.`,
+      };
     }
 
     case 'deleteAdminTask': {

@@ -196,8 +196,16 @@ export async function generateAndSaveImage(_userId: string, prompt: string, imag
   return runUserAction<{ image?: GeneratedImage }>('generateAndSaveImage', { prompt, imageModel });
 }
 
+export async function refreshPendingImageGenerations(_userId: string) {
+  return runUserAction<{ refreshed?: number }>('refreshPendingImageGenerations', {});
+}
+
 export async function improveImagePrompt(_userId: string, prompt: string) {
   return runUserAction<{ improvedPrompt?: string }>('improveImagePrompt', { prompt });
+}
+
+export async function generateRandomImagePrompt(_userId: string) {
+  return runUserAction<{ improvedPrompt?: string }>('generateRandomImagePrompt', {});
 }
 
 export async function generateAndSaveMusic(
@@ -222,8 +230,41 @@ export async function generateAndSaveMusic(
   }>('generateAndSaveMusic', payload);
 }
 
-export async function generateAndSaveVideo(_userId: string, prompt: string) {
-  return runUserAction<{ video?: GeneratedVideo }>('generateAndSaveVideo', { prompt });
+export async function generateAndSaveVideo(
+  _userId: string,
+  payload: {
+    prompt: string;
+    rawIdea?: string;
+    durationSeconds: number;
+    aspectRatio: '9:16' | '16:9';
+    resolution: '480x848' | '848x480' | '720x1280' | '1280x720';
+  }
+) {
+  return runUserAction<{ video?: GeneratedVideo }>('generateAndSaveVideo', payload);
+}
+
+export async function refreshPendingVideoGenerations(_userId: string) {
+  return runUserAction<{ refreshed?: number }>('refreshPendingVideoGenerations', {});
+}
+
+export async function improveVideoIdea(_userId: string, prompt: string) {
+  return runUserAction<{ improvedPrompt?: string }>('improveVideoIdea', { prompt });
+}
+
+export async function generateRandomVideoIdea(_userId: string) {
+  return runUserAction<{ improvedPrompt?: string }>('generateRandomVideoIdea', {});
+}
+
+export async function improveVideoPrompt(
+  _userId: string,
+  payload: {
+    rawIdea: string;
+    durationSeconds: number;
+    aspectRatio: '9:16' | '16:9';
+    resolution: '480x848' | '848x480' | '720x1280' | '1280x720';
+  }
+) {
+  return runUserAction<{ improvedPrompt?: string }>('improveVideoPrompt', payload);
 }
 
 export async function getUserGeneratedMusic(_userId: string) {

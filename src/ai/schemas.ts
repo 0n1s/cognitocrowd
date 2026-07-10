@@ -69,8 +69,13 @@ export type GenerateProfileImageOutput = z.infer<typeof GenerateProfileImageOutp
 export const GenerateImageInputSchema = z.object({
   prompt: z.string().describe('A text prompt to generate an image from.'),
   imageModel: z.enum(['normal', 'uncensored']).optional().default('normal'),
+  negativePrompt: z.string().optional().default('').describe('Things to avoid in the generated image.'),
+  size: z.string().optional().default('1024x1024').describe('Image size in WIDTHxHEIGHT format.'),
+  n: z.number().int().min(1).max(4).optional().default(1),
+  steps: z.number().int().min(1).max(100).optional().default(10),
+  guidanceScale: z.number().min(0).max(30).optional().default(2.5),
 });
-export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
+export type GenerateImageInput = z.input<typeof GenerateImageInputSchema>;
 
 export const GenerateImageOutputSchema = z.object({
     imageDataUri: z.string().describe("The generated image as a data URI. Expected format: 'data:image/png;base64,<encoded_data>'."),
@@ -80,8 +85,15 @@ export type GenerateImageOutput = z.infer<typeof GenerateImageOutputSchema>;
 
 export const GenerateVideoInputSchema = z.object({
   prompt: z.string().describe('A text prompt to generate a video from.'),
+  negativePrompt: z.string().optional().default('').describe('Things to avoid in the generated video.'),
+  width: z.number().int().min(1).max(2048).optional().default(480),
+  height: z.number().int().min(1).max(2048).optional().default(848),
+  frames: z.number().int().min(1).max(720).optional().default(120),
+  steps: z.number().int().min(1).max(100).optional().default(4),
+  guidance: z.number().min(1).max(10).optional().default(5),
+  seed: z.number().int().optional().default(-1),
 });
-export type GenerateVideoInput = z.infer<typeof GenerateVideoInputSchema>;
+export type GenerateVideoInput = z.input<typeof GenerateVideoInputSchema>;
 
 export const GenerateVideoOutputSchema = z.object({
     videoUrl: z.string().url().describe("The URL of the generated video file."),

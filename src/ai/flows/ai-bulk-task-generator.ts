@@ -10,6 +10,7 @@
 
 import {ai, getAiClient} from '@/ai/genkit';
 import {z} from 'genkit';
+import { randomUUID } from 'crypto';
 import {GenerateTaskOutputSchema} from '@/ai/schemas';
 import { getAppSettings } from '@/lib/database';
 import { resolveConfiguredModel, validateModelAvailability } from '@/ai/model-resolver';
@@ -89,8 +90,9 @@ const bulkGenerateTasksFlow = ai.defineFlow(
     const runtimeAi = getAiClient({
       providers: settings.aiProviders,
     });
+    const promptName = `bulkTaskGeneratorPromptRuntime-${randomUUID()}`;
     const runtimePrompt = runtimeAi.definePrompt({
-      name: 'bulkTaskGeneratorPromptRuntime',
+      name: promptName,
       input: {schema: BulkGenerateTasksInputSchema},
       output: {schema: BulkGenerateTasksOutputSchema},
       prompt: promptTemplate,

@@ -44,6 +44,10 @@ export async function bulkCreateAdminTasks(data: { count: number; expertise: str
   return runAdminAction('bulkCreateAdminTasks', data);
 }
 
+export async function bulkCreateAdminTasksChunk(data: { count: number; expertise: string[]; taskTypes: TaskType[]; minPoints?: number; maxPoints?: number; model?: string }) {
+  return runAdminAction('bulkCreateAdminTasksChunk', data);
+}
+
 export async function deleteAdminTask(taskId: string) {
   return runAdminAction('deleteAdminTask', { taskId });
 }

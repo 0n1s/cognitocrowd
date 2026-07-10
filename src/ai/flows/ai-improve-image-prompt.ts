@@ -14,9 +14,32 @@ export async function improveImagePrompt(input: ImproveImagePromptInput): Promis
   return improveImagePromptFlow(input);
 }
 
+const fallbackRandomImagePrompts = [
+  'Generate an image of a glass greenhouse floating above a misty forest at sunrise, warm golden light, lush plants pressing against fogged windows, ultra-detailed, shallow depth of field, photorealistic.',
+  'Generate an image of a tiny robot painter sitting on a rooftop at blue hour, painting the city skyline on a canvas, neon reflections on wet concrete, whimsical mood, 35mm lens, richly textured digital art.',
+  'Generate an image of a surreal desert library with towering shelves half-buried in sand, a lone traveler reading under a floating moon, dramatic shadows, matte painting style, highly detailed, atmospheric.',
+  'Generate an image of a luxury matte black perfume bottle on rippled silver fabric, soft studio lighting, crisp reflections, elegant minimal composition, high-end commercial photography.',
+  'Generate an image of a cozy fantasy kitchen inside a giant tree, glowing jars, copper pots, herbs hanging from wooden beams, warm lantern light, storybook realism, intricate environmental detail.'
+];
+
+function buildFallbackImprovedPrompt(rawPrompt: string) {
+  const prompt = rawPrompt.trim();
+  return `Generate an image of ${prompt}, with a clear subject, intentional composition, detailed background, expressive lighting, rich textures, coherent color palette, and a polished high-resolution visual style.`;
+}
+
+function buildFallbackRandomImagePrompt() {
+  return fallbackRandomImagePrompts[Math.floor(Math.random() * fallbackRandomImagePrompts.length)];
+}
+
+function isRandomPromptRequest(prompt: string) {
+  const normalized = prompt.trim().toLowerCase();
+  return /\b(random|surprise|invent|generate an idea|new idea)\b/.test(normalized);
+}
+
 const promptTemplate = `You are an expert prompt engineer for an AI image generator. 
 Your task is to take a user's basic prompt and expand it into a more detailed, descriptive, and visually rich prompt. 
 Add details about style (e.g., photorealistic, watercolor, anime), lighting, composition, and mood. 
+If the user asks for a random idea, invent one original image prompt with a clear subject, setting, composition, lighting, color palette, and visual style.
 Do not return JSON.
 Do not return Markdown code fences.
 Return only the improved prompt as plain text without any additional commentary or explanation starting with "Generate an image of" and ending with a period.
@@ -57,7 +80,7 @@ const improveImagePromptFlow = ai.defineFlow(
     const model = validateModelAvailability(configuredModel, 'text', settings.aiProviders);
 
     if (!model || !model.trim()) {
-      return { improvedPrompt: input.prompt.trim() };
+      return { improvedPrompt: isRandomPromptRequest(input.prompt) ? buildFallbackRandomImagePrompt() : buildFallbackImprovedPrompt(input.prompt) };
     }
 
     try {
@@ -69,12 +92,12 @@ const improveImagePromptFlow = ai.defineFlow(
       const extracted = extractTextFromGenerateResult(generated);
       const improvedPrompt = extractImprovedPrompt(extracted);
       if (!improvedPrompt) {
-        return { improvedPrompt: input.prompt.trim() };
+        return { improvedPrompt: isRandomPromptRequest(input.prompt) ? buildFallbackRandomImagePrompt() : buildFallbackImprovedPrompt(input.prompt) };
       }
 
       return { improvedPrompt };
     } catch {
-      return { improvedPrompt: input.prompt.trim() };
+      return { improvedPrompt: isRandomPromptRequest(input.prompt) ? buildFallbackRandomImagePrompt() : buildFallbackImprovedPrompt(input.prompt) };
     }
   }
 );
