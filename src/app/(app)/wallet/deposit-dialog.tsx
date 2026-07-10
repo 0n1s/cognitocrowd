@@ -196,7 +196,6 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
                                 step="0.01"
                                 disabled={isSubmitting}
                             />
-                            <p className="text-xs text-muted-foreground">Session currency is set from the header picker.</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="method">Deposit Method</Label>
@@ -223,7 +222,7 @@ export function DepositDialog({ open, onOpenChange, settings, userId, onDeposit 
                                         <p className="text-sm font-semibold">{selectedMethod.name}</p>
                                         <p className="text-xs text-muted-foreground">{selectedMethod.description || 'Enter the fields required for this method.'}</p>
                                     </div>
-                                    <span className="text-xs uppercase tracking-wide text-muted-foreground">{selectedMethod.provider}</span>
+                                    {/* <span className="text-xs uppercase tracking-wide text-muted-foreground">{selectedMethod.provider}</span> */}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                     {selectedMethod.provider === 'custom' || selectedMethod.processingMode === 'admin_verified'

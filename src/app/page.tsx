@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck, Sparkles, X, Music2, WandSparkles } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck, Sparkles, X, Music2, WandSparkles, HelpCircle } from 'lucide-react';
 import NextImage from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getEnabledExpertiseAreas, getPackages, getAppSettings } from '@/lib/database';
@@ -14,7 +14,7 @@ import { LandingAuthButtons } from '@/components/landing-auth-buttons';
 import { formatMoney, getPackageMoney } from '@/lib/currency';
 
 
-const LandingHeader = () => (
+const LandingHeader = ({ showFaq = false }: { showFaq?: boolean }) => (
   <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div className="container flex h-16 items-center">
       <Link href="/" className="mr-6 flex items-center space-x-2">
@@ -26,6 +26,7 @@ const LandingHeader = () => (
         <Link href="#tools" className="text-muted-foreground transition-colors hover:text-foreground">AI Tools</Link>
         <Link href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
         <Link href="#testimonials" className="text-muted-foreground transition-colors hover:text-foreground">Testimonials</Link>
+        {showFaq && <Link href="#faq" className="text-muted-foreground transition-colors hover:text-foreground">FAQ</Link>}
       </nav>
       <div className="flex flex-1 items-center justify-end space-x-2">
         <ThemeToggle />
@@ -109,6 +110,10 @@ export default async function Home() {
   ];
 
   const { landingPageContent } = settings;
+  const faqItems = (settings.faqItems || []).filter((item) =>
+    item.enabled !== false && item.question.trim() && item.answer.trim()
+  );
+  const showFaq = settings.faqEnabled !== false && faqItems.length > 0;
   
   if (!landingPageContent) {
     return <div>Landing page content not configured.</div>;
@@ -129,7 +134,7 @@ export default async function Home() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <LandingHeader />
+      <LandingHeader showFaq={showFaq} />
 
       <main className="flex-1">
         {/* Hero Section */}
@@ -393,6 +398,33 @@ export default async function Home() {
                 </div>
             </div>
         </section>
+
+        {showFaq && (
+          <section id="faq" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30">
+            <div className="container">
+              <div className="mx-auto max-w-2xl text-center mb-12">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+                  <HelpCircle className="h-6 w-6 text-primary" />
+                </div>
+                <h2 className="font-headline text-4xl font-bold">{settings.faqTitle || 'Frequently Asked Questions'}</h2>
+                {settings.faqSubtitle ? (
+                  <p className="text-muted-foreground mt-4 text-lg">{settings.faqSubtitle}</p>
+                ) : null}
+              </div>
+              <div className="mx-auto grid max-w-4xl gap-4">
+                {faqItems.map((item) => (
+                  <details key={item.id} className="group rounded-lg border border-border/50 bg-background/80 p-5 shadow-sm">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left text-base font-semibold">
+                      <span>{item.question}</span>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-primary transition-transform group-open:rotate-45">+</span>
+                    </summary>
+                    <p className="mt-4 leading-relaxed text-muted-foreground">{item.answer}</p>
+                  </details>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Hiring Section */}
         <section id="hiring" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30 relative overflow-hidden">

@@ -578,6 +578,10 @@ export async function getAppSettings(): Promise<AppSettings> {
         openAiCompatibleDiscoveredModels: [],
         aiRankedPayoutMode: 'on',
         earnPerScoreEnabled: true,
+        faqEnabled: false,
+        faqTitle: 'Frequently Asked Questions',
+        faqSubtitle: '',
+        faqItems: [],
         landingPageContent: {
             processImage1: "https://placehold.co/800x600.png",
             processImage2: "https://placehold.co/800x600.png",
@@ -749,6 +753,17 @@ export async function getAppSettings(): Promise<AppSettings> {
         mergedSettings.paymentMethods = (mergedSettings.withdrawalMethods || []).map((method) => ({ id: method.id, name: method.name }));
         mergedSettings.qualificationTestAntiCopyEnabled = mergedSettings.qualificationTestAntiCopyEnabled !== false;
         mergedSettings.leaderboardEnabled = mergedSettings.leaderboardEnabled !== false;
+        mergedSettings.faqEnabled = mergedSettings.faqEnabled === true;
+        mergedSettings.faqTitle = String(mergedSettings.faqTitle || defaultSettings.faqTitle || '').trim();
+        mergedSettings.faqSubtitle = String(mergedSettings.faqSubtitle || defaultSettings.faqSubtitle || '').trim();
+        mergedSettings.faqItems = Array.isArray(mergedSettings.faqItems)
+            ? mergedSettings.faqItems.map((item) => ({
+                id: String(item.id || uuidv4()),
+                question: String(item.question || '').trim(),
+                answer: String(item.answer || '').trim(),
+                enabled: item.enabled !== false,
+            }))
+            : defaultSettings.faqItems;
         const configuredCopyLimit = Number(mergedSettings.qualificationTestCopyAttemptLimit);
         mergedSettings.qualificationTestCopyAttemptLimit = Number.isFinite(configuredCopyLimit)
             ? Math.max(1, Math.floor(configuredCopyLimit))

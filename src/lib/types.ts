@@ -301,6 +301,13 @@ export type OnboardingStep = {
     content: string;
 };
 
+export type FAQItem = {
+    id: string;
+    question: string;
+    answer: string;
+    enabled?: boolean;
+};
+
 export type LandingPageContent = {
     processImage1: string;
     processImage2: string;
@@ -379,6 +386,10 @@ export type AppSettings = {
   onboardingCourseTitle?: string;
   onboardingCourseDescription?: string;
   onboardingCourseSteps?: OnboardingStep[];
+  faqEnabled?: boolean;
+  faqTitle?: string;
+  faqSubtitle?: string;
+  faqItems?: FAQItem[];
   landingPageContent?: LandingPageContent;
   autoApprovalEnabled?: boolean;
   autoApprovalThreshold?: number;

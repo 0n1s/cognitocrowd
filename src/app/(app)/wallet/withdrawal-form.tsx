@@ -235,7 +235,6 @@ export function WithdrawalForm({ userId, settings, currentBalance, minWithdrawal
                             step="0.01"
                             disabled={isSubmitting}
                         />
-                        <p className="text-xs text-muted-foreground">Session currency is set from the header picker.</p>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="method">Payment Method</Label>

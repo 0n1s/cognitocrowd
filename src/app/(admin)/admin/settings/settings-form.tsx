@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Trash2, Loader2, GripVertical, RefreshCw, Copy, Check, ChevronDown } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, GripVertical, RefreshCw, Copy, Check, ChevronDown, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { discoverOpenAiCompatibleModels } from "@/lib/actions";
+import { discoverOpenAiCompatibleModels, generateFaqItems, improveLandingPageText } from "@/lib/actions";
 import { auth } from "@/lib/firebase";
 import { getAdminAppSettings, testAdminModel } from "@/lib/admin-api";
 import { v4 as uuidv4 } from "uuid";
@@ -181,7 +181,9 @@ export function SettingsForm() {
     const [discoveringProviderId, setDiscoveringProviderId] = useState<string | null>(null);
     const [testingModality, setTestingModality] = useState<ModelModality | null>(null);
     const [isOnboardingSettingsOpen, setIsOnboardingSettingsOpen] = useState(false);
+    const [isFaqSettingsOpen, setIsFaqSettingsOpen] = useState(false);
     const [isAiModelSettingsOpen, setIsAiModelSettingsOpen] = useState(false);
+    const [faqAiAction, setFaqAiAction] = useState<string | null>(null);
     const [testResults, setTestResults] = useState<Record<ModelModality, {
         message?: string;
         text?: string;
@@ -279,6 +281,14 @@ export function SettingsForm() {
                 if (fetchedSettings.onboardingCourseSteps && !fetchedSettings.onboardingCourseSteps.every(s => s.id)) {
                     fetchedSettings.onboardingCourseSteps = fetchedSettings.onboardingCourseSteps.map(s => ({...s, id: uuidv4()}));
                 }
+                fetchedSettings.faqEnabled = fetchedSettings.faqEnabled === true;
+                fetchedSettings.faqTitle = String(fetchedSettings.faqTitle || 'Frequently Asked Questions');
+                fetchedSettings.faqSubtitle = String(fetchedSettings.faqSubtitle || 'Everything you need to know before joining Trainly.');
+                fetchedSettings.faqItems = (fetchedSettings.faqItems || []).map((item) => ({
+                    ...item,
+                    id: item.id || uuidv4(),
+                    enabled: item.enabled !== false,
+                }));
                 fetchedSettings.aiProviders = fetchedSettings.aiProviders || [];
                 fetchedSettings.aiProviders = (fetchedSettings.aiProviders || []).map(sanitizeProviderDiscoveredModels);
                 fetchedSettings.defaultTextGenAiModel = fetchedSettings.defaultTextGenAiModel || fetchedSettings.defaultGenAiModel || '';
@@ -396,6 +406,105 @@ export function SettingsForm() {
         handleFieldChange('onboardingCourseSteps', newSteps);
     };
 
+    const handleAddFaqItem = () => {
+        if (!settings) return;
+        const newItems = [...(settings.faqItems || []), { id: uuidv4(), question: '', answer: '', enabled: true }];
+        handleFieldChange('faqItems', newItems);
+    };
+
+    const handleRemoveFaqItem = (id: string) => {
+        if (!settings) return;
+        handleFieldChange('faqItems', (settings.faqItems || []).filter((item) => item.id !== id));
+    };
+
+    const handleFaqItemChange = (id: string, field: 'question' | 'answer' | 'enabled', value: string | boolean) => {
+        if (!settings) return;
+        const newItems = (settings.faqItems || []).map((item) =>
+            item.id === id ? { ...item, [field]: value } : item
+        );
+        handleFieldChange('faqItems', newItems);
+    };
+
+    const parseFaqSuggestions = (rawText: string) => {
+        const trimmed = rawText.trim();
+        const jsonMatch = trimmed.match(/\[[\s\S]*\]/);
+        const candidate = jsonMatch?.[0] || trimmed;
+        const parsed = JSON.parse(candidate) as Array<{ question?: unknown; answer?: unknown }>;
+        return parsed
+            .map((item) => ({
+                id: uuidv4(),
+                question: String(item.question || '').trim(),
+                answer: String(item.answer || '').trim(),
+                enabled: true,
+            }))
+            .filter((item) => item.question && item.answer)
+            .slice(0, 8);
+    };
+
+    const handleGenerateFaqWithAi = async () => {
+        if (!settings || faqAiAction) return;
+        setFaqAiAction('generate');
+        try {
+            const result = await generateFaqItems(6);
+
+            if (!result.success || !result.items) {
+                throw new Error(result.message || 'AI did not return FAQ suggestions.');
+            }
+
+            const suggestions = parseFaqSuggestions(JSON.stringify(result.items));
+            if (suggestions.length === 0) {
+                throw new Error('AI did not return usable FAQ items.');
+            }
+
+            setSettings({
+                ...settings,
+                faqEnabled: true,
+                faqTitle: settings.faqTitle || 'Frequently Asked Questions',
+                faqSubtitle: settings.faqSubtitle || 'Answers to common questions about earning, qualifying, and using Trainly.',
+                faqItems: suggestions,
+            });
+            toast({ title: 'FAQ generated', description: `${suggestions.length} FAQ items were added. Review them before saving.` });
+        } catch (error) {
+            toast({
+                title: 'FAQ AI failed',
+                description: error instanceof Error ? error.message : 'Could not generate FAQ items.',
+                variant: 'destructive',
+            });
+        } finally {
+            setFaqAiAction(null);
+        }
+    };
+
+    const handleImproveFaqField = async (
+        actionKey: string,
+        value: string,
+        context: string,
+        onImproved: (value: string) => void
+    ) => {
+        if (!value.trim()) {
+            toast({ title: 'Nothing to improve', description: 'Enter text first, then ask AI to improve it.', variant: 'destructive' });
+            return;
+        }
+
+        setFaqAiAction(actionKey);
+        try {
+            const result = await improveLandingPageText(value, context);
+            if (!result.success || !result.improvedText) {
+                throw new Error(result.message || 'AI did not return improved text.');
+            }
+            onImproved(result.improvedText);
+            toast({ title: 'FAQ improved', description: 'AI updated the selected FAQ text.' });
+        } catch (error) {
+            toast({
+                title: 'FAQ AI failed',
+                description: error instanceof Error ? error.message : 'Could not improve FAQ text.',
+                variant: 'destructive',
+            });
+        } finally {
+            setFaqAiAction(null);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!settings) return;
         setIsSubmitting(true);
@@ -428,6 +537,7 @@ export function SettingsForm() {
             paymentMethods: (normalizedSettings.withdrawalMethods || []).filter(m => m.name.trim() !== '').map((m) => ({ id: m.id, name: m.name })),
             depositMethods: (normalizedSettings.depositMethods || []).filter(m => m.name.trim() !== ''),
             onboardingCourseSteps: (normalizedSettings.onboardingCourseSteps || []).filter(s => s.title.trim() !== '' && s.content.trim() !== ''),
+            faqItems: (normalizedSettings.faqItems || []).filter((item) => item.question.trim() !== '' && item.answer.trim() !== ''),
             defaultGenAiModel: normalizedSettings.defaultTextGenAiModel,
             aiProviders: (normalizedSettings.aiProviders || []).map((provider) => ({
                 ...provider,
@@ -491,6 +601,7 @@ export function SettingsForm() {
             paymentMethods: (normalizedSettings.withdrawalMethods || []).filter(m => m.name.trim() !== '').map((m) => ({ id: m.id, name: m.name })),
             depositMethods: (normalizedSettings.depositMethods || []).filter(m => m.name.trim() !== ''),
             onboardingCourseSteps: (normalizedSettings.onboardingCourseSteps || []).filter(s => s.title.trim() !== '' && s.content.trim() !== ''),
+            faqItems: (normalizedSettings.faqItems || []).filter((item) => item.question.trim() !== '' && item.answer.trim() !== ''),
             defaultGenAiModel: normalizedSettings.defaultTextGenAiModel,
             aiProviders: (normalizedSettings.aiProviders || []).map((provider) => ({
                 ...provider,
@@ -933,6 +1044,170 @@ export function SettingsForm() {
                                 </div>
                             </div>
                         )}
+                    </CollapsibleContent>
+                </Collapsible>
+
+                <Separator />
+
+                <Collapsible open={isFaqSettingsOpen} onOpenChange={setIsFaqSettingsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">FAQ Settings</h3>
+                            <p className="text-sm text-muted-foreground">Manage the questions shown on the public landing page.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isFaqSettingsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isFaqSettingsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-6 space-y-6">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="faq-enabled" checked={settings.faqEnabled !== false} onCheckedChange={(checked) => handleFieldChange('faqEnabled', checked)} />
+                            <Label htmlFor="faq-enabled">Show FAQ on frontend</Label>
+                        </div>
+                        <div className="rounded-md border bg-primary/5 p-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <Label className="text-base font-semibold">AI FAQ Assistant</Label>
+                                    <p className="text-xs text-muted-foreground">Generate a starter FAQ set or improve individual FAQ text using the configured text model.</p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleGenerateFaqWithAi}
+                                    disabled={Boolean(faqAiAction)}
+                                    className="shrink-0"
+                                >
+                                    {faqAiAction === 'generate' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                    Generate FAQ
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <Label htmlFor="faq-title">FAQ Title</Label>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={Boolean(faqAiAction) || !String(settings.faqTitle || '').trim()}
+                                        onClick={() => handleImproveFaqField(
+                                            'title',
+                                            settings.faqTitle || '',
+                                            'FAQ section title for Trainly landing page',
+                                            (value) => handleFieldChange('faqTitle', value)
+                                        )}
+                                    >
+                                        {faqAiAction === 'title' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                        Improve
+                                    </Button>
+                                </div>
+                                <Input id="faq-title" value={settings.faqTitle || ''} onChange={(e) => handleFieldChange('faqTitle', e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <Label htmlFor="faq-subtitle">FAQ Subtitle</Label>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={Boolean(faqAiAction) || !String(settings.faqSubtitle || '').trim()}
+                                        onClick={() => handleImproveFaqField(
+                                            'subtitle',
+                                            settings.faqSubtitle || '',
+                                            'FAQ section subtitle for Trainly landing page',
+                                            (value) => handleFieldChange('faqSubtitle', value)
+                                        )}
+                                    >
+                                        {faqAiAction === 'subtitle' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                        Improve
+                                    </Button>
+                                </div>
+                                <Input id="faq-subtitle" value={settings.faqSubtitle || ''} onChange={(e) => handleFieldChange('faqSubtitle', e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <Label className="text-base font-semibold">FAQ Questions</Label>
+                            {(settings.faqItems || []).map((item, index) => (
+                                <div key={item.id} className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <Label className="font-semibold">Question {index + 1}</Label>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center space-x-2">
+                                                <Switch
+                                                    id={`faq-enabled-${item.id}`}
+                                                    checked={item.enabled !== false}
+                                                    onCheckedChange={(checked) => handleFaqItemChange(item.id, 'enabled', checked)}
+                                                />
+                                                <Label htmlFor={`faq-enabled-${item.id}`} className="text-sm font-normal">Visible</Label>
+                                            </div>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveFaqItem(item.id)}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                <span className="sr-only">Remove FAQ question</span>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Label htmlFor={`faq-question-${item.id}`}>Question</Label>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled={Boolean(faqAiAction) || !item.question.trim()}
+                                                onClick={() => handleImproveFaqField(
+                                                    `question-${item.id}`,
+                                                    item.question,
+                                                    'FAQ question for Trainly landing page. Make it concise and clear.',
+                                                    (value) => handleFaqItemChange(item.id, 'question', value)
+                                                )}
+                                            >
+                                                {faqAiAction === `question-${item.id}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                                Improve
+                                            </Button>
+                                        </div>
+                                        <Input
+                                            id={`faq-question-${item.id}`}
+                                            value={item.question}
+                                            onChange={(e) => handleFaqItemChange(item.id, 'question', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Label htmlFor={`faq-answer-${item.id}`}>Answer</Label>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled={Boolean(faqAiAction) || !item.answer.trim()}
+                                                onClick={() => handleImproveFaqField(
+                                                    `answer-${item.id}`,
+                                                    item.answer,
+                                                    `FAQ answer for this question: "${item.question}". Make it helpful, direct, and suitable for Trainly users.`,
+                                                    (value) => handleFaqItemChange(item.id, 'answer', value)
+                                                )}
+                                            >
+                                                {faqAiAction === `answer-${item.id}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                                Improve
+                                            </Button>
+                                        </div>
+                                        <Textarea
+                                            id={`faq-answer-${item.id}`}
+                                            value={item.answer}
+                                            onChange={(e) => handleFaqItemChange(item.id, 'answer', e.target.value)}
+                                            rows={3}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                            <Button type="button" variant="outline" size="sm" onClick={handleAddFaqItem}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add FAQ
+                            </Button>
+                        </div>
                     </CollapsibleContent>
                 </Collapsible>
 

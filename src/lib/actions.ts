@@ -8,6 +8,7 @@ import type { Task, TaskType, Package, User, AppSettings, WithdrawalRequest, Cha
 import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
+import { generateFaq as generateFaqFlow } from "@/ai/flows/ai-generate-faq";
 import { improveLandingPageText as improveLandingPageTextFlow } from "@/ai/flows/ai-improve-landing-page-text";
 import { improveImagePrompt as improveImagePromptFlow } from "@/ai/flows/ai-improve-image-prompt";
 import { v4 as uuidv4 } from "uuid";
@@ -1069,6 +1070,17 @@ export async function generateLandingImage(prompt: string) {
         return { success: true, imageDataUri: result.imageDataUri };
     } catch (error) {
         console.error("Error generating landing page image:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function generateFaqItems(count = 6) {
+    try {
+        const result = await generateFaqFlow({ count });
+        return { success: true, items: result.items };
+    } catch (error) {
+        console.error("Error generating FAQ items with AI:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };
     }

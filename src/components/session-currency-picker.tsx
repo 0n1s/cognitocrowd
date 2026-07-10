@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAppSettings } from "@/lib/database";
-import { useSessionCurrency } from "@/hooks/use-session-currency";
+import { SESSION_CURRENCY_STORAGE_KEY, useSessionCurrency } from "@/hooks/use-session-currency";
 
 export function SessionCurrencyPicker() {
   const { currency, supportedCurrencies, setCurrency, applyCurrencyConfig } = useSessionCurrency();
@@ -23,7 +23,8 @@ export function SessionCurrencyPicker() {
         const geoPayload = geoResponse && geoResponse.ok
           ? await geoResponse.json().catch(() => null)
           : null;
-        if (geoPayload?.currency) {
+        const hasStoredCurrency = typeof window !== 'undefined' && Boolean(window.sessionStorage.getItem(SESSION_CURRENCY_STORAGE_KEY));
+        if (geoPayload?.currency && !hasStoredCurrency) {
           setCurrency(String(geoPayload.currency));
         }
       } catch {

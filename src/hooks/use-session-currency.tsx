@@ -10,9 +10,30 @@ type SessionCurrencyContextValue = {
   applyCurrencyConfig: (defaultCurrency?: string, supportedCurrencyList?: string[]) => void;
 };
 
-const SESSION_CURRENCY_STORAGE_KEY = "trainly.session.currency";
+export const SESSION_CURRENCY_STORAGE_KEY = "trainly.session.currency";
 
 const SessionCurrencyContext = createContext<SessionCurrencyContextValue | null>(null);
+
+function readStoredCurrency() {
+  if (typeof window === "undefined") return null;
+
+  const fromSession = window.sessionStorage.getItem(SESSION_CURRENCY_STORAGE_KEY);
+  if (fromSession) return fromSession;
+
+  const fromLegacyLocal = window.localStorage.getItem(SESSION_CURRENCY_STORAGE_KEY);
+  if (fromLegacyLocal) {
+    window.sessionStorage.setItem(SESSION_CURRENCY_STORAGE_KEY, fromLegacyLocal);
+    window.localStorage.removeItem(SESSION_CURRENCY_STORAGE_KEY);
+    return fromLegacyLocal;
+  }
+
+  return null;
+}
+
+function writeStoredCurrency(currencyCode: string) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(SESSION_CURRENCY_STORAGE_KEY, currencyCode);
+}
 
 function getBrowserKnownCurrencies() {
   if (typeof Intl === "undefined" || typeof (Intl as any).supportedValuesOf !== "function") {
@@ -42,7 +63,7 @@ export function SessionCurrencyProvider({ children }: { children: React.ReactNod
   const [supportedCurrencies, setSupportedCurrencies] = useState<string[]>([...SUPPORTED_CURRENCIES]);
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? window.localStorage.getItem(SESSION_CURRENCY_STORAGE_KEY) : null;
+    const stored = readStoredCurrency();
     if (!stored) return;
     setCurrencyState(normalizeCurrencyCode(stored, DEFAULT_CURRENCY));
   }, []);
@@ -50,9 +71,7 @@ export function SessionCurrencyProvider({ children }: { children: React.ReactNod
   const setCurrency = useCallback((nextCurrency: string) => {
     const normalized = normalizeCurrencyCode(nextCurrency, DEFAULT_CURRENCY);
     setCurrencyState(normalized);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SESSION_CURRENCY_STORAGE_KEY, normalized);
-    }
+    writeStoredCurrency(normalized);
   }, []);
 
   const applyCurrencyConfig = useCallback((defaultCurrency?: string, supportedCurrencyList?: string[]) => {
@@ -61,7 +80,7 @@ export function SessionCurrencyProvider({ children }: { children: React.ReactNod
 
     const normalizedDefault = normalizeCurrencyCode(defaultCurrency || DEFAULT_CURRENCY, DEFAULT_CURRENCY);
     setCurrencyState((current) => {
-      const stored = typeof window !== "undefined" ? window.localStorage.getItem(SESSION_CURRENCY_STORAGE_KEY) : null;
+      const stored = readStoredCurrency();
       const candidate = normalizeCurrencyCode(stored || current || normalizedDefault, normalizedDefault);
       const finalCurrency = normalizedSupported.includes(candidate)
         ? candidate
@@ -69,9 +88,7 @@ export function SessionCurrencyProvider({ children }: { children: React.ReactNod
           ? normalizedDefault
           : normalizedSupported[0] || DEFAULT_CURRENCY;
 
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(SESSION_CURRENCY_STORAGE_KEY, finalCurrency);
-      }
+      writeStoredCurrency(finalCurrency);
 
       return finalCurrency;
     });
