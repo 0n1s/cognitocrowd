@@ -21,16 +21,10 @@ export function LandingAuthButtons() {
   if (user) {
     return (
       <div className="flex items-center gap-2">
-        <Button variant="ghost" asChild>
+        <Button asChild>
           <Link href="/dashboard">
             <LayoutDashboard className="mr-2 h-4 w-4" />
             Dashboard
-          </Link>
-        </Button>
-        <Button asChild>
-          <Link href="/chat">
-            <Sparkles className="mr-2 h-4 w-4" />
-            Open Workspace
           </Link>
         </Button>
       </div>

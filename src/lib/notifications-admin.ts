@@ -2,6 +2,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import type { UserNotificationType } from '@/lib/types';
 import { sendEmail } from '@/lib/email';
+import { emailTemplate } from '@/lib/email-templates';
 
 type CreateUserNotificationInput = {
   userId: string;
@@ -114,24 +115,16 @@ async function sendEmailNotification(userId: string, title: string, message: str
 
     if (!email) return;
 
+    const href = ''; // Ideally passed through or derived from input.metadata
+    const displayMessage = message.length > 200 ? message.slice(0, 200) + '...' : message;
+
     await sendEmail({
       to: { address: email, name },
       subject: title,
-      htmlBody: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="color: #1a1a2e; font-size: 24px; margin: 0;">TrainlyLabs</h1>
-          </div>
-          <div style="background: #f8f9fa; border-radius: 8px; padding: 24px;">
-            <h2 style="color: #1a1a2e; font-size: 18px; margin: 0 0 12px;">${title}</h2>
-            <p style="color: #4a4a6a; font-size: 14px; line-height: 1.6; margin: 0;">${message}</p>
-          </div>
-          <div style="text-align: center; margin-top: 24px; color: #9a9ab0; font-size: 12px;">
-            <p>You received this email because you have a TrainlyLabs account.</p>
-            <p>© ${new Date().getFullYear()} TrainlyLabs. All rights reserved.</p>
-          </div>
-        </div>
-      `,
+      htmlBody: emailTemplate({
+        title,
+        body: `<p>${displayMessage}</p>`,
+      }),
     });
   } catch (error) {
     console.error('Email notification failed:', error);

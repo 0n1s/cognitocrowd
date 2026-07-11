@@ -148,5 +148,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Email logs (server-written only, admin read-only)
+    match /email_logs/{logId} {
+      allow read: if isSignedIn() && isAdmin();
+      allow create, update, delete: if false;
+    }
+
   }
 }

@@ -97,7 +97,7 @@ const CHAT_MODE_PERSONA = {
         icon: Sparkles,
         iconClass: "text-sky-500",
         aiBubble: "border-sky-200/70 bg-white/80 dark:bg-sky-950/30 dark:border-sky-900/60",
-        inputPlaceholder: "Ask for quick strategy, task tips, or onboarding help...",
+        inputPlaceholder: "Ask me anything, I'm here to help",
     },
     uncensored: {
         title: "Raw Mode",
@@ -105,7 +105,7 @@ const CHAT_MODE_PERSONA = {
         icon: Flame,
         iconClass: "text-rose-500",
         aiBubble: "border-rose-300/70 bg-rose-50/70 dark:bg-rose-950/30 dark:border-rose-900/70",
-        inputPlaceholder: "Ask directly. This mode keeps responses candid.",
+        inputPlaceholder: "Ask me anything, no holds barred",
     },
     coding: {
         title: "Dev Console",
@@ -113,7 +113,7 @@ const CHAT_MODE_PERSONA = {
         icon: Code2,
         iconClass: "text-emerald-500",
         aiBubble: "border-emerald-300/70 bg-emerald-50/70 dark:bg-emerald-950/25 dark:border-emerald-900/70 font-mono",
-        inputPlaceholder: "Describe a bug, API flow, or architecture task...",
+        inputPlaceholder: "Write a Hello World Python script",
     },
     hacking: {
         title: "Offensive Simulator",
@@ -121,7 +121,7 @@ const CHAT_MODE_PERSONA = {
         icon: TerminalSquare,
         iconClass: "text-lime-400",
         aiBubble: "border-lime-500/30 bg-zinc-950/95 text-lime-200",
-        inputPlaceholder: "Run a threat-analysis prompt in this shell...",
+        inputPlaceholder: "How to scan hidden wifi networks",
     },
 } satisfies Record<ChatModelKey, {
     title: string;
@@ -566,14 +566,14 @@ export function ChatUI({
                 </div>
             </div>
 
-            <div className={cn("relative min-h-0 flex-1 bg-gradient-to-b", theme.surface)}>
+            <div className={cn("relative min-h-0 flex-1", theme.surface)}>
                 {isHacking && (
                     <>
                         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(132,204,22,0.06)_1px,transparent_1px)] bg-[size:100%_3px] opacity-35" />
                         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(132,204,22,0.12),transparent_55%)]" />
                     </>
                 )}
-                <ScrollArea className="h-full overscroll-contain">
+                <ScrollArea className="h-full overflow-y-auto overscroll-contain">
                     {isLoadingHistory ? <div className="px-3 py-4"><ChatSkeleton /></div> : (
                         <div className="space-y-3 px-2.5 py-3 pb-2 sm:space-y-4 sm:px-4 sm:py-4 md:px-6">
                             {messages.length === 0 && !isLoading && (

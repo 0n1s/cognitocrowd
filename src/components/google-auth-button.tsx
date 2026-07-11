@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { useState, useEffect, useRef } from "react";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -32,6 +32,39 @@ export function GoogleAuthButton({ mode, disabled }: GoogleAuthButtonProps) {
       .catch(() => setGoogleEnabled(false));
   }, []);
 
+  const redirectHandled = useRef(false);
+
+  // Handle redirect result on mount (when popup is blocked)
+  useEffect(() => {
+    if (!auth || redirectHandled.current) return;
+    redirectHandled.current = true;
+
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!result?.user) return;
+        const user = result.user;
+
+        if (mode === "signup") {
+          const res = await fetch(`/api/user/check-user?uid=${user.uid}`).catch(() => null);
+          const exists = res?.ok ? await res.json() : null;
+          if (!exists?.exists) {
+            await setupNewUser(
+              user.uid,
+              user.displayName || "User",
+              user.email || "",
+              new URLSearchParams(window.location.search).get('ref') || ''
+            );
+          }
+        }
+
+        toast({ title: mode === "login" ? "Signed in" : "Account created", description: `Welcome${user.displayName ? `, ${user.displayName}` : ''}!` });
+      })
+      .catch((error) => {
+        if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/credential-already-in-use') return;
+        console.error('Google redirect auth error:', error);
+      });
+  }, [auth, mode, toast]);
+
   const handleGoogleAuth = async () => {
     if (!auth) {
       toast({ title: "Configuration Error", description: "Firebase is not configured.", variant: "destructive" });
@@ -60,6 +93,13 @@ export function GoogleAuthButton({ mode, disabled }: GoogleAuthButtonProps) {
 
       toast({ title: mode === "login" ? "Signed in" : "Account created", description: `Welcome${user.displayName ? `, ${user.displayName}` : ''}!` });
     } catch (error: any) {
+      // Popup blocked — fall back to redirect
+      if (error?.code === 'auth/popup-blocked') {
+        toast({ title: "Popup blocked", description: "Redirecting to Google sign-in..." });
+        await signInWithRedirect(auth, new GoogleAuthProvider());
+        return;
+      }
+
       if (error?.code === 'auth/popup-closed-by-user') return;
       console.error('Google auth error:', error);
       toast({

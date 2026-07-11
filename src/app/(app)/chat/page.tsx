@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ChatUI, type Message } from "./chat-ui";
 import { aiAssistantTaskGuidance } from "@/ai/flows/ai-assistant-chat";
@@ -252,8 +252,50 @@ export default function ChatPage() {
         }
     };
 
+    // Track visual viewport height for mobile keyboard handling
+    const viewportHeightRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 0);
+    const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+    useEffect(() => {
+        const handler = () => {
+            const vh = window.visualViewport?.height || window.innerHeight;
+            viewportHeightRef.current = vh;
+            setViewportHeight(vh);
+        };
+        handler(); // Set initial
+        window.visualViewport?.addEventListener('resize', handler);
+        window.addEventListener('resize', handler);
+        return () => {
+            window.visualViewport?.removeEventListener('resize', handler);
+            window.removeEventListener('resize', handler);
+        };
+    }, []);
+
+    // Close keyboard when sending
+    useEffect(() => {
+        if (isLoading && typeof window !== 'undefined') {
+            window.scrollTo(0, 0);
+            document.activeElement && (document.activeElement as HTMLElement)?.blur();
+        }
+    }, [isLoading]);
+
+    // The header height offset differs on mobile (3.5rem = 56px) vs desktop (5.5rem = 88px)
+    // We only use the dynamic height on mobile when the keyboard is detected
+    const headerOffsetSm = 56; // 3.5rem
+    const headerOffsetLg = 88; // 5.5rem
+    const isMobileKeyboardOpen = viewportHeight !== null && viewportHeight < viewportHeightRef.current * 0.8;
+
+    let containerStyle: React.CSSProperties | undefined;
+    if (isMobileKeyboardOpen && viewportHeight !== null) {
+        // When keyboard is open, use the visual viewport height exactly
+        containerStyle = { height: viewportHeight - headerOffsetSm, overflow: 'hidden' };
+    }
+
     return (
-        <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col sm:h-[calc(100dvh-5.5rem)]">
+        <div
+            className="flex min-h-0 flex-col [height:calc(100dvh-3.5rem)] sm:[height:calc(100dvh-5.5rem)]"
+            style={containerStyle}
+        >
             <div className="hidden mb-3 sm:block">
                 <h1 className="text-2xl font-bold font-headline lg:text-3xl">TrainlyLabs AI Assistant</h1>
                 <p className="mt-1 text-sm text-muted-foreground">Ask me anything about available contributions or how to get started.</p>

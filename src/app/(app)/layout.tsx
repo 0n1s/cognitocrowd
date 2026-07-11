@@ -422,15 +422,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
-        <div className="flex flex-col min-h-screen">
-          <AppHeader isAdmin={isAdmin} />
-          <main className={cn(
-            "min-h-0 flex-1 bg-background",
-            pathname.startsWith('/chat') ? "overflow-hidden p-0 sm:p-4 md:p-6 lg:p-8" : "p-4 md:p-8 lg:p-10"
-          )}>{children}</main>
-        </div>
-      </SidebarInset>
+        <SidebarInset>
+          <div className={cn("flex flex-col", pathname.startsWith('/chat') ? "[min-height:100dvh]" : "min-h-screen")}>
+            <AppHeader isAdmin={isAdmin} />
+            <main className={cn(
+              "min-h-0 flex-1 bg-background",
+              pathname.startsWith('/chat') ? "overflow-hidden p-0 sm:p-4 md:p-6 lg:p-8" : "p-4 md:p-8 lg:p-10"
+            )}>{children}</main>
+          </div>
+        </SidebarInset>
     </SidebarProvider>
   );
 }
