@@ -7,6 +7,8 @@ import { logJsonEvent } from '@/lib/json-logger';
 import { awardReferralBonusForDeposit } from '@/lib/referrals-admin';
 import { getPackageMoney, normalizeCurrencyCode } from '@/lib/currency';
 import { normalizeToUsdAmount } from '@/lib/exchange-rates';
+import { getAiUserFacingError, isAiEndpointErrorMessage } from '@/lib/ai-error';
+import { createUserNotification } from '@/lib/notifications-admin';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +25,46 @@ type VerifiedUser = {
 };
 
 const USER_ACTION_RATE_LIMIT_WINDOW_MS = 60_000;
+
+function serializeNotification(doc: any) {
+  const data = doc.data() || {};
+  return {
+    id: doc.id,
+    userId: String(data.userId || ''),
+    type: String(data.type || 'system'),
+    title: String(data.title || ''),
+    message: String(data.message || ''),
+    href: String(data.href || ''),
+    metadata: data.metadata || {},
+    readAt: data.readAt?.toDate ? data.readAt.toDate().toISOString() : data.readAt || null,
+    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt || '',
+  };
+}
+
+const AI_USER_ACTIONS = new Set([
+  'generateAndSaveImage',
+  'refreshPendingImageGenerations',
+  'improveImagePrompt',
+  'generateRandomImagePrompt',
+  'generateAndSaveMusic',
+  'improveMusicLyrics',
+  'improveMusicCaption',
+  'improveMusicIdea',
+  'generateRandomMusicIdea',
+  'suggestMusicDuration',
+  'generateAndSaveVideo',
+  'refreshPendingVideoGenerations',
+  'improveVideoIdea',
+  'generateRandomVideoIdea',
+  'improveVideoPrompt',
+]);
+
+function getUserFacingActionError(action: string, message: string) {
+  if (AI_USER_ACTIONS.has(action) && isAiEndpointErrorMessage(message)) {
+    return getAiUserFacingError(message);
+  }
+  return message;
+}
 
 function getUserActionRateLimit(action: string) {
   if (['generateAndSaveImage', 'generateAndSaveMusic', 'generateAndSaveVideo'].includes(action)) {
@@ -549,6 +591,84 @@ async function verifyMusicStyleProfiles(uid: string) {
 async function handleUserAction(request: NextRequest, authUser: VerifiedUser, action: string, payload: Record<string, any>) {
   const uid = authUser.uid;
   switch (action) {
+    case 'getUserNotifications': {
+      const limit = Math.min(Math.max(Number(payload.limit || 20), 1), 50);
+      const snapshot = await (adminDb as any)
+        .collection('user_notifications')
+        .where('userId', '==', uid)
+        .limit(100)
+        .get();
+
+      const allNotifications = snapshot.docs
+        .map(serializeNotification)
+        .sort((a: any, b: any) => {
+          const left = new Date(a.createdAt || 0).getTime();
+          const right = new Date(b.createdAt || 0).getTime();
+          return right - left;
+        });
+      const notifications = allNotifications.slice(0, limit);
+      const unreadCount = allNotifications.filter((notification: any) => !notification.readAt).length;
+      return { success: true, notifications, unreadCount };
+    }
+
+    case 'markNotificationRead': {
+      const notificationId = String(payload.notificationId || '').trim();
+      if (!notificationId) throw new Error('Notification ID is required.');
+      const ref = (adminDb as any).collection('user_notifications').doc(notificationId);
+      const snap = await ref.get();
+      if (!snap.exists || snap.data()?.userId !== uid) throw new Error('Notification not found.');
+      await ref.set({ readAt: Timestamp.now() }, { merge: true });
+      return { success: true, message: 'Notification marked as read.' };
+    }
+
+    case 'markAllNotificationsRead': {
+      const snapshot = await (adminDb as any)
+        .collection('user_notifications')
+        .where('userId', '==', uid)
+        .limit(100)
+        .get();
+
+      const batch = (adminDb as any).batch();
+      const unreadDocs = snapshot.docs.filter((doc: any) => !doc.data()?.readAt);
+      unreadDocs.forEach((doc: any) => batch.set(doc.ref, { readAt: Timestamp.now() }, { merge: true }));
+      await batch.commit();
+      return { success: true, message: 'Notifications marked as read.', updated: unreadDocs.length };
+    }
+
+    case 'deleteUserNotification': {
+      const notificationId = String(payload.notificationId || '').trim();
+      if (!notificationId) throw new Error('Notification ID is required.');
+      const ref = (adminDb as any).collection('user_notifications').doc(notificationId);
+      const snap = await ref.get();
+      if (!snap.exists || snap.data()?.userId !== uid) throw new Error('Notification not found.');
+      await ref.delete();
+      return { success: true, message: 'Notification deleted.' };
+    }
+
+    case 'deleteAllNotifications': {
+      const snapshot = await (adminDb as any)
+        .collection('user_notifications')
+        .where('userId', '==', uid)
+        .limit(100)
+        .get();
+
+      const batch = (adminDb as any).batch();
+      snapshot.docs.forEach((doc: any) => batch.delete(doc.ref));
+      await batch.commit();
+      return { success: true, message: 'Notifications cleared.', deleted: snapshot.docs.length };
+    }
+
+    case 'createTestNotification': {
+      await createUserNotification({
+        userId: uid,
+        type: 'system',
+        title: 'Notifications are ready',
+        message: 'You will see important TrainlyLabs updates here first.',
+        href: '/dashboard',
+      });
+      return { success: true, message: 'Test notification created.' };
+    }
+
     case 'getMusicStyleProfiles': {
       await verifyMusicStyleProfiles(uid);
       const snapshot = await adminDb.collection('music_style_profiles').where('userId', '==', uid).get();
@@ -970,6 +1090,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         transaction.update(userRef, updates);
       });
 
+      await createUserNotification({
+        userId: uid,
+        type: 'generation',
+        title: downloadURL ? 'Image generated' : 'Image generation started',
+        message: downloadURL ? 'Your image is ready in the gallery.' : 'Your image generation is queued. We will track it in your gallery.',
+        href: '/image-generation',
+        metadata: { imageId: imageRef.id, status: submittedStatus },
+      }).catch(() => undefined);
+
       return {
         success: true,
         message: downloadURL ? 'Image generated successfully.' : 'Image generation has started.',
@@ -1041,7 +1170,7 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           const message = error instanceof Error ? error.message : 'Unable to refresh image generation status.';
           await doc.ref.update({
             status: 'failed',
-            errorMessage: message,
+            errorMessage: getUserFacingActionError('refreshPendingImageGenerations', message),
             updatedAt: Timestamp.now(),
           });
           refreshed += 1;
@@ -1294,6 +1423,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         throw error;
       }
 
+      await createUserNotification({
+        userId: uid,
+        type: 'generation',
+        title: 'Music generated',
+        message: 'Your music track is ready in the music gallery.',
+        href: '/music-generation',
+        metadata: { musicId: musicRef.id },
+      }).catch(() => undefined);
+
       return {
         success: true,
         message: 'Music generated successfully.',
@@ -1491,6 +1629,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
         transaction.update(userRef, updates);
       });
 
+      await createUserNotification({
+        userId: uid,
+        type: 'generation',
+        title: submitted.videoUrl ? 'Video generated' : 'Video generation started',
+        message: submitted.videoUrl ? 'Your video is ready in the gallery.' : 'Your video generation is queued. You can check progress in the video gallery.',
+        href: '/video-generation',
+        metadata: { videoId: videoRef.id, status: submittedStatus },
+      }).catch(() => undefined);
+
       return {
         success: true,
         message: submitted.videoUrl ? 'Video generated successfully.' : 'Video generation has started.',
@@ -1559,7 +1706,7 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           const message = error instanceof Error ? error.message : 'Unable to refresh video generation status.';
           await doc.ref.update({
             status: 'failed',
-            errorMessage: message,
+            errorMessage: getUserFacingActionError('refreshPendingVideoGenerations', message),
             updatedAt: Timestamp.now(),
           });
           refreshed += 1;
@@ -1853,6 +2000,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           requestedAt: Timestamp.now(),
         });
       });
+
+      await createUserNotification({
+        userId: uid,
+        type: 'wallet',
+        title: 'Withdrawal requested',
+        message: `Your withdrawal request for ${normalizedAmount.amountCurrency} ${normalizedAmount.amountInCurrency.toFixed(2)} was submitted for review.`,
+        href: '/wallet',
+        metadata: { amountUsd: normalizedAmount.amountUsd, currency: normalizedAmount.amountCurrency },
+      }).catch(() => undefined);
 
       return { success: true, message: 'Withdrawal request submitted.' };
     }
@@ -2926,6 +3082,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           createdAt: Timestamp.now(),
         });
 
+        await createUserNotification({
+          userId: uid,
+          type: 'wallet',
+          title: 'Deposit invoice created',
+          message: 'Complete the Plisio invoice to credit your wallet.',
+          href: '/wallet',
+          metadata: { amountUsd: normalizedAmount.amountUsd, invoiceUrl: invoice.invoiceUrl, status: 'pending' },
+        }).catch(() => undefined);
+
         return {
           success: true,
           message: 'Plisio invoice created. Complete payment to credit your wallet.',
@@ -2952,6 +3117,14 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           fieldValues,
           createdAt: Timestamp.now(),
         });
+        await createUserNotification({
+          userId: uid,
+          type: 'wallet',
+          title: 'Deposit request submitted',
+          message: `Your ${method.name} deposit request was submitted for review.`,
+          href: '/wallet',
+          metadata: { amountUsd: normalizedAmount.amountUsd, currency: normalizedAmount.amountCurrency, status: 'pending' },
+        }).catch(() => undefined);
         return { success: true, message: `${method.name} request submitted. Please follow the method instructions.`, method };
       }
 
@@ -2990,6 +3163,17 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       if (!isAdminVerified && completedDepositId) {
         await awardReferralBonusForDeposit(completedDepositId);
       }
+
+      await createUserNotification({
+        userId: uid,
+        type: 'wallet',
+        title: isAdminVerified ? 'Deposit request submitted' : 'Deposit completed',
+        message: isAdminVerified
+          ? `Your ${method.name} deposit request was submitted for review.`
+          : `Your wallet was credited with ${normalizedAmount.amountCurrency} ${normalizedAmount.amountInCurrency.toFixed(2)}.`,
+        href: '/wallet',
+        metadata: { amountUsd: normalizedAmount.amountUsd, currency: normalizedAmount.amountCurrency, status: isAdminVerified ? 'pending' : 'completed' },
+      }).catch(() => undefined);
 
       return { success: true, message: isAdminVerified ? 'Deposit request submitted for admin review.' : 'Deposit successful.' };
     }
@@ -3089,6 +3273,15 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
           createdAt: Timestamp.now(),
         });
       });
+
+      await createUserNotification({
+        userId: uid,
+        type: 'account',
+        title: 'Package activated',
+        message: `You are now subscribed to the ${pkgName} package.`,
+        href: '/packages',
+        metadata: { packageId },
+      }).catch(() => undefined);
 
       return { success: true, message: `Successfully subscribed to the ${pkgName} package!` };
     }
@@ -3484,6 +3677,13 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
       await userRef.set(newUserDoc);
       const persistedUser = await userRef.get();
       if (referralCode && !persistedUser.data()?.referredBy) throw new Error('Referral attribution could not be verified.');
+      await createUserNotification({
+        userId: uid,
+        type: 'account',
+        title: 'Welcome to TrainlyLabs',
+        message: 'Your account is ready. Important account, wallet, and AI generation updates will appear here.',
+        href: '/dashboard',
+      }).catch(() => undefined);
       return { success: true, message: 'User setup completed.', referredBy: persistedUser.data()?.referredBy || null };
     }
 
@@ -3591,10 +3791,12 @@ async function handleUserAction(request: NextRequest, authUser: VerifiedUser, ac
 }
 
 export async function POST(request: NextRequest) {
+  let action = '';
   try {
     const authUser = await verifyUser(request);
 
     const body = (await request.json()) as UserActionPayload;
+    action = typeof body?.action === 'string' ? body.action : '';
     if (!body?.action) {
       return NextResponse.json({ success: false, message: 'Action is required.' }, { status: 400 });
     }
@@ -3606,6 +3808,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
     const status = message === 'Unauthorized request.' ? 401 : message.startsWith('Too many requests.') ? 429 : 400;
-    return NextResponse.json({ success: false, message }, { status });
+    const userFacingMessage = getUserFacingActionError(action, message);
+    return NextResponse.json({ success: false, message: userFacingMessage }, { status });
   }
 }

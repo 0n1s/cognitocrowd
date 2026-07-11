@@ -19,7 +19,7 @@ const LandingHeader = ({ showFaq = false }: { showFaq?: boolean }) => (
     <div className="container flex h-16 items-center">
       <Link href="/" className="mr-6 flex items-center space-x-2">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-        <span className="font-bold font-headline text-lg">Trainly</span>
+        <span className="font-bold font-headline text-lg">TrainlyLabs</span>
       </Link>
       <nav className="hidden flex-1 items-center space-x-6 text-sm font-medium md:flex">
         <Link href="#why-trainly" className="text-muted-foreground transition-colors hover:text-foreground">Why Us</Link>
@@ -39,10 +39,14 @@ const LandingHeader = ({ showFaq = false }: { showFaq?: boolean }) => (
 const LandingFooter = () => (
   <footer className="border-t border-border/40">
     <div className="container py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-      <p className="text-sm text-muted-foreground text-center md:text-left">&copy; {new Date().getFullYear()} Trainly. All rights reserved.</p>
-      <div className="flex items-center gap-4">
-        <Link href="#" className="text-sm text-muted-foreground hover:text-foreground">Privacy Policy</Link>
-        <Link href="#" className="text-sm text-muted-foreground hover:text-foreground">Terms of Service</Link>
+      <p className="text-sm text-muted-foreground text-center md:text-left">&copy; {new Date().getFullYear()} TrainlyLabs. All rights reserved.</p>
+      <div className="flex flex-wrap items-center justify-center gap-4">
+        <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">About</Link>
+        <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">Contact</Link>
+        <Link href="/privacy-policy" className="text-sm text-muted-foreground hover:text-foreground">Privacy Policy</Link>
+        <Link href="/terms-of-service" className="text-sm text-muted-foreground hover:text-foreground">Terms of Service</Link>
+        <Link href="/refund-policy" className="text-sm text-muted-foreground hover:text-foreground">Refund Policy</Link>
+        <Link href="/contributor-guidelines" className="text-sm text-muted-foreground hover:text-foreground">Contributor Guidelines</Link>
       </div>
     </div>
   </footer>

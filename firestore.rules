@@ -142,5 +142,11 @@ service cloud.firestore {
       allow create, update, delete: if isSignedIn() && isAdmin();
     }
 
+    // User notifications
+    match /user_notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
   }
 }

@@ -8,7 +8,7 @@ export default function WelcomePage() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-3xl font-headline">Welcome to Trainly!</CardTitle>
+                <CardTitle className="text-3xl font-headline">Welcome to TrainlyLabs!</CardTitle>
                 <CardDescription className="text-lg text-muted-foreground pt-2">
                     Before you can start contributing, we need to ask a few questions to verify your account and tailor your experience.
                 </CardDescription>

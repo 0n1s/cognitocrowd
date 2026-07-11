@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { getMessaging, type Messaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -18,6 +19,7 @@ let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 let auth: Auth | null = null;
 let storage: FirebaseStorage | null = null;
+let messaging: Messaging | null = null;
 
 // Check if all required environment variables are present
 const firebaseConfigIsValid =
@@ -31,6 +33,20 @@ if (firebaseConfigIsValid) {
   db = getFirestore(app);
   auth = getAuth(app);
   storage = getStorage(app);
+}
+
+// Lazy init messaging (only in browser, when supported)
+export async function getMessagingInstance(): Promise<Messaging | null> {
+  if (messaging) return messaging;
+  if (typeof window === 'undefined' || !app) return null;
+  const supported = await isSupported();
+  if (!supported) return null;
+  try {
+    messaging = getMessaging(app);
+  } catch {
+    messaging = null;
+  }
+  return messaging;
 }
 
 export { app, db, auth, storage };

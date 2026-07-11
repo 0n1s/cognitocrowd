@@ -1,10 +1,10 @@
-
 "use client";
 
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { getUserData } from "@/lib/database";
+import { auth } from '@/lib/firebase';
+import { getAppSettings, getUserData } from "@/lib/database";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
@@ -28,16 +28,32 @@ export default function OnboardingLayout({
       return;
     }
 
-    // If there is a user, check their application status.
-    getUserData(user.uid).then(userData => {
-      // If the user has already been approved, they don't need to be here.
-      // Redirect them to the main application dashboard.
+    const checkStatus = async () => {
+      const userData = await getUserData(user.uid);
+
+      // 1. Admins bypass email verification and onboarding entirely
+      if (userData?.role === 'super_user_alpha_7') {
+        router.push('/dashboard');
+        return;
+      }
+
+      // 2. Check email verification first (before any onboarding, skip for admins)
+      if (!user.emailVerified) {
+        const settings = await getAppSettings().catch(() => null);
+        if (settings?.requireEmailVerification) {
+          router.replace('/verify-email');
+          return;
+        }
+      }
+
+      // 3. Email verified (or not required), check onboarding status
       if (userData?.onboardingStatus === 'approved') {
         router.push('/dashboard');
       }
-      // Otherwise, if their status is 'pending', 'rejected', or undefined,
-      // we allow them to stay on the onboarding pages to complete the process.
-    });
+      // Otherwise, stay on onboarding
+    };
+
+    checkStatus();
 
   }, [user, authLoading, router]);
 
@@ -57,7 +73,7 @@ export default function OnboardingLayout({
         <div className="absolute top-4 left-4">
             <Link href="/" className="flex items-center space-x-2">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                <span className="font-bold font-headline text-lg">Trainly</span>
+                <span className="font-bold font-headline text-lg">TrainlyLabs</span>
             </Link>
         </div>
         <div className="w-full max-w-2xl">

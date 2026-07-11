@@ -8,8 +8,9 @@ import type { AiProviderConfig } from '@/lib/types';
 import { validateModelAvailability } from '@/ai/model-resolver';
 import { generateOpenAiCompatibleImage } from '@/ai/openai-image';
 import { generateOpenAiCompatibleVideo } from '@/ai/openai-video';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminAuth, adminDb, adminApp } from '@/lib/firebase-admin';
 import { awardReferralBonusForDeposit, reverseReferralBonusForDeposit } from '@/lib/referrals-admin';
+import { createUserNotification } from '@/lib/notifications-admin';
 import { normalizeCurrencyCode } from '@/lib/currency';
 import { normalizeToUsdAmount } from '@/lib/exchange-rates';
 
@@ -107,7 +108,7 @@ async function verifyAdmin(request: NextRequest) {
   return uid;
 }
 
-async function handleAction(action: string, payload: Record<string, any>) {
+async function handleAction(action: string, payload: Record<string, any>, uid: string = '') {
   switch (action) {
     case 'testAdminModel': {
       const { modality, model } = payload as { modality?: ModelModality; model?: string };
@@ -304,7 +305,7 @@ async function handleAction(action: string, payload: Record<string, any>) {
       if (!userId || !data || typeof data !== 'object') {
         throw new Error('Invalid payload for updateAdminUser.');
       }
-      const allowedKeys = ['packageId', 'role', 'earningsBalance', 'depositBalance', 'expertise', 'referralEligible'];
+      const allowedKeys = ['packageId', 'role', 'earningsBalance', 'depositBalance', 'expertise', 'referralEligible', 'emailVerified'];
       const updates = Object.fromEntries(Object.entries(data).filter(([key]) => allowedKeys.includes(key)));
 
       if ('expertise' in updates) {
@@ -315,6 +316,25 @@ async function handleAction(action: string, payload: Record<string, any>) {
       }
 
       await adminDb.collection('users').doc(userId).update(updates);
+
+      // Notify the user if their package was changed
+      if ('packageId' in updates) {
+        const newPackageId = String(updates.packageId || '');
+        if (newPackageId) {
+          const pkg = await adminDb.collection('packages').doc(newPackageId).get().catch(() => null);
+          const packageName = pkg?.data()?.name || 'a new plan';
+        await createUserNotification({
+          userId: userId,
+          type: 'system',
+          title: 'Plan Updated',
+          message: `Your plan has been updated to ${packageName}. Check your dashboard for the latest features and limits.`,
+          href: '/packages',
+          metadata: { packageId: newPackageId },
+          sendEmail: true,
+        });
+        }
+      }
+
       return { success: true, message: 'User updated successfully.' };
     }
 
@@ -352,6 +372,18 @@ async function handleAction(action: string, payload: Record<string, any>) {
           creditedAt: amount > 0 ? Timestamp.now() : null,
         });
       });
+
+      // Notify the user about the referral balance adjustment
+      const direction = amount > 0 ? 'credited' : 'deducted';
+      await createUserNotification({
+        userId,
+        type: 'system',
+        title: 'Referral Balance Updated',
+        message: `$${Math.abs(amount).toFixed(2)} has been ${direction} from your referral balance. Reason: ${reason}`,
+        href: '/referrals',
+        metadata: { amount, reason, direction },
+      });
+
       return { success: true, message: 'Referral balance adjusted.' };
     }
 
@@ -436,6 +468,30 @@ async function handleAction(action: string, payload: Record<string, any>) {
         throw new Error('Invalid payload for updateUserApprovalStatus.');
       }
       await adminDb.collection('users').doc(userId).update({ onboardingStatus: status });
+
+      // Notify the user about their approval status
+      if (status === 'approved') {
+        await createUserNotification({
+          userId,
+          type: 'system',
+          title: 'Account Approved',
+          message: 'Your account has been approved! You can now access the platform and start contributing.',
+          href: '/dashboard',
+          metadata: { status },
+          sendEmail: true,
+        });
+      } else {
+        await createUserNotification({
+          userId,
+          type: 'system',
+          title: 'Account Not Approved',
+          message: 'Your account application has been reviewed and was not approved at this time. Please contact support for more information.',
+          href: '/contact',
+          metadata: { status },
+          sendEmail: true,
+        });
+      }
+
       return { success: true, message: `User status updated to ${status}.` };
     }
 
@@ -477,6 +533,9 @@ async function handleAction(action: string, payload: Record<string, any>) {
         throw new Error('Invalid payload for updateWithdrawalRequestStatus.');
       }
 
+      let withdrawalUserId = '';
+      let withdrawalAmount = 0;
+
       await adminDb.runTransaction(async (transaction) => {
         const requestRef = adminDb.collection('withdrawal_requests').doc(requestId);
         const requestDoc = await transaction.get(requestRef);
@@ -484,6 +543,8 @@ async function handleAction(action: string, payload: Record<string, any>) {
         if (!requestDoc.exists) throw new Error('Withdrawal request not found.');
 
         const requestData = requestDoc.data() as { userId: string; amount: number; status: string; source?: string; partnerId?: string };
+        withdrawalUserId = requestData.userId;
+        withdrawalAmount = requestData.amount;
         const oldStatus = requestData.status;
         if (oldStatus === newStatus) return;
 
@@ -507,6 +568,25 @@ async function handleAction(action: string, payload: Record<string, any>) {
 
         transaction.update(requestRef, { status: newStatus, processedAt: Timestamp.now() });
       });
+
+      // Notify the user about the withdrawal status change
+      if (withdrawalUserId) {
+        const statusLabels: Record<string, string> = {
+          completed: 'approved and processed',
+          failed: 'declined — your funds have been returned',
+          pending: 'set back to pending review',
+        };
+        const label = statusLabels[String(newStatus)] || `updated to ${newStatus}`;
+        await createUserNotification({
+          userId: withdrawalUserId,
+          type: 'system',
+          title: 'Withdrawal Status Updated',
+          message: `Your withdrawal request for $${withdrawalAmount.toFixed(2)} has been ${label}.`,
+          href: '/wallet',
+          metadata: { requestId, status: newStatus, amount: withdrawalAmount },
+          sendEmail: true,
+        });
+      }
 
       return { success: true, message: `Request status updated to ${newStatus}.` };
     }
@@ -559,6 +639,9 @@ async function handleAction(action: string, payload: Record<string, any>) {
         throw new Error('Invalid payload for updateDepositStatus.');
       }
 
+      let depositUserId = '';
+      let depositAmount = 0;
+
       await adminDb.runTransaction(async (transaction) => {
         const depositRef = adminDb.collection('deposits').doc(String(depositId));
         const depositDoc = await transaction.get(depositRef);
@@ -578,6 +661,9 @@ async function handleAction(action: string, payload: Record<string, any>) {
         if (!userId || amount <= 0) {
           throw new Error('Deposit is missing required data.');
         }
+
+        depositUserId = userId;
+        depositAmount = amount;
 
         if (previousStatus === newStatus) {
           return;
@@ -612,6 +698,25 @@ async function handleAction(action: string, payload: Record<string, any>) {
         await awardReferralBonusForDeposit(String(depositId));
       } else {
         await reverseReferralBonusForDeposit(String(depositId));
+      }
+
+      // Notify the user about the deposit status change
+      if (depositUserId) {
+        const statusLabels: Record<string, string> = {
+          completed: 'approved and credited to your balance',
+          failed: 'declined',
+          pending: 'set back to pending review',
+        };
+        const label = statusLabels[String(newStatus)] || `updated to ${newStatus}`;
+        await createUserNotification({
+          userId: depositUserId,
+          type: 'system',
+          title: 'Deposit Status Updated',
+          message: `Your deposit of $${depositAmount.toFixed(2)} has been ${label}.`,
+          href: '/wallet',
+          metadata: { depositId, status: newStatus, amount: depositAmount },
+          sendEmail: true,
+        });
       }
 
       return { success: true, message: `Deposit status updated to ${newStatus}.` };
@@ -890,18 +995,47 @@ async function handleAction(action: string, payload: Record<string, any>) {
     case 'reviewPartnerApplication': {
       const applicationId = String(payload.applicationId || ''); const decision = String(payload.decision || ''); const data = payload.data || {};
       if (!applicationId || !['approved','rejected'].includes(decision)) throw new Error('Invalid application review.');
+      let applicantUserId = '';
+      let rejectionReason = '';
       await adminDb.runTransaction(async (transaction) => {
         const applicationRef = adminDb.collection('partner_applications').doc(applicationId); const application = await transaction.get(applicationRef);
         if (!application.exists || application.data()?.status !== 'pending') throw new Error('Pending application not found.');
         const app = application.data() || {}; const userRef = adminDb.collection('users').doc(String(app.userId)); const user = await transaction.get(userRef); if (!user.exists) throw new Error('Applicant not found.');
+        applicantUserId = String(app.userId);
         const lockRef = adminDb.collection('partner_application_locks').doc(String(app.userId));
-        if (decision === 'rejected') { transaction.update(applicationRef, { status: 'rejected', rejectionReason: String(data.rejectionReason || 'Application did not meet requirements.'), reviewedAt: Timestamp.now() }); transaction.delete(lockRef); return; }
+        if (decision === 'rejected') { rejectionReason = String(data.rejectionReason || 'Application did not meet requirements.'); transaction.update(applicationRef, { status: 'rejected', rejectionReason, reviewedAt: Timestamp.now() }); transaction.delete(lockRef); return; }
         const partnerRef = adminDb.collection('countryPartners').doc();
         transaction.update(userRef, { role: 'country_partner' });
         transaction.set(partnerRef, { userId: app.userId, name: app.name, email: app.email, country: String(data.country || app.country), paymentMethods: Array.isArray(data.paymentMethods) ? data.paymentMethods : app.paymentMethods || [], workingHours: app.workingHours || '', depositFeePercent: Number(data.depositFeePercent || 0), withdrawalFeePercent: Number(data.withdrawalFeePercent || 0), partnerWalletBalance: Number(data.initialWalletBalance || 0), depositLimit: Number(data.depositLimit || 0), withdrawalLimit: Number(data.withdrawalLimit || 0), minimumWalletBalance: Number(data.minimumWalletBalance || 0), permissions: { deposits: data.allowDeposits !== false, withdrawals: data.allowWithdrawals !== false, messaging: data.allowMessaging !== false }, isActive: true, isAvailable: true, applicationId, createdAt: Timestamp.now() });
         transaction.update(applicationRef, { status: 'approved', partnerId: partnerRef.id, reviewedAt: Timestamp.now() });
         transaction.delete(lockRef);
       });
+
+      // Notify the applicant
+      if (applicantUserId) {
+        if (decision === 'approved') {
+          await createUserNotification({
+            userId: applicantUserId,
+            type: 'system',
+            title: 'Partner Application Approved',
+            message: 'Congratulations! Your partner application has been approved. You can now access the Partner Portal.',
+            href: '/partner',
+            metadata: { applicationId, status: 'approved' },
+            sendEmail: true,
+          });
+        } else {
+          await createUserNotification({
+            userId: applicantUserId,
+            type: 'system',
+            title: 'Partner Application Not Approved',
+            message: `Your partner application was not approved. Reason: ${rejectionReason || 'Application did not meet requirements.'}`,
+            href: '/partner-program',
+            metadata: { applicationId, status: 'rejected', reason: rejectionReason },
+            sendEmail: true,
+          });
+        }
+      }
+
       return { success: true, message: `Application ${decision}.` };
     }
 
@@ -924,8 +1058,14 @@ async function handleAction(action: string, payload: Record<string, any>) {
     case 'resolvePartnerTransaction': {
       const transactionId = String(payload.transactionId || ''); const resolution = String(payload.resolution || ''); const note = String(payload.note || '').trim(); if (!transactionId || !['complete','cancel'].includes(resolution)) throw new Error('Invalid resolution.');
       let completedDepositId: string | null = null;
+      let partnerTxUserId = '';
+      let partnerTxAmount = 0;
+      let partnerTxType = '';
       await adminDb.runTransaction(async (transaction) => {
         const ref = adminDb.collection('partner_transactions').doc(transactionId); const doc = await transaction.get(ref); if (!doc.exists) throw new Error('Transaction not found.'); const item = doc.data() || {};
+        partnerTxUserId = String(item.userId || '');
+        partnerTxAmount = Number(item.amount || 0);
+        partnerTxType = String(item.type || '');
         const userRef = adminDb.collection('users').doc(String(item.userId)); const partnerRef = adminDb.collection('countryPartners').doc(String(item.partnerId)); const [user, partner] = await Promise.all([transaction.get(userRef), transaction.get(partnerRef)]); if (!user.exists || !partner.exists) throw new Error('User or partner not found.');
         if (resolution === 'cancel') { if (item.type === 'withdrawal' && item.status !== 'completed') transaction.update(userRef, { earningsBalance: Number(user.data()?.earningsBalance || 0) + Number(item.amount || 0) }); transaction.update(ref, { status: 'cancelled', adminResolution: note, updatedAt: Timestamp.now() }); return; }
         if (item.type === 'deposit' && item.status !== 'completed') { const balance = Number(partner.data()?.partnerWalletBalance || 0); if (balance < Number(item.amount)) throw new Error('Partner wallet has insufficient funds.'); const depositRef = adminDb.collection('deposits').doc(`partner_${transactionId}`); transaction.update(partnerRef, { partnerWalletBalance: balance - Number(item.amount) }); transaction.update(userRef, { depositBalance: Number(user.data()?.depositBalance || 0) + Number(item.amount) }); transaction.set(depositRef, { userId: item.userId, amount: Number(item.amount), method: `Partner: ${item.partnerName}`, partnerId: item.partnerId, partnerTransactionId: transactionId, status: 'completed', createdAt: Timestamp.now(), processedAt: Timestamp.now() }); completedDepositId = depositRef.id; }
@@ -933,6 +1073,21 @@ async function handleAction(action: string, payload: Record<string, any>) {
         transaction.update(ref, { status: 'completed', adminResolution: note, updatedAt: Timestamp.now(), completedAt: Timestamp.now() });
       });
       if (completedDepositId) await awardReferralBonusForDeposit(completedDepositId);
+
+      // Notify the user about the partner transaction resolution
+      if (partnerTxUserId) {
+        const resolutionLabel = resolution === 'complete' ? 'completed' : 'cancelled';
+        const typeLabel = partnerTxType === 'deposit' ? 'deposit' : 'withdrawal';
+        await createUserNotification({
+          userId: partnerTxUserId,
+          type: 'system',
+          title: 'Partner Transaction Resolved',
+          message: `Your partner ${typeLabel} of $${partnerTxAmount.toFixed(2)} has been ${resolutionLabel}.${note ? ` Note: ${note}` : ''}`,
+          href: '/wallet',
+          metadata: { transactionId, resolution, type: partnerTxType, amount: partnerTxAmount },
+        });
+      }
+
       return { success: true, message: 'Partner transaction resolved.' };
     }
 
@@ -1025,6 +1180,38 @@ async function handleAction(action: string, payload: Record<string, any>) {
       return { success: true, message: 'Question deleted successfully.' };
     }
 
+    case 'sendTestEmail': {
+      const toAddress = String(payload.to || '').trim();
+      const subject = String(payload.subject || '').trim();
+      const htmlBodyInput = String(payload.htmlBody || '').trim();
+      if (!toAddress || !subject || !htmlBodyInput) throw new Error('Recipient, subject, and body are required.');
+
+      const { sendEmail } = await import('@/lib/email');
+      const result = await sendEmail({
+        to: { address: toAddress },
+        subject,
+        htmlBody: htmlBodyInput,
+      });
+      if (!result) throw new Error('Failed to send test email. Check Zeptomail configuration.');
+      return { success: true, message: 'Test email sent to ' + toAddress + '.' };
+    }
+
+    case 'verifyUserEmail': {
+      const { userId } = payload;
+      if (!userId) throw new Error('userId is required.');
+      const { getAuth } = await import('firebase-admin/auth');
+      await getAuth(adminApp()).updateUser(userId, { emailVerified: true });
+      return { success: true, message: 'Email marked as verified.' };
+    }
+
+    case 'getUserEmailStatus': {
+      const { userId } = payload;
+      if (!userId) throw new Error('userId is required.');
+      const { getAuth } = await import('firebase-admin/auth');
+      const userRecord = await getAuth(adminApp()).getUser(userId);
+      return { success: true, emailVerified: userRecord.emailVerified || false, email: userRecord.email || '' };
+    }
+
     case 'recordExpense': {
       const amount = Number(payload.amount);
       const category = String(payload.category || '').trim();
@@ -1069,7 +1256,7 @@ export async function POST(request: NextRequest) {
 
     await enforceAdminActionRateLimit(adminUid, body.action);
 
-    const result = await handleAction(body.action, body.payload || {});
+    const result = await handleAction(body.action, body.payload || {}, adminUid);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';

@@ -27,12 +27,12 @@ export type GenerateFaqOutput = z.infer<typeof GenerateFaqOutputSchema>;
 
 const fallbackFaqItems = [
   {
-    question: 'How do I start earning on Trainly?',
+    question: 'How do I start earning on TrainlyLabs?',
     answer: 'Create an account, complete onboarding and qualification, then choose available contributions that match your approved expertise.',
   },
   {
     question: 'How does qualification work?',
-    answer: 'You select your areas of expertise and complete a short test so Trainly can match you with the right tasks and maintain quality standards.',
+    answer: 'You select your areas of expertise and complete a short test so TrainlyLabs can match you with the right tasks and maintain quality standards.',
   },
   {
     question: 'What AI tools are available?',
@@ -89,7 +89,7 @@ const generateFaqFlow = ai.defineFlow(
     try {
       const generated = await runtimeAi.generate({
         model,
-        prompt: `Generate ${input.count} concise FAQ items for Trainly, a platform where human experts complete paid AI training contributions and use AI workspace tools like chat, image generation, video generation, and music generation.
+        prompt: `Generate ${input.count} concise FAQ items for TrainlyLabs, a platform where human experts complete paid AI training contributions and use AI workspace tools like chat, image generation, video generation, and music generation.
 
 Cover earning, qualification, account approval, deposits, withdrawals, and AI workspace access.
 

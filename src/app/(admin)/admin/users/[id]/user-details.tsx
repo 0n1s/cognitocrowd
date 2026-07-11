@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Package as TPackage, AdminUser } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
-import { adjustReferralBalance, updateAdminUser } from "@/lib/admin-api";
-import { ArrowLeft, Edit, Loader2 } from 'lucide-react';
+import { adjustReferralBalance, updateAdminUser, verifyUserEmail } from "@/lib/admin-api";
+import { ArrowLeft, Edit, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const BASE_EXPERTISE_OPTIONS = [
@@ -164,7 +165,43 @@ function EditUserDialog({ user, packages, open, onOpenChange, onUserUpdated }: {
 
 export function UserPageHeader({ user, packages }: { user: AdminUser, packages: TPackage[] }) {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+    const [verifying, setVerifying] = useState(false);
     const router = useRouter();
+    const { toast } = useToast();
+
+    // Fetch email verification status from Firebase Auth
+    useEffect(() => {
+      const fetchStatus = async () => {
+        try {
+          const { getUserEmailStatus } = await import('@/lib/admin-api');
+          const result = await getUserEmailStatus(user.id);
+          if (result.success) {
+            setEmailVerified(result.emailVerified);
+          }
+        } catch {
+          // Ignore errors — fallback to null
+        }
+      };
+      fetchStatus();
+    }, [user.id]);
+
+    const handleVerifyEmail = async () => {
+      setVerifying(true);
+      try {
+        const result = await verifyUserEmail(user.id);
+        if (result.success) {
+          setEmailVerified(true);
+          toast({ title: "Success", description: "Email marked as verified." });
+        } else {
+          toast({ title: "Error", description: result.message || "Failed to verify email.", variant: "destructive" });
+        }
+      } catch (error) {
+        toast({ title: "Error", description: "Failed to verify email.", variant: "destructive" });
+      } finally {
+        setVerifying(false);
+      }
+    };
 
     const getInitials = (name: string | null | undefined) => {
         if (!name) return "U";
@@ -185,6 +222,32 @@ export function UserPageHeader({ user, packages }: { user: AdminUser, packages: 
                         <div>
                             <h1 className="text-2xl font-bold font-headline">{user.name}</h1>
                             <p className="text-muted-foreground">{user.email}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {emailVerified === true ? (
+                                <Badge variant="default" className="flex items-center gap-1">
+                                  <CheckCircle className="h-3 w-3" /> Email Verified
+                                </Badge>
+                              ) : emailVerified === false ? (
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <XCircle className="h-3 w-3" /> Not Verified
+                                  </Badge>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleVerifyEmail}
+                                    disabled={verifying}
+                                  >
+                                    {verifying && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                                    Verify Manually
+                                  </Button>
+                                </div>
+                              ) : null}
+                              {emailVerified === null && (
+                                <Badge variant="outline">Checking...</Badge>
+                              )}
+                            </div>
                         </div>
                     </div>
                 </div>

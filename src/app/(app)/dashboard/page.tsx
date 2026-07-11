@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { DailyLimitPopup } from '@/components/daily-limit-popup';
 import { Progress } from '@/components/ui/progress';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
+import { AutoPromptPushNotification } from '@/components/auto-prompt-push-notification';
 
 const StatCard = ({ title, value, icon: Icon, description }: { title: string; value: string | number; icon: React.ElementType; description: string }) => {
   return (
@@ -284,6 +285,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <AutoPromptPushNotification />
       <DailyLimitPopup />
       <section className="rounded-2xl border border-border/60 bg-gradient-to-br from-primary/10 via-background to-background p-6 md:p-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">

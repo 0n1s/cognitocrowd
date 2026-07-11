@@ -582,6 +582,53 @@ export async function getAppSettings(): Promise<AppSettings> {
         faqTitle: 'Frequently Asked Questions',
         faqSubtitle: '',
         faqItems: [],
+        publicTrustCompanyContext: 'TrainlyLabs is an AI training and creative tools platform where contributors can qualify for paid tasks, use AI workspace tools, manage wallet activity, and participate in community programs. The platform values clear rules, transparent payments, contributor quality, data privacy, and responsive support.',
+        publicTrustPageAiModel: '',
+        supportWidgetEnabled: false,
+        supportWidgetProvider: 'none',
+        supportWidgetTawkPropertyId: '',
+        supportWidgetTawkWidgetId: '',
+        supportWidgetCrispWebsiteId: '',
+        supportWidgetScriptUrl: '',
+        supportWidgetCustomScript: '',
+        publicPages: {
+            about: {
+                title: 'About TrainlyLabs',
+                subtitle: 'Human expertise for better AI systems.',
+                content: 'TrainlyLabs connects skilled contributors with AI training, evaluation, and creative tooling workflows. Our platform helps people qualify, complete paid contributions, access AI workspace tools, and manage earnings through a transparent account experience.',
+                enabled: true,
+            },
+            contact: {
+                title: 'Contact TrainlyLabs',
+                subtitle: 'Need help or want to reach the team?',
+                content: 'For support, account questions, partnership inquiries, or payment concerns, contact the TrainlyLabs team through your in-app support channel or the official support email configured by the site administrator.',
+                enabled: true,
+            },
+            privacy: {
+                title: 'Privacy Policy',
+                subtitle: 'How TrainlyLabs handles user information.',
+                content: 'TrainlyLabs collects account, profile, contribution, wallet, and usage information needed to operate the platform. This page should be reviewed and customized by your legal team before launch to describe data collection, storage, third-party services, user rights, and retention practices.',
+                enabled: true,
+            },
+            terms: {
+                title: 'Terms of Service',
+                subtitle: 'Rules for using TrainlyLabs.',
+                content: 'By using TrainlyLabs, users agree to follow platform rules, provide accurate account information, complete work honestly, respect intellectual property, and avoid misuse of AI tools or payment systems. This page should be reviewed and customized by your legal team before launch.',
+                enabled: true,
+            },
+            refund: {
+                title: 'Refund and Deposit Policy',
+                subtitle: 'How deposits, packages, and refunds are handled.',
+                content: 'Deposits and package purchases are processed according to the payment methods available in the wallet. This page should explain confirmation timing, failed payments, package access, refund eligibility, and support escalation before launch.',
+                enabled: true,
+            },
+            guidelines: {
+                title: 'Contributor Guidelines',
+                subtitle: 'Quality standards for TrainlyLabs contributors.',
+                content: 'Contributors should follow task instructions carefully, submit original and accurate work, avoid spam or low-effort responses, protect confidential information, and use AI assistance only where allowed by task rules.',
+                enabled: true,
+            },
+        },
         landingPageContent: {
             processImage1: "https://placehold.co/800x600.png",
             processImage2: "https://placehold.co/800x600.png",
@@ -634,7 +681,7 @@ export async function getAppSettings(): Promise<AppSettings> {
             testimonialsTitle: "Trusted by Experts Worldwide",
             testimonialsSubtitle: "Our contributors are the backbone of the next AI revolution. Here's what they have to say.",
             testimonials: [
-                { name: "Aisha Khan", role: "Software Engineer", quote: "Trainly provides the most interesting and challenging code-related tasks. It's rewarding to know my work directly improves the models I use daily." },
+                { name: "Aisha Khan", role: "Software Engineer", quote: "TrainlyLabs provides the most interesting and challenging code-related tasks. It's rewarding to know my work directly improves the models I use daily." },
                 { name: "Dr. Ben Carter", role: "Medical Researcher", quote: "The platform's focus on quality and accuracy is impressive. It's a fantastic way to contribute specialized knowledge and stay at the cutting edge of AI." },
                 { name: "Maria Garcia", role: "Creative Writer & Editor", quote: "I get to use my writing skills to shape how AI communicates. The tasks are engaging, and the platform is incredibly intuitive and fair." }
             ],
@@ -727,6 +774,17 @@ export async function getAppSettings(): Promise<AppSettings> {
         mergedSettings.defaultTextGenAiModel = normalizeTextModel(mergedSettings.defaultTextGenAiModel) || mergedSettings.defaultGenAiModel || defaultSettings.defaultTextGenAiModel;
         mergedSettings.defaultImageGenAiModel = normalizeImageModel(mergedSettings.defaultImageGenAiModel) || defaultSettings.defaultImageGenAiModel;
         mergedSettings.defaultVideoGenAiModel = normalizeVideoModel(mergedSettings.defaultVideoGenAiModel) || defaultSettings.defaultVideoGenAiModel;
+        mergedSettings.supportWidgetEnabled = mergedSettings.supportWidgetEnabled === true;
+        mergedSettings.publicTrustCompanyContext = String(mergedSettings.publicTrustCompanyContext || defaultSettings.publicTrustCompanyContext || '').trim();
+        mergedSettings.publicTrustPageAiModel = normalizeTextModel(mergedSettings.publicTrustPageAiModel) || mergedSettings.defaultTextGenAiModel || defaultSettings.publicTrustPageAiModel;
+        mergedSettings.supportWidgetProvider = ['tawk', 'crisp', 'custom'].includes(String(mergedSettings.supportWidgetProvider || ''))
+            ? mergedSettings.supportWidgetProvider
+            : 'none';
+        mergedSettings.supportWidgetTawkPropertyId = String(mergedSettings.supportWidgetTawkPropertyId || '').trim();
+        mergedSettings.supportWidgetTawkWidgetId = String(mergedSettings.supportWidgetTawkWidgetId || '').trim();
+        mergedSettings.supportWidgetCrispWebsiteId = String(mergedSettings.supportWidgetCrispWebsiteId || '').trim();
+        mergedSettings.supportWidgetScriptUrl = String(mergedSettings.supportWidgetScriptUrl || '').trim();
+        mergedSettings.supportWidgetCustomScript = String(mergedSettings.supportWidgetCustomScript || '').trim();
         mergedSettings.plisioApiKey = String(mergedSettings.plisioApiKey || '').trim();
         mergedSettings.plisioPublicBaseUrl = String(mergedSettings.plisioPublicBaseUrl || '').trim();
         mergedSettings.processingTimeZone = String(mergedSettings.processingTimeZone || defaultSettings.processingTimeZone || 'UTC').trim() || 'UTC';
@@ -764,6 +822,10 @@ export async function getAppSettings(): Promise<AppSettings> {
                 enabled: item.enabled !== false,
             }))
             : defaultSettings.faqItems;
+        mergedSettings.publicPages = {
+            ...defaultSettings.publicPages,
+            ...(mergedSettings.publicPages || {}),
+        };
         const configuredCopyLimit = Number(mergedSettings.qualificationTestCopyAttemptLimit);
         mergedSettings.qualificationTestCopyAttemptLimit = Number.isFinite(configuredCopyLimit)
             ? Math.max(1, Math.floor(configuredCopyLimit))

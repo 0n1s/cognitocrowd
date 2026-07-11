@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { User, Package, GeneratedImage } from './types';
 import { getPackage } from './database';
 import { generateImage } from "@/ai/flows/ai-generate-image";
+import { getAiUserFacingError } from "@/lib/ai-error";
 
 export async function generateAndSaveImage(userId: string, prompt: string): Promise<{ success: boolean; message: string; image?: GeneratedImage; }> {
     if (!db || !storage) {
@@ -113,6 +114,6 @@ export async function generateAndSaveImage(userId: string, prompt: string): Prom
     } catch (error) {
         console.error("Error generating and saving image:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message: getAiUserFacingError(message) };
     }
 }

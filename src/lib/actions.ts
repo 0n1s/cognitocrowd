@@ -9,12 +9,14 @@ import { bulkGenerateTasks } from "@/ai/flows/ai-bulk-task-generator";
 import { generateQualificationTest, evaluateQualificationTest } from "@/ai/flows/ai-qualification-test";
 import { generateLandingImage as generateLandingImageFlow } from "@/ai/flows/ai-generate-landing-image";
 import { generateFaq as generateFaqFlow } from "@/ai/flows/ai-generate-faq";
+import { generatePublicTrustPage as generatePublicTrustPageFlow } from "@/ai/flows/ai-generate-public-trust-page";
 import { improveLandingPageText as improveLandingPageTextFlow } from "@/ai/flows/ai-improve-landing-page-text";
 import { improveImagePrompt as improveImagePromptFlow } from "@/ai/flows/ai-improve-image-prompt";
 import { v4 as uuidv4 } from "uuid";
 import { getMostRecentChat, getAppSettings, getUserData, getQualificationTest, getTasks, getPendingApprovals, getPackage } from './database';
 import { headers } from "next/headers";
 import { adminDb, adminStorage } from "@/lib/firebase-admin";
+import { getAiUserFacingError } from "@/lib/ai-error";
 
 
 export type CreateTaskInput = {
@@ -1071,7 +1073,7 @@ export async function generateLandingImage(prompt: string) {
     } catch (error) {
         console.error("Error generating landing page image:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message: getAiUserFacingError(message) };
     }
 }
 
@@ -1082,7 +1084,25 @@ export async function generateFaqItems(count = 6) {
     } catch (error) {
         console.error("Error generating FAQ items with AI:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message: getAiUserFacingError(message) };
+    }
+}
+
+export async function generatePublicTrustPage(input: {
+    pageKey: 'about' | 'contact' | 'privacy' | 'terms' | 'refund' | 'guidelines';
+    companyContext?: string;
+    currentTitle?: string;
+    currentSubtitle?: string;
+    currentContent?: string;
+    model?: string;
+}) {
+    try {
+        const result = await generatePublicTrustPageFlow(input);
+        return { success: true, page: result };
+    } catch (error) {
+        console.error("Error generating public trust page with AI:", error);
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message: getAiUserFacingError(message) };
     }
 }
 
@@ -1096,7 +1116,7 @@ export async function improveLandingPageText(originalText: string, context: stri
     } catch (error) {
         console.error("Error improving text with AI:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message: getAiUserFacingError(message) };
     }
 }
 

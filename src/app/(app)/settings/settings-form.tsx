@@ -15,16 +15,18 @@ import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCre
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, Wand2, Clipboard, Save } from "lucide-react";
+import { Loader2, Upload, Wand2, Clipboard, Save, Copy, Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getUserData, getPackage } from "@/lib/database";
-import { v4 as uuidv4 } from "uuid";
-import type { Package } from "@/lib/types";
+import type { Package, User } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { NotificationPermissionButton } from "@/components/notification-permission";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -330,8 +332,13 @@ export function SettingsForm() {
     const { toast } = useToast();
     const router = useRouter();
     const [userPackage, setUserPackage] = useState<Package | null>(null);
+    const [accountData, setAccountData] = useState<User | null>(null);
     const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
+    const [isAccountProfileSubmitting, setIsAccountProfileSubmitting] = useState(false);
     const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+    const [country, setCountry] = useState("");
+    const [languagesText, setLanguagesText] = useState("");
+    const [expertiseText, setExpertiseText] = useState("");
 
     const profileForm = useForm<z.infer<typeof profileFormSchema>>({
         resolver: zodResolver(profileFormSchema),
@@ -349,6 +356,10 @@ export function SettingsForm() {
             
             // Fetch full user data to get package info
             getUserData(user.uid).then(userData => {
+                setAccountData(userData || null);
+                setCountry(userData?.country || "");
+                setLanguagesText((userData?.languages || []).join(", "));
+                setExpertiseText((userData?.expertise || []).join(", "));
                 if (userData?.packageId) {
                     getPackage(userData.packageId).then(pkg => {
                         setUserPackage(pkg);
@@ -388,6 +399,66 @@ export function SettingsForm() {
         } finally {
             setIsProfileSubmitting(false);
         }
+    };
+
+    const parseCommaList = (value: string) => value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+    const saveAccountProfile = async () => {
+        if (!user || !auth?.currentUser) {
+            toast({ title: "Error", description: "You are not logged in.", variant: "destructive" });
+            return;
+        }
+
+        setIsAccountProfileSubmitting(true);
+        try {
+            const idToken = await auth.currentUser.getIdToken();
+            const response = await fetch('/api/user/profile', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    country,
+                    languages: parseCommaList(languagesText),
+                    expertise: parseCommaList(expertiseText),
+                }),
+            });
+
+            if (!response.ok) {
+                const result = await response.json().catch(() => ({}));
+                throw new Error(result?.message || 'Failed to update account details.');
+            }
+
+            setAccountData((current) => current ? {
+                ...current,
+                country,
+                languages: parseCommaList(languagesText),
+                expertise: parseCommaList(expertiseText),
+            } : current);
+            toast({ title: "Success", description: "Your account details have been updated." });
+            router.refresh();
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: error instanceof Error ? error.message : "Failed to update account details.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsAccountProfileSubmitting(false);
+        }
+    };
+
+    const copyReferralCode = () => {
+        const code = accountData?.referralCode || "";
+        if (!code) return;
+        navigator.clipboard.writeText(code).then(
+            () => toast({ title: "Copied", description: "Referral code copied to clipboard." }),
+            () => toast({ title: "Copy Failed", description: "Could not copy referral code.", variant: "destructive" })
+        );
     };
 
     const onPasswordSubmit = async (values: z.infer<typeof passwordFormSchema>) => {
@@ -471,6 +542,58 @@ export function SettingsForm() {
             <ProfilePictureForm userPackage={userPackage} />
             <Card>
                 <CardHeader>
+                    <CardTitle>Account Details</CardTitle>
+                    <CardDescription>Manage your contributor profile, account status, and referral information.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2 rounded-md border p-3">
+                            <Label className="text-xs uppercase text-muted-foreground">Account Status</Label>
+                            <div>
+                                <Badge variant={accountData?.onboardingStatus === 'approved' ? 'default' : accountData?.onboardingStatus === 'rejected' ? 'destructive' : 'secondary'}>
+                                    {accountData?.onboardingStatus || 'pending'}
+                                </Badge>
+                            </div>
+                        </div>
+                        <div className="space-y-2 rounded-md border p-3">
+                            <Label className="text-xs uppercase text-muted-foreground">Current Package</Label>
+                            <p className="font-medium">{userPackage?.name || 'No active package'}</p>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="settings-country">Country</Label>
+                        <Input id="settings-country" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Italy" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="settings-languages">Languages</Label>
+                        <Input id="settings-languages" value={languagesText} onChange={(e) => setLanguagesText(e.target.value)} placeholder="English" />
+                        <p className="text-xs text-muted-foreground">Separate multiple languages with commas.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="settings-expertise">Expertise Areas</Label>
+                        <Textarea id="settings-expertise" value={expertiseText} onChange={(e) => setExpertiseText(e.target.value)} placeholder="Software Development, Mathematics, Creative Writing" rows={3} />
+                        <p className="text-xs text-muted-foreground">Separate expertise areas with commas.</p>
+                    </div>
+                    <div className="space-y-2 rounded-md border p-3">
+                        <Label className="text-xs uppercase text-muted-foreground">Referral Code</Label>
+                        <div className="flex gap-2">
+                            <Input readOnly value={accountData?.referralCode || 'Not generated yet'} />
+                            <Button type="button" variant="outline" size="icon" onClick={copyReferralCode} disabled={!accountData?.referralCode}>
+                                <Copy className="h-4 w-4" />
+                                <span className="sr-only">Copy referral code</span>
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+                <CardFooter className="border-t px-6 py-4">
+                    <Button type="button" onClick={saveAccountProfile} disabled={isAccountProfileSubmitting}>
+                        {isAccountProfileSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Account Details
+                    </Button>
+                </CardFooter>
+            </Card>
+            <Card>
+                <CardHeader>
                     <CardTitle>Profile</CardTitle>
                     <CardDescription>Update your public display name.</CardDescription>
                 </CardHeader>
@@ -499,6 +622,19 @@ export function SettingsForm() {
                         </CardFooter>
                     </form>
                 </Form>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Push Notifications</CardTitle>
+                    <CardDescription>Get notified even when the app is closed. Enable browser push notifications to receive real-time updates on deposits, withdrawals, and account changes.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center gap-3">
+                        <Bell className="h-5 w-5 text-muted-foreground" />
+                        <NotificationPermissionButton />
+                    </div>
+                </CardContent>
             </Card>
 
             <Card>

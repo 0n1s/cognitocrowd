@@ -6,6 +6,9 @@ import { AuthProvider } from '@/hooks/use-auth';
 import { SessionCurrencyProvider } from '@/hooks/use-session-currency';
 import { ThemeProvider } from "@/components/theme-provider";
 import { Roboto } from 'next/font/google';
+import { SupportWidget } from '@/components/support-widget';
+import { ServiceWorkerRegister } from '@/components/service-worker-register';
+import { getAppSettings } from '@/lib/database';
 
 const roboto = Roboto({
   weight: ['400', '500', '700'],
@@ -17,7 +20,7 @@ const roboto = Roboto({
 const FAVICON_VERSION = '20260708-1';
 
 export const metadata: Metadata = {
-  title: 'Trainly',
+  title: 'TrainlyLabs',
   description: 'Help train AI models by completing simple, gamified tasks.',
   icons: {
     icon: [`/favicon.ico?v=${FAVICON_VERSION}`, `/icon.svg?v=${FAVICON_VERSION}`],
@@ -26,27 +29,32 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const settings = await getAppSettings().catch(() => null);
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head />
       <body className={`${roboto.variable} font-body antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <SessionCurrencyProvider>
-            <AuthProvider>
-              {children}
-            </AuthProvider>
-          </SessionCurrencyProvider>
-          <Toaster />
-        </ThemeProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <SessionCurrencyProvider>
+              <AuthProvider>
+                <ServiceWorkerRegister />
+                {children}
+              </AuthProvider>
+            </SessionCurrencyProvider>
+            <Toaster />
+            <SupportWidget settings={settings} />
+          </ThemeProvider>
       </body>
     </html>
   );

@@ -4,9 +4,10 @@
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
+import { auth } from '@/lib/firebase';
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
-import { getUserData } from "@/lib/database";
+import { getAppSettings, getUserData } from "@/lib/database";
 
 const AuthLayoutSkeleton = () => (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -53,6 +54,22 @@ export default function AuthLayout({
         userData = await getUserData(user.uid);
       }
       if (!userData) return;
+
+      // Admins bypass email verification
+      if (userData.role !== 'super_user_alpha_7' && !user.emailVerified) {
+        const settings = await getAppSettings().catch(() => null);
+        if (settings?.requireEmailVerification) {
+          router.replace('/verify-email');
+          return;
+        }
+      }
+
+      // Admins go straight to dashboard
+      if (userData.role === 'super_user_alpha_7') {
+        router.push('/dashboard');
+        return;
+      }
+
       if (userData?.onboardingStatus === 'pending') {
         router.push('/onboarding/welcome');
       } else {
@@ -84,7 +101,7 @@ export default function AuthLayout({
         <div className="mx-auto grid w-full max-w-sm gap-6">
             <Link href="/" className="flex items-center justify-center lg:justify-start space-x-2 mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                <span className="font-bold font-headline text-lg">Trainly</span>
+                <span className="font-bold font-headline text-lg">TrainlyLabs</span>
             </Link>
             {!loading && !user && children}
         </div>

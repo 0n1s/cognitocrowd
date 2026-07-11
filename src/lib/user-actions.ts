@@ -8,6 +8,7 @@ import { ref, getDownloadURL, uploadBytes } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { generateProfileImage } from "@/ai/flows/ai-generate-profile-image";
 import { getUserData, getPackage } from "./database";
+import { getAiUserFacingError } from "@/lib/ai-error";
 
 export async function updateUserNameInDB(userId: string, name: string) {
     if (!db) {
@@ -57,7 +58,7 @@ export async function generateAiProfilePicture(userId: string, prompt: string): 
     } catch (error) {
         console.error("Error generating AI profile picture:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message: getAiUserFacingError(message) };
     }
 }
 

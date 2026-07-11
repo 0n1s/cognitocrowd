@@ -195,3 +195,15 @@ export async function getAdminAppSettings() {
 export async function testAdminModel(modality: ModelModality, model: string) {
   return runAdminAction('testAdminModel', { modality, model });
 }
+
+export async function sendTestEmail(to: string, subject: string, htmlBody: string) {
+  return runAdminAction('sendTestEmail', { to, subject, htmlBody });
+}
+
+export async function verifyUserEmail(userId: string) {
+  return runAdminAction('verifyUserEmail', { userId });
+}
+
+export async function getUserEmailStatus(userId: string) {
+  return runAdminAction('getUserEmailStatus', { userId }) as Promise<{ success: boolean; emailVerified: boolean; email: string; message?: string }>;
+}

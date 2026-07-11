@@ -1,5 +1,5 @@
 import { auth } from '@/lib/firebase';
-import type { GeneratedImage, GeneratedMusic, GeneratedVideo, LeaderboardEntry, MusicStyleProfile } from '@/lib/types';
+import type { GeneratedImage, GeneratedMusic, GeneratedVideo, LeaderboardEntry, MusicStyleProfile, UserNotification } from '@/lib/types';
 
 type ApiResult<T = Record<string, unknown>> = T & {
   success: boolean;
@@ -169,6 +169,30 @@ export async function submitQualificationTest(
 
 export async function setupNewUser(_userId: string, name: string, email: string, referralCode?: string) {
   return runUserAction<{ referredBy?: string | null }>('setupNewUser', { name, email, referralCode });
+}
+
+export async function getUserNotifications(limit = 20) {
+  return runUserAction<{ notifications?: UserNotification[]; unreadCount?: number }>('getUserNotifications', { limit });
+}
+
+export async function markNotificationRead(notificationId: string) {
+  return runUserAction('markNotificationRead', { notificationId });
+}
+
+export async function markAllNotificationsRead() {
+  return runUserAction<{ updated?: number }>('markAllNotificationsRead', {});
+}
+
+export async function deleteUserNotification(notificationId: string) {
+  return runUserAction('deleteUserNotification', { notificationId });
+}
+
+export async function deleteAllNotifications() {
+  return runUserAction<{ deleted?: number }>('deleteAllNotifications', {});
+}
+
+export async function createTestNotification() {
+  return runUserAction('createTestNotification', {});
 }
 
 export async function getInitialChatHistory(_userId: string) {

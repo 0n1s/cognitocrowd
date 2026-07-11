@@ -255,7 +255,7 @@ export default function ChatPage() {
     return (
         <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col sm:h-[calc(100dvh-5.5rem)]">
             <div className="hidden mb-3 sm:block">
-                <h1 className="text-2xl font-bold font-headline lg:text-3xl">Trainly AI Assistant</h1>
+                <h1 className="text-2xl font-bold font-headline lg:text-3xl">TrainlyLabs AI Assistant</h1>
                 <p className="mt-1 text-sm text-muted-foreground">Ask me anything about available contributions or how to get started.</p>
             </div>
             <ChatUI 

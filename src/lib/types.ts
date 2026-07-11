@@ -114,6 +114,27 @@ export type AdminUser = User & {
   packageName: string;
 };
 
+export type UserNotificationType =
+  | 'system'
+  | 'account'
+  | 'wallet'
+  | 'generation'
+  | 'task'
+  | 'partner'
+  | 'referral';
+
+export type UserNotification = {
+  id: string;
+  userId: string;
+  type: UserNotificationType;
+  title: string;
+  message: string;
+  href?: string;
+  readAt?: any;
+  createdAt: any;
+  metadata?: Record<string, unknown>;
+};
+
 export type CountryPartner = {
   id: string;
   userId: string;
@@ -308,6 +329,16 @@ export type FAQItem = {
     enabled?: boolean;
 };
 
+export type PublicPageKey = 'about' | 'contact' | 'privacy' | 'terms' | 'refund' | 'guidelines';
+
+export type PublicPageContent = {
+    title: string;
+    subtitle?: string;
+    content: string;
+    contentHtml?: string;
+    enabled?: boolean;
+};
+
 export type LandingPageContent = {
     processImage1: string;
     processImage2: string;
@@ -390,6 +421,16 @@ export type AppSettings = {
   faqTitle?: string;
   faqSubtitle?: string;
   faqItems?: FAQItem[];
+  publicTrustCompanyContext?: string;
+  publicTrustPageAiModel?: string;
+  supportWidgetEnabled?: boolean;
+  supportWidgetProvider?: 'none' | 'tawk' | 'crisp' | 'custom';
+  supportWidgetTawkPropertyId?: string;
+  supportWidgetTawkWidgetId?: string;
+  supportWidgetCrispWebsiteId?: string;
+  supportWidgetScriptUrl?: string;
+  supportWidgetCustomScript?: string;
+  publicPages?: Partial<Record<PublicPageKey, PublicPageContent>>;
   landingPageContent?: LandingPageContent;
   autoApprovalEnabled?: boolean;
   autoApprovalThreshold?: number;
@@ -417,6 +458,10 @@ export type AppSettings = {
   partnerWithdrawalDays?: string[];
   partnerWithdrawalMinimumAmount?: number;
   partnerWithdrawalMaximumAmount?: number;
+
+  // Email & Notification settings
+  requireEmailVerification?: boolean;
+  emailNotificationsEnabled?: boolean;
 };
 
 export type AiProviderConfig = {

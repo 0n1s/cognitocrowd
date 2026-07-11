@@ -7,6 +7,7 @@ import { db } from "@/lib/firebase";
 import { collection, doc, Timestamp, runTransaction, setDoc } from "firebase/firestore";
 import type { User, Package, GeneratedVideo } from './types';
 import { generateVideo } from "@/ai/flows/ai-generate-video";
+import { getAiUserFacingError } from "@/lib/ai-error";
 
 export async function generateAndSaveVideo(userId: string, prompt: string): Promise<{ success: boolean; message: string; video?: GeneratedVideo; }> {
     if (!db) {
@@ -98,6 +99,6 @@ export async function generateAndSaveVideo(userId: string, prompt: string): Prom
     } catch (error) {
         console.error("Error generating and saving video:", error);
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message: getAiUserFacingError(message) };
     }
 }

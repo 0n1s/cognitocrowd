@@ -3,16 +3,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AiProviderConfig, AppSettings, OnboardingStep } from "@/lib/types";
+import { AiProviderConfig, AppSettings, OnboardingStep, type PublicPageKey } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Trash2, Loader2, GripVertical, RefreshCw, Copy, Check, ChevronDown, Sparkles } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, GripVertical, RefreshCw, Copy, Check, ChevronDown, Sparkles, Mail } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { discoverOpenAiCompatibleModels, generateFaqItems, improveLandingPageText } from "@/lib/actions";
+import { discoverOpenAiCompatibleModels, generateFaqItems, generatePublicTrustPage, improveLandingPageText } from "@/lib/actions";
 import { auth } from "@/lib/firebase";
 import { getAdminAppSettings, testAdminModel } from "@/lib/admin-api";
 import { v4 as uuidv4 } from "uuid";
@@ -23,6 +24,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { AVAILABLE_MODELS, type ModelModality, type ModelOption } from "@/ai/models";
 import { DepositMethodsManager } from "@/components/admin/deposit-methods-manager";
 import { WithdrawalMethodsManager } from "@/components/admin/withdrawal-methods-manager";
+import { plainTextToTrustPageHtml, sanitizeTrustPageHtml } from "@/lib/trust-page-html";
 
 type CustomModelType = 'uncensored' | 'vision' | 'hacking' | 'coding';
 
@@ -153,6 +155,75 @@ function SearchableModelSelect({
     );
 }
 
+function TrustPageRichTextEditor({
+    id,
+    value,
+    onChange,
+}: {
+    id: string;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const editorRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || document.activeElement === editor) return;
+        editor.innerHTML = sanitizeTrustPageHtml(value || '');
+    }, [value]);
+
+    const commitEditorValue = () => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        const nextValue = sanitizeTrustPageHtml(editor.innerHTML);
+        if (nextValue !== editor.innerHTML) {
+            editor.innerHTML = nextValue;
+        }
+        onChange(nextValue);
+    };
+
+    const runCommand = (command: string, commandValue?: string) => {
+        editorRef.current?.focus();
+        document.execCommand(command, false, commandValue);
+        commitEditorValue();
+    };
+
+    const insertHtml = (html: string) => {
+        editorRef.current?.focus();
+        document.execCommand('insertHTML', false, sanitizeTrustPageHtml(html));
+        commitEditorValue();
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 rounded-md border bg-muted/30 p-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => runCommand('formatBlock', 'h2')}>H2</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => runCommand('formatBlock', 'h3')}>H3</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => runCommand('bold')}>Bold</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => runCommand('italic')}>Italic</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => runCommand('insertUnorderedList')}>List</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => insertHtml('<section class="trust-section"><h2>Section title</h2><p>Write the details here.</p></section>')}>Section</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => insertHtml('<div class="trust-callout"><p>Important note for users.</p></div>')}>Callout</Button>
+            </div>
+            <div
+                id={id}
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                className="trust-content min-h-72 rounded-md border bg-background p-4 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onInput={commitEditorValue}
+                onBlur={commitEditorValue}
+                onPaste={(event) => {
+                    event.preventDefault();
+                    const pastedHtml = event.clipboardData.getData('text/html');
+                    const pastedText = event.clipboardData.getData('text/plain');
+                    insertHtml(pastedHtml ? sanitizeTrustPageHtml(pastedHtml) : plainTextToTrustPageHtml(pastedText));
+                }}
+            />
+        </div>
+    );
+}
+
 
 const LoadingSkeleton = () => (
     <Card>
@@ -180,10 +251,20 @@ export function SettingsForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [discoveringProviderId, setDiscoveringProviderId] = useState<string | null>(null);
     const [testingModality, setTestingModality] = useState<ModelModality | null>(null);
+    const [isUserApprovalSettingsOpen, setIsUserApprovalSettingsOpen] = useState(false);
+    const [isDepositWithdrawalSettingsOpen, setIsDepositWithdrawalSettingsOpen] = useState(false);
+    const [isEmailNotificationSettingsOpen, setIsEmailNotificationSettingsOpen] = useState(false);
     const [isOnboardingSettingsOpen, setIsOnboardingSettingsOpen] = useState(false);
     const [isFaqSettingsOpen, setIsFaqSettingsOpen] = useState(false);
+    const [isSupportSettingsOpen, setIsSupportSettingsOpen] = useState(false);
+    const [isPublicPagesOpen, setIsPublicPagesOpen] = useState(false);
     const [isAiModelSettingsOpen, setIsAiModelSettingsOpen] = useState(false);
     const [faqAiAction, setFaqAiAction] = useState<string | null>(null);
+    const [publicTrustAiAction, setPublicTrustAiAction] = useState<PublicPageKey | null>(null);
+    const [testEmailDialogOpen, setTestEmailDialogOpen] = useState(false);
+    const [testEmailTo, setTestEmailTo] = useState('');
+    const [testEmailSubject, setTestEmailSubject] = useState('');
+    const [testEmailBody, setTestEmailBody] = useState('');
     const [testResults, setTestResults] = useState<Record<ModelModality, {
         message?: string;
         text?: string;
@@ -200,6 +281,14 @@ export function SettingsForm() {
         audio: {},
     });
     const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const publicPageOptions: Array<{ key: PublicPageKey; label: string }> = [
+        { key: 'about', label: 'About' },
+        { key: 'contact', label: 'Contact' },
+        { key: 'privacy', label: 'Privacy Policy' },
+        { key: 'terms', label: 'Terms of Service' },
+        { key: 'refund', label: 'Refund / Deposit Policy' },
+        { key: 'guidelines', label: 'Contributor Guidelines' },
+    ];
 
     const createProvider = (): AiProviderConfig => ({
         id: `provider-${uuidv4().slice(0, 8)}`,
@@ -283,12 +372,25 @@ export function SettingsForm() {
                 }
                 fetchedSettings.faqEnabled = fetchedSettings.faqEnabled === true;
                 fetchedSettings.faqTitle = String(fetchedSettings.faqTitle || 'Frequently Asked Questions');
-                fetchedSettings.faqSubtitle = String(fetchedSettings.faqSubtitle || 'Everything you need to know before joining Trainly.');
+                fetchedSettings.faqSubtitle = String(fetchedSettings.faqSubtitle || 'Everything you need to know before joining TrainlyLabs.');
                 fetchedSettings.faqItems = (fetchedSettings.faqItems || []).map((item) => ({
                     ...item,
                     id: item.id || uuidv4(),
                     enabled: item.enabled !== false,
                 }));
+                fetchedSettings.supportWidgetEnabled = fetchedSettings.supportWidgetEnabled === true;
+                fetchedSettings.supportWidgetProvider = fetchedSettings.supportWidgetProvider || 'none';
+                fetchedSettings.supportWidgetTawkPropertyId = String(fetchedSettings.supportWidgetTawkPropertyId || '');
+                fetchedSettings.supportWidgetTawkWidgetId = String(fetchedSettings.supportWidgetTawkWidgetId || 'default');
+                fetchedSettings.supportWidgetCrispWebsiteId = String(fetchedSettings.supportWidgetCrispWebsiteId || '');
+                fetchedSettings.supportWidgetScriptUrl = String(fetchedSettings.supportWidgetScriptUrl || '');
+                fetchedSettings.supportWidgetCustomScript = String(fetchedSettings.supportWidgetCustomScript || '');
+                fetchedSettings.publicPages = fetchedSettings.publicPages || {};
+                fetchedSettings.publicTrustCompanyContext = String(
+                    fetchedSettings.publicTrustCompanyContext ||
+                    'TrainlyLabs is an AI training and creative tools platform where contributors can qualify for paid tasks, use AI workspace tools, manage wallet activity, and participate in community programs. The platform values clear rules, transparent payments, contributor quality, data privacy, and responsive support.'
+                );
+                fetchedSettings.publicTrustPageAiModel = fetchedSettings.publicTrustPageAiModel || fetchedSettings.defaultTextGenAiModel || fetchedSettings.defaultGenAiModel || '';
                 fetchedSettings.aiProviders = fetchedSettings.aiProviders || [];
                 fetchedSettings.aiProviders = (fetchedSettings.aiProviders || []).map(sanitizeProviderDiscoveredModels);
                 fetchedSettings.defaultTextGenAiModel = fetchedSettings.defaultTextGenAiModel || fetchedSettings.defaultGenAiModel || '';
@@ -359,6 +461,11 @@ export function SettingsForm() {
                 );
                 fetchedSettings.defaultCodingAiModel = normalizeModelId(
                     fetchedSettings.defaultCodingAiModel,
+                    validModelIds,
+                    ''
+                );
+                fetchedSettings.publicTrustPageAiModel = normalizeModelId(
+                    fetchedSettings.publicTrustPageAiModel,
                     validModelIds,
                     ''
                 );
@@ -460,7 +567,7 @@ export function SettingsForm() {
                 ...settings,
                 faqEnabled: true,
                 faqTitle: settings.faqTitle || 'Frequently Asked Questions',
-                faqSubtitle: settings.faqSubtitle || 'Answers to common questions about earning, qualifying, and using Trainly.',
+                faqSubtitle: settings.faqSubtitle || 'Answers to common questions about earning, qualifying, and using TrainlyLabs.',
                 faqItems: suggestions,
             });
             toast({ title: 'FAQ generated', description: `${suggestions.length} FAQ items were added. Review them before saving.` });
@@ -505,6 +612,72 @@ export function SettingsForm() {
         }
     };
 
+    const handlePublicPageChange = (key: PublicPageKey, field: 'title' | 'subtitle' | 'content' | 'contentHtml' | 'enabled', value: string | boolean) => {
+        if (!settings) return;
+        const current = settings.publicPages?.[key] || { title: '', subtitle: '', content: '', enabled: true };
+        handleFieldChange('publicPages', {
+            ...(settings.publicPages || {}),
+            [key]: {
+                ...current,
+                [field]: value,
+            },
+        });
+    };
+
+    const handleGeneratePublicTrustPage = async (key: PublicPageKey) => {
+        if (!settings || publicTrustAiAction) return;
+        const current = settings.publicPages?.[key] || { title: '', subtitle: '', content: '', contentHtml: '', enabled: true };
+        setPublicTrustAiAction(key);
+        try {
+            const result = await generatePublicTrustPage({
+                pageKey: key,
+                companyContext: settings.publicTrustCompanyContext || '',
+                currentTitle: current.title || '',
+                currentSubtitle: current.subtitle || '',
+                currentContent: current.contentHtml || current.content || '',
+                model: settings.publicTrustPageAiModel || settings.defaultTextGenAiModel || settings.defaultGenAiModel || '',
+            });
+
+            if (!result.success || !result.page) {
+                throw new Error(result.message || 'AI did not return a trust page draft.');
+            }
+
+            handleFieldChange('publicPages', {
+                ...(settings.publicPages || {}),
+                [key]: {
+                    ...current,
+                    title: result.page.title,
+                    subtitle: result.page.subtitle,
+                    content: result.page.content,
+                    contentHtml: sanitizeTrustPageHtml(result.page.contentHtml),
+                    enabled: true,
+                },
+            });
+            toast({ title: 'Trust page generated', description: `${publicPageOptions.find((page) => page.key === key)?.label || 'Page'} draft is ready for review.` });
+        } catch (error) {
+            toast({
+                title: 'AI generation failed',
+                description: error instanceof Error ? error.message : 'Could not generate this trust page.',
+                variant: 'destructive',
+            });
+        } finally {
+            setPublicTrustAiAction(null);
+        }
+    };
+
+    const sanitizePublicPagesForSave = (pages: AppSettings['publicPages']) => {
+        return Object.fromEntries(
+            Object.entries(pages || {}).map(([key, page]) => [
+                key,
+                {
+                    ...page,
+                    contentHtml: sanitizeTrustPageHtml(page?.contentHtml || plainTextToTrustPageHtml(page?.content || '')),
+                    content: String(page?.content || '').trim(),
+                },
+            ])
+        ) as AppSettings['publicPages'];
+    };
+
     const handleSubmit = async () => {
         if (!settings) return;
         setIsSubmitting(true);
@@ -518,6 +691,12 @@ export function SettingsForm() {
         const normalizedSettings: AppSettings = {
             ...settings,
             aiProviders: sanitizedProviders,
+            supportWidgetTawkPropertyId: String(settings.supportWidgetTawkPropertyId || '').trim(),
+            supportWidgetTawkWidgetId: String(settings.supportWidgetTawkWidgetId || '').trim() || 'default',
+            supportWidgetCrispWebsiteId: String(settings.supportWidgetCrispWebsiteId || '').trim(),
+            supportWidgetScriptUrl: String(settings.supportWidgetScriptUrl || '').trim(),
+            supportWidgetCustomScript: String(settings.supportWidgetCustomScript || '').trim(),
+            publicTrustCompanyContext: String(settings.publicTrustCompanyContext || '').trim(),
         };
         const validModelIds = getValidModelIds(normalizedSettings);
         normalizedSettings.defaultTextGenAiModel = normalizeModelId(normalizedSettings.defaultTextGenAiModel, validModelIds, '');
@@ -528,6 +707,7 @@ export function SettingsForm() {
         normalizedSettings.defaultVisionAiModel = normalizeModelId(normalizedSettings.defaultVisionAiModel, validModelIds, '');
         normalizedSettings.defaultHackingAiModel = normalizeModelId(normalizedSettings.defaultHackingAiModel, validModelIds, '');
         normalizedSettings.defaultCodingAiModel = normalizeModelId(normalizedSettings.defaultCodingAiModel, validModelIds, '');
+        normalizedSettings.publicTrustPageAiModel = normalizeModelId(normalizedSettings.publicTrustPageAiModel, validModelIds, '');
 
         setSettings(normalizedSettings);
 
@@ -538,6 +718,7 @@ export function SettingsForm() {
             depositMethods: (normalizedSettings.depositMethods || []).filter(m => m.name.trim() !== ''),
             onboardingCourseSteps: (normalizedSettings.onboardingCourseSteps || []).filter(s => s.title.trim() !== '' && s.content.trim() !== ''),
             faqItems: (normalizedSettings.faqItems || []).filter((item) => item.question.trim() !== '' && item.answer.trim() !== ''),
+            publicPages: sanitizePublicPagesForSave(normalizedSettings.publicPages),
             defaultGenAiModel: normalizedSettings.defaultTextGenAiModel,
             aiProviders: (normalizedSettings.aiProviders || []).map((provider) => ({
                 ...provider,
@@ -584,6 +765,12 @@ export function SettingsForm() {
         const normalizedSettings: AppSettings = {
             ...settingsInput,
             aiProviders: sanitizedProviders,
+            supportWidgetTawkPropertyId: String(settingsInput.supportWidgetTawkPropertyId || '').trim(),
+            supportWidgetTawkWidgetId: String(settingsInput.supportWidgetTawkWidgetId || '').trim() || 'default',
+            supportWidgetCrispWebsiteId: String(settingsInput.supportWidgetCrispWebsiteId || '').trim(),
+            supportWidgetScriptUrl: String(settingsInput.supportWidgetScriptUrl || '').trim(),
+            supportWidgetCustomScript: String(settingsInput.supportWidgetCustomScript || '').trim(),
+            publicTrustCompanyContext: String(settingsInput.publicTrustCompanyContext || '').trim(),
         };
         const validModelIds = getValidModelIds(normalizedSettings);
         normalizedSettings.defaultTextGenAiModel = normalizeModelId(normalizedSettings.defaultTextGenAiModel, validModelIds, '');
@@ -594,6 +781,7 @@ export function SettingsForm() {
         normalizedSettings.defaultVisionAiModel = normalizeModelId(normalizedSettings.defaultVisionAiModel, validModelIds, '');
         normalizedSettings.defaultHackingAiModel = normalizeModelId(normalizedSettings.defaultHackingAiModel, validModelIds, '');
         normalizedSettings.defaultCodingAiModel = normalizeModelId(normalizedSettings.defaultCodingAiModel, validModelIds, '');
+        normalizedSettings.publicTrustPageAiModel = normalizeModelId(normalizedSettings.publicTrustPageAiModel, validModelIds, '');
 
         const settingsToSave = {
             ...normalizedSettings,
@@ -602,6 +790,7 @@ export function SettingsForm() {
             depositMethods: (normalizedSettings.depositMethods || []).filter(m => m.name.trim() !== ''),
             onboardingCourseSteps: (normalizedSettings.onboardingCourseSteps || []).filter(s => s.title.trim() !== '' && s.content.trim() !== ''),
             faqItems: (normalizedSettings.faqItems || []).filter((item) => item.question.trim() !== '' && item.answer.trim() !== ''),
+            publicPages: sanitizePublicPagesForSave(normalizedSettings.publicPages),
             defaultGenAiModel: normalizedSettings.defaultTextGenAiModel,
             aiProviders: (normalizedSettings.aiProviders || []).map((provider) => ({
                 ...provider,
@@ -895,6 +1084,9 @@ export function SettingsForm() {
     const selectedDefaultTextModel = settings.defaultTextGenAiModel && textModelIds.has(settings.defaultTextGenAiModel)
         ? settings.defaultTextGenAiModel
         : '';
+    const selectedPublicTrustPageAiModel = settings.publicTrustPageAiModel && textModelIds.has(settings.publicTrustPageAiModel)
+        ? settings.publicTrustPageAiModel
+        : '';
     const selectedDefaultImageModel = settings.defaultImageGenAiModel && imageModelIds.has(settings.defaultImageGenAiModel)
         ? settings.defaultImageGenAiModel
         : '';
@@ -910,11 +1102,20 @@ export function SettingsForm() {
 
                 <Separator />
 
-                <div>
-                    <h3 className="text-lg font-semibold">User Approval Settings</h3>
-                    <p className="text-sm text-muted-foreground">Automate the qualification test approval process based on user scores.</p>
-                </div>
-                <div className="space-y-6">
+                <Collapsible open={isUserApprovalSettingsOpen} onOpenChange={setIsUserApprovalSettingsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">User Approval Settings</h3>
+                            <p className="text-sm text-muted-foreground">Automate the qualification test approval process based on user scores.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isUserApprovalSettingsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isUserApprovalSettingsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-6 space-y-6">
                     <div className="flex items-center space-x-2">
                         <Switch id="auto-approval-enabled" checked={settings.autoApprovalEnabled} onCheckedChange={(checked) => handleFieldChange('autoApprovalEnabled', checked)} />
                         <Label htmlFor="auto-approval-enabled">Enable Auto-Approval</Label>
@@ -992,7 +1193,8 @@ export function SettingsForm() {
                             <p className="text-xs text-muted-foreground">Users receive up to this many random questions from the selected expertise question set.</p>
                         </div>
                     </div>
-                </div>
+                    </CollapsibleContent>
+                </Collapsible>
                 
                 <Collapsible open={isOnboardingSettingsOpen} onOpenChange={setIsOnboardingSettingsOpen}>
                     <div className="flex items-start justify-between gap-4">
@@ -1098,7 +1300,7 @@ export function SettingsForm() {
                                         onClick={() => handleImproveFaqField(
                                             'title',
                                             settings.faqTitle || '',
-                                            'FAQ section title for Trainly landing page',
+                                            'FAQ section title for TrainlyLabs landing page',
                                             (value) => handleFieldChange('faqTitle', value)
                                         )}
                                     >
@@ -1119,7 +1321,7 @@ export function SettingsForm() {
                                         onClick={() => handleImproveFaqField(
                                             'subtitle',
                                             settings.faqSubtitle || '',
-                                            'FAQ section subtitle for Trainly landing page',
+                                            'FAQ section subtitle for TrainlyLabs landing page',
                                             (value) => handleFieldChange('faqSubtitle', value)
                                         )}
                                     >
@@ -1162,7 +1364,7 @@ export function SettingsForm() {
                                                 onClick={() => handleImproveFaqField(
                                                     `question-${item.id}`,
                                                     item.question,
-                                                    'FAQ question for Trainly landing page. Make it concise and clear.',
+                                                    'FAQ question for TrainlyLabs landing page. Make it concise and clear.',
                                                     (value) => handleFaqItemChange(item.id, 'question', value)
                                                 )}
                                             >
@@ -1187,7 +1389,7 @@ export function SettingsForm() {
                                                 onClick={() => handleImproveFaqField(
                                                     `answer-${item.id}`,
                                                     item.answer,
-                                                    `FAQ answer for this question: "${item.question}". Make it helpful, direct, and suitable for Trainly users.`,
+                                                    `FAQ answer for this question: "${item.question}". Make it helpful, direct, and suitable for TrainlyLabs users.`,
                                                     (value) => handleFaqItemChange(item.id, 'answer', value)
                                                 )}
                                             >
@@ -1208,6 +1410,230 @@ export function SettingsForm() {
                                 <PlusCircle className="mr-2 h-4 w-4" /> Add FAQ
                             </Button>
                         </div>
+                    </CollapsibleContent>
+                </Collapsible>
+
+                <Separator />
+
+                <Collapsible open={isSupportSettingsOpen} onOpenChange={setIsSupportSettingsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">Customer Support Platform</h3>
+                            <p className="text-sm text-muted-foreground">Add a live chat widget such as Tawk.to or Crisp across the frontend.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isSupportSettingsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isSupportSettingsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-6 space-y-5">
+                        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+                            <div>
+                                <Label htmlFor="support-widget-enabled" className="text-base font-semibold">Enable support widget</Label>
+                                <p className="text-xs text-muted-foreground">When enabled, the selected support chat widget loads globally.</p>
+                            </div>
+                            <Switch
+                                id="support-widget-enabled"
+                                checked={settings.supportWidgetEnabled === true}
+                                onCheckedChange={(checked) => handleFieldChange('supportWidgetEnabled', checked)}
+                            />
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="support-widget-provider">Provider</Label>
+                                <select
+                                    id="support-widget-provider"
+                                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                                    value={settings.supportWidgetProvider || 'none'}
+                                    onChange={(e) => {
+                                        const provider = e.target.value as AppSettings['supportWidgetProvider'];
+                                        setSettings({
+                                            ...settings,
+                                            supportWidgetProvider: provider,
+                                            supportWidgetEnabled: provider !== 'none' ? settings.supportWidgetEnabled : false,
+                                        });
+                                    }}
+                                >
+                                    <option value="none">None</option>
+                                    <option value="tawk">Tawk.to</option>
+                                    <option value="crisp">Crisp</option>
+                                    <option value="custom">Custom HTTPS script</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {settings.supportWidgetProvider === 'tawk' ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="support-widget-tawk-property">Tawk.to Property ID</Label>
+                                    <Input
+                                        id="support-widget-tawk-property"
+                                        value={settings.supportWidgetTawkPropertyId || ''}
+                                        onChange={(e) => handleFieldChange('supportWidgetTawkPropertyId', e.target.value)}
+                                        placeholder="64f..."
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="support-widget-tawk-widget">Tawk.to Widget ID</Label>
+                                    <Input
+                                        id="support-widget-tawk-widget"
+                                        value={settings.supportWidgetTawkWidgetId || 'default'}
+                                        onChange={(e) => handleFieldChange('supportWidgetTawkWidgetId', e.target.value)}
+                                        placeholder="default"
+                                    />
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {settings.supportWidgetProvider === 'crisp' ? (
+                            <div className="space-y-2">
+                                <Label htmlFor="support-widget-crisp-id">Crisp Website ID</Label>
+                                <Input
+                                    id="support-widget-crisp-id"
+                                    value={settings.supportWidgetCrispWebsiteId || ''}
+                                    onChange={(e) => handleFieldChange('supportWidgetCrispWebsiteId', e.target.value)}
+                                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                                />
+                            </div>
+                        ) : null}
+
+                        {settings.supportWidgetProvider === 'custom' ? (
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="support-widget-script-url">Custom widget script URL</Label>
+                                    <Input
+                                        id="support-widget-script-url"
+                                        value={settings.supportWidgetScriptUrl || ''}
+                                        onChange={(e) => handleFieldChange('supportWidgetScriptUrl', e.target.value)}
+                                        placeholder="https://example.com/widget.js"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Use this when the provider gives you a direct JavaScript file URL. Only HTTPS URLs are loaded.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="support-widget-custom-script">Custom widget script snippet</Label>
+                                    <Textarea
+                                        id="support-widget-custom-script"
+                                        value={settings.supportWidgetCustomScript || ''}
+                                        onChange={(e) => handleFieldChange('supportWidgetCustomScript', e.target.value)}
+                                        placeholder={'<!-- Paste the widget embed code here -->\n<script>\n  window.supportWidgetConfig = { ... };\n</script>\n<script src="https://example.com/widget.js"></script>'}
+                                        rows={8}
+                                        className="font-mono text-xs"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Pasted JavaScript runs across the site. Use snippets only from support platforms you trust.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : null}
+                    </CollapsibleContent>
+                </Collapsible>
+
+                <Separator />
+
+                <Collapsible open={isPublicPagesOpen} onOpenChange={setIsPublicPagesOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">Public Trust Pages</h3>
+                            <p className="text-sm text-muted-foreground">Configure About, Contact, Privacy, Terms, refund, and contributor guideline pages.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isPublicPagesOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isPublicPagesOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-6 space-y-4">
+                        <div className="rounded-md border bg-primary/5 p-4 space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="public-trust-company-context" className="text-base font-semibold">Company context for AI drafts</Label>
+                                <Textarea
+                                    id="public-trust-company-context"
+                                    value={settings.publicTrustCompanyContext || ''}
+                                    onChange={(e) => handleFieldChange('publicTrustCompanyContext', e.target.value)}
+                                    rows={5}
+                                    placeholder="Describe your company, users, payment rules, support channels, jurisdictions, and any constraints AI should respect."
+                                />
+                                <p className="text-xs text-muted-foreground">This context is sent with one selected page at a time so AI can draft accurate trust copy without bloating the prompt.</p>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <SearchableModelSelect
+                                    id="public-trust-page-ai-model"
+                                    label="Trust Page AI Model"
+                                    placeholder="Search text models..."
+                                    options={textModelOptions}
+                                    value={selectedPublicTrustPageAiModel}
+                                    onChange={(nextValue) => handleFieldChange('publicTrustPageAiModel', nextValue)}
+                                />
+                            </div>
+                        </div>
+                        {publicPageOptions.map(({ key, label }) => {
+                            const page = settings.publicPages?.[key] || { title: label, subtitle: '', content: '', contentHtml: '', enabled: true };
+                            const pageHtml = sanitizeTrustPageHtml(page.contentHtml || plainTextToTrustPageHtml(page.content || ''));
+                            return (
+                                <div key={key} className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <Label className="text-base font-semibold">{label}</Label>
+                                        <div className="flex items-center space-x-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={Boolean(publicTrustAiAction)}
+                                                onClick={() => handleGeneratePublicTrustPage(key)}
+                                            >
+                                                {publicTrustAiAction === key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                                Generate
+                                            </Button>
+                                            <Switch
+                                                id={`public-page-${key}-enabled`}
+                                                checked={page.enabled !== false}
+                                                onCheckedChange={(checked) => handlePublicPageChange(key, 'enabled', checked)}
+                                            />
+                                            <Label htmlFor={`public-page-${key}-enabled`} className="text-sm font-normal">Enabled</Label>
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`public-page-${key}-title`}>Title</Label>
+                                            <Input
+                                                id={`public-page-${key}-title`}
+                                                value={page.title || ''}
+                                                onChange={(e) => handlePublicPageChange(key, 'title', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`public-page-${key}-subtitle`}>Subtitle</Label>
+                                            <Input
+                                                id={`public-page-${key}-subtitle`}
+                                                value={page.subtitle || ''}
+                                                onChange={(e) => handlePublicPageChange(key, 'subtitle', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`public-page-${key}-content`}>Rich Content</Label>
+                                        <TrustPageRichTextEditor
+                                            id={`public-page-${key}-content`}
+                                            value={pageHtml}
+                                            onChange={(value) => {
+                                                handleFieldChange('publicPages', {
+                                                    ...(settings.publicPages || {}),
+                                                    [key]: {
+                                                        ...page,
+                                                        contentHtml: value,
+                                                        content: value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(),
+                                                    },
+                                                });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </CollapsibleContent>
                 </Collapsible>
 
@@ -1507,98 +1933,240 @@ export function SettingsForm() {
 
                 <Separator />
 
-                <div>
-                    <h3 className="text-lg font-semibold">Deposit Settings</h3>
-                    <p className="text-sm text-muted-foreground">Manage accepted deposit methods.</p>
-                </div>
-                <DepositMethodsManager
-                    methods={settings.depositMethods || []}
-                    onChange={(methods) => handleFieldChange('depositMethods', methods)}
-                />
-                
-                <Separator />
-                
-                <div>
-                    <h3 className="text-lg font-semibold">Withdrawal Settings</h3>
-                    <p className="text-sm text-muted-foreground">Manage payment methods and the withdrawal schedule for users.</p>
-                </div>
-                <WithdrawalMethodsManager
-                    methods={settings.withdrawalMethods || []}
-                    onChange={(methods) => handleFieldChange('withdrawalMethods', methods)}
-                />
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2 md:col-span-2">
-                        <SearchableModelSelect
-                            id="processing-timezone"
-                            label="Processing Timezone"
-                            placeholder="Search timezones..."
-                            options={processingTimeZoneOptions}
-                            value={settings.processingTimeZone || 'UTC'}
-                            onChange={(nextValue) => handleFieldChange('processingTimeZone', nextValue || 'UTC')}
-                        />
-                        <p className="text-xs text-muted-foreground">Used for server-side day checks (withdrawals and partner day schedules). Use an IANA timezone like UTC, Africa/Nairobi, America/New_York.</p>
+                <Collapsible open={isEmailNotificationSettingsOpen} onOpenChange={setIsEmailNotificationSettingsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">Email & Notification Settings</h3>
+                            <p className="text-sm text-muted-foreground">Control email verification requirements and transactional email notifications.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isEmailNotificationSettingsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isEmailNotificationSettingsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="withdrawal-min-amount" className="text-base font-semibold">Global Minimum Withdrawal (USD)</Label>
-                        <Input
-                            id="withdrawal-min-amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={settings.withdrawalMinimumAmount ?? 0}
-                            onChange={(e) => handleFieldChange('withdrawalMinimumAmount', Number(e.target.value) || 0)}
-                            placeholder="0"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="withdrawal-max-amount" className="text-base font-semibold">Global Maximum Withdrawal (USD)</Label>
-                        <Input
-                            id="withdrawal-max-amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={settings.withdrawalMaximumAmount ?? 0}
-                            onChange={(e) => handleFieldChange('withdrawalMaximumAmount', Number(e.target.value) || 0)}
-                            placeholder="0"
-                        />
-                        <p className="text-xs text-muted-foreground">Set to 0 for no maximum.</p>
-                    </div>
-                </div>
-                
-                <div className="space-y-4">
-                    <Label className="text-base font-semibold">Weekly Withdrawal Days</Label>
-                    <p className="text-sm text-muted-foreground">
-                        Select specific days of the week for processing withdrawals. This will be shown to users.
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-2">
-                        {weekdays.map((day) => (
-                            <div key={day} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={`day-${day}`}
-                                    checked={settings.withdrawalDays?.includes(day)}
-                                    onCheckedChange={(checked) => handleDayChange(day, checked as boolean)}
-                                />
-                                <Label htmlFor={`day-${day}`} className="font-normal">{day}</Label>
+                    <CollapsibleContent className="mt-6 space-y-3">
+                    <div className="rounded-md border p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <Label className="text-base font-semibold">Send Test Email</Label>
+                                <p className="text-xs text-muted-foreground">Send a test email to any address to verify Zeptomail integration.</p>
                             </div>
-                        ))}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setTestEmailDialogOpen(true)}
+                            >
+                                <Mail className="mr-2 h-4 w-4" />
+                                Send Test Email
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                    <Dialog open={testEmailDialogOpen} onOpenChange={setTestEmailDialogOpen}>
+                        <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Send Test Email</DialogTitle>
+                                <DialogDescription>Send a custom test email via Zeptomail to verify the integration.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="test-email-to">To</Label>
+                                    <Input
+                                        id="test-email-to"
+                                        type="email"
+                                        placeholder="user@example.com"
+                                        value={testEmailTo}
+                                        onChange={(e) => setTestEmailTo(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="test-email-subject">Subject</Label>
+                                    <Input
+                                        id="test-email-subject"
+                                        placeholder="Test Email"
+                                        value={testEmailSubject}
+                                        onChange={(e) => setTestEmailSubject(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="test-email-body">Body (HTML)</Label>
+                                    <Textarea
+                                        id="test-email-body"
+                                        rows={6}
+                                        placeholder="<h2>Hello!</h2><p>This is a test email.</p>"
+                                        value={testEmailBody}
+                                        onChange={(e) => setTestEmailBody(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <DialogClose asChild>
+                                    <Button type="button" variant="outline">Cancel</Button>
+                                </DialogClose>
+                                <Button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (!testEmailTo || !testEmailSubject || !testEmailBody) {
+                                            toast({ title: "Missing fields", description: "All fields are required.", variant: "destructive" });
+                                            return;
+                                        }
+                                        const { sendTestEmail } = await import('@/lib/admin-api');
+                                        const result = await sendTestEmail(testEmailTo, testEmailSubject, testEmailBody);
+                                        if (result.success) {
+                                            toast({ title: "Success", description: result.message || "Test email sent." });
+                                            setTestEmailDialogOpen(false);
+                                        } else {
+                                            toast({ title: "Error", description: result.message || "Failed to send test email.", variant: "destructive" });
+                                        }
+                                    }}
+                                    disabled={!testEmailTo || !testEmailSubject || !testEmailBody}
+                                >
+                                    Send
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                    <div className="rounded-md border p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <Label htmlFor="require-email-verification" className="text-base font-semibold">Require Email Verification</Label>
+                                <p className="text-xs text-muted-foreground">If enabled, users must verify their email address before accessing the platform.</p>
+                            </div>
+                            <Switch
+                                id="require-email-verification"
+                                checked={settings.requireEmailVerification === true}
+                                onCheckedChange={(checked) => handleFieldChange('requireEmailVerification', checked)}
+                            />
+                        </div>
+                    </div>
+                    <div className="rounded-md border p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <Label htmlFor="email-notifications-enabled" className="text-base font-semibold">Email Notifications</Label>
+                                <p className="text-xs text-muted-foreground">Send transactional emails for important events like deposit approvals, withdrawals, and account changes.</p>
+                            </div>
+                            <Switch
+                                id="email-notifications-enabled"
+                                checked={settings.emailNotificationsEnabled !== false}
+                                onCheckedChange={(checked) => handleFieldChange('emailNotificationsEnabled', checked)}
+                            />
+                        </div>
+                    </div>
+                    </CollapsibleContent>
+                </Collapsible>
 
-                <div className="space-y-2">
-                    <Label htmlFor="schedule" className="text-base font-semibold">
-                        Custom Schedule Information
-                    </Label>
-                    <Textarea
-                        id="schedule"
-                        value={settings.withdrawalScheduleInfo}
-                        onChange={(e) => handleFieldChange('withdrawalScheduleInfo', e.target.value)}
-                        placeholder="e.g., Withdrawals are also processed on the 1st and 15th of each month."
-                    />
-                    <p className="text-xs text-muted-foreground">
-                        This text is shown to users in addition to any weekly schedule. Use for non-weekday schedules.
-                    </p>
-                </div>
+                <Separator />
+
+                <Collapsible open={isDepositWithdrawalSettingsOpen} onOpenChange={setIsDepositWithdrawalSettingsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">Deposit & Withdrawal Settings</h3>
+                            <p className="text-sm text-muted-foreground">Manage deposit methods, withdrawal methods, limits, processing timezone, and withdrawal schedule.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isDepositWithdrawalSettingsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isDepositWithdrawalSettingsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-6 space-y-6">
+                        <div>
+                            <h4 className="text-base font-semibold mb-2">Deposit Methods</h4>
+                            <DepositMethodsManager
+                                methods={settings.depositMethods || []}
+                                onChange={(methods) => handleFieldChange('depositMethods', methods)}
+                            />
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div>
+                            <h4 className="text-base font-semibold mb-2">Withdrawal Methods</h4>
+                            <WithdrawalMethodsManager
+                                methods={settings.withdrawalMethods || []}
+                                onChange={(methods) => handleFieldChange('withdrawalMethods', methods)}
+                            />
+                        </div>
+
+                        <Separator />
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="space-y-2 md:col-span-2">
+                                <SearchableModelSelect
+                                    id="processing-timezone"
+                                    label="Processing Timezone"
+                                    placeholder="Search timezones..."
+                                    options={processingTimeZoneOptions}
+                                    value={settings.processingTimeZone || 'UTC'}
+                                    onChange={(nextValue) => handleFieldChange('processingTimeZone', nextValue || 'UTC')}
+                                />
+                                <p className="text-xs text-muted-foreground">Used for server-side day checks (withdrawals and partner day schedules). Use an IANA timezone like UTC, Africa/Nairobi, America/New_York.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="withdrawal-min-amount" className="text-base font-semibold">Global Minimum Withdrawal (USD)</Label>
+                                <Input
+                                    id="withdrawal-min-amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={settings.withdrawalMinimumAmount ?? 0}
+                                    onChange={(e) => handleFieldChange('withdrawalMinimumAmount', Number(e.target.value) || 0)}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="withdrawal-max-amount" className="text-base font-semibold">Global Maximum Withdrawal (USD)</Label>
+                                <Input
+                                    id="withdrawal-max-amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={settings.withdrawalMaximumAmount ?? 0}
+                                    onChange={(e) => handleFieldChange('withdrawalMaximumAmount', Number(e.target.value) || 0)}
+                                    placeholder="0"
+                                />
+                                <p className="text-xs text-muted-foreground">Set to 0 for no maximum.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <Label className="text-base font-semibold">Weekly Withdrawal Days</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Select specific days of the week for processing withdrawals. This will be shown to users.
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-2">
+                                {weekdays.map((day) => (
+                                    <div key={day} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`day-${day}`}
+                                            checked={settings.withdrawalDays?.includes(day)}
+                                            onCheckedChange={(checked) => handleDayChange(day, checked as boolean)}
+                                        />
+                                        <Label htmlFor={`day-${day}`} className="font-normal">{day}</Label>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="schedule" className="text-base font-semibold">
+                                Custom Schedule Information
+                            </Label>
+                            <Textarea
+                                id="schedule"
+                                value={settings.withdrawalScheduleInfo}
+                                onChange={(e) => handleFieldChange('withdrawalScheduleInfo', e.target.value)}
+                                placeholder="e.g., Withdrawals are also processed on the 1st and 15th of each month."
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                This text is shown to users in addition to any weekly schedule. Use for non-weekday schedules.
+                            </p>
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
             </CardContent>
             <CardFooter>
                  <Button onClick={handleSubmit} disabled={isSubmitting}>

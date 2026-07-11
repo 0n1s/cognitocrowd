@@ -50,10 +50,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
+import { auth } from "@/lib/firebase";
 import { getAppSettings, getPackage, getUserData } from "@/lib/database";
 import { setupNewUser } from "@/lib/user-api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SessionCurrencyPicker } from "@/components/session-currency-picker";
+import { UserNotificationBell } from "@/components/user-notification-bell";
 import type { Package as UserPackage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -70,7 +72,7 @@ const navItems = [
   { href: "/partner", icon: Landmark, label: "Partner Portal" },
 ];
 
-const AppHeader = () => {
+const AppHeader = ({ isAdmin }: { isAdmin: boolean }) => {
   const { isMobile } = useSidebar();
   const { user } = useAuth();
 
@@ -83,10 +85,11 @@ const AppHeader = () => {
     <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
       {isMobile && <SidebarTrigger />}
       <div className="flex-1">
-        <h1 className="font-headline text-lg font-semibold">Trainly</h1>
+        <h1 className="font-headline text-lg font-semibold">TrainlyLabs</h1>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
         <SessionCurrencyPicker />
+        <UserNotificationBell isAdmin={isAdmin} />
         <ThemeToggle />
         <div className="hidden text-right sm:block">
           <p className="font-semibold text-sm">{user?.displayName || "User"}</p>
@@ -209,7 +212,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const settings = await getAppSettings().catch(() => null);
       setLeaderboardEnabled(settings?.leaderboardEnabled !== false);
 
-        let userData = await getUserData(user!.uid);
+      let userData = await getUserData(user!.uid);
 
         // If the user exists in Auth but not in our database, create the user record.
         if (!userData) {
@@ -224,6 +227,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 return;
             }
         }
+
+      // If email verification is required and the user has not verified (skip for admins)
+      if (userData.role !== 'super_user_alpha_7' && settings?.requireEmailVerification && !user!.emailVerified) {
+        router.replace('/verify-email');
+        return;
+      }
         
         // If the user is an admin, grant immediate access.
         if (userData.role === 'super_user_alpha_7') {
@@ -263,7 +272,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     checkUserStatus();
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, pathname]);
   
   if (!isAuthorized) {
     return (
@@ -292,7 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link href="/dashboard" className="group rounded-xl border border-sidebar-border/60 bg-sidebar-accent/30 px-3 py-2 transition-colors hover:bg-sidebar-accent/60">
             <div className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-              <span className="font-headline font-semibold text-lg text-sidebar-foreground">Trainly</span>
+              <span className="font-headline font-semibold text-lg text-sidebar-foreground">TrainlyLabs</span>
             </div>
             <p className="mt-1 text-xs text-sidebar-foreground/70">Contributor Workspace</p>
           </Link>
@@ -415,7 +424,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <AppHeader />
+          <AppHeader isAdmin={isAdmin} />
           <main className={cn(
             "min-h-0 flex-1 bg-background",
             pathname.startsWith('/chat') ? "overflow-hidden p-0 sm:p-4 md:p-6 lg:p-8" : "p-4 md:p-8 lg:p-10"

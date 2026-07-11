@@ -33,6 +33,7 @@ import {
   UserCheck,
   GalleryHorizontal,
   Landmark,
+  Mail,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const navItems = [
   { href: "/admin/qualifications", icon: FileQuestion, label: "Qualifications" },
   { href: "/admin/approvals", icon: UserCheck, label: "Approvals" },
   { href: "/admin/landing", icon: GalleryHorizontal, label: "Landing Page" },
+  { href: "/admin/email-logs", icon: Mail, label: "Email Logs" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -146,7 +148,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/dashboard" className="group rounded-xl border border-sidebar-border/60 bg-sidebar-accent/30 px-3 py-2 transition-colors hover:bg-sidebar-accent/60">
             <div className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-              <span className="font-headline font-semibold text-lg text-sidebar-foreground">Trainly</span>
+              <span className="font-headline font-semibold text-lg text-sidebar-foreground">TrainlyLabs</span>
             </div>
             <p className="mt-1 text-xs text-sidebar-foreground/70">Admin Control Center</p>
           </Link>

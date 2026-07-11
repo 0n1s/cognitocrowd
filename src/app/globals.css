@@ -90,6 +90,58 @@
 }
 
 @layer components {
+  .trust-content {
+    @apply space-y-6 text-base leading-7 text-card-foreground;
+  }
+
+  .trust-content .trust-section {
+    @apply space-y-3;
+  }
+
+  .trust-content h2 {
+    @apply pt-2 font-headline text-2xl font-bold tracking-tight text-foreground;
+  }
+
+  .trust-content h3 {
+    @apply pt-1 text-lg font-semibold text-foreground;
+  }
+
+  .trust-content p {
+    @apply text-muted-foreground;
+  }
+
+  .trust-content strong {
+    @apply font-semibold text-foreground;
+  }
+
+  .trust-content a {
+    @apply font-medium text-primary underline underline-offset-4;
+  }
+
+  .trust-content .trust-list {
+    @apply ml-5 space-y-2 text-muted-foreground;
+  }
+
+  .trust-content ul.trust-list {
+    @apply list-disc;
+  }
+
+  .trust-content ol.trust-list {
+    @apply list-decimal;
+  }
+
+  .trust-content .trust-callout {
+    @apply rounded-lg border border-primary/20 bg-primary/10 p-4 text-sm text-foreground;
+  }
+
+  .trust-content .trust-grid {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+
+  .trust-content .trust-card {
+    @apply rounded-lg border bg-background p-4 shadow-sm;
+  }
+
   .ts-wrapper.single .ts-control {
     @apply bg-background border border-input rounded-md min-h-10 text-sm;
   }

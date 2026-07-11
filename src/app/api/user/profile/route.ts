@@ -42,7 +42,16 @@ async function verifyUser(request: NextRequest): Promise<VerifiedUser> {
 const userProfileSchema = z.object({
   name: z.string().min(2).optional(),
   photoURL: z.string().url().optional(),
-}).refine((data) => data.name !== undefined || data.photoURL !== undefined, {
+  country: z.string().max(80).optional(),
+  languages: z.array(z.string().min(1).max(40)).max(20).optional(),
+  expertise: z.array(z.string().min(1).max(80)).max(30).optional(),
+}).refine((data) => (
+  data.name !== undefined ||
+  data.photoURL !== undefined ||
+  data.country !== undefined ||
+  data.languages !== undefined ||
+  data.expertise !== undefined
+), {
   message: 'At least one field is required.',
 });
 
@@ -55,12 +64,21 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Invalid profile payload.' }, { status: 400 });
     }
 
-    const updates: Record<string, string> = {};
+    const updates: Record<string, any> = {};
     if (parsedBody.data.name !== undefined) {
       updates.name = parsedBody.data.name;
     }
     if (parsedBody.data.photoURL !== undefined) {
       updates.photoURL = parsedBody.data.photoURL;
+    }
+    if (parsedBody.data.country !== undefined) {
+      updates.country = parsedBody.data.country.trim();
+    }
+    if (parsedBody.data.languages !== undefined) {
+      updates.languages = parsedBody.data.languages.map((item) => item.trim()).filter(Boolean);
+    }
+    if (parsedBody.data.expertise !== undefined) {
+      updates.expertise = parsedBody.data.expertise.map((item) => item.trim()).filter(Boolean);
     }
 
     await adminDb.collection('users').doc(verifiedUser.uid).set(updates, { merge: true });
