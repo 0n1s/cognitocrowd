@@ -462,6 +462,7 @@ export type AppSettings = {
   // Email & Notification settings
   requireEmailVerification?: boolean;
   emailNotificationsEnabled?: boolean;
+  googleAuthEnabled?: boolean;
 };
 
 export type AiProviderConfig = {

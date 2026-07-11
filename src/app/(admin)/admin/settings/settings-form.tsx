@@ -2054,6 +2054,19 @@ export function SettingsForm() {
                             />
                         </div>
                     </div>
+                    <div className="rounded-md border p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <Label htmlFor="google-auth-enabled" className="text-base font-semibold">Google Authentication</Label>
+                                <p className="text-xs text-muted-foreground">Allow users to sign up and sign in with their Google account.</p>
+                            </div>
+                            <Switch
+                                id="google-auth-enabled"
+                                checked={settings.googleAuthEnabled === true}
+                                onCheckedChange={(checked) => handleFieldChange('googleAuthEnabled', checked)}
+                            />
+                        </div>
+                    </div>
                     </CollapsibleContent>
                 </Collapsible>
 

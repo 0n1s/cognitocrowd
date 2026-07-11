@@ -12,13 +12,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import { LocalCaptcha } from '@/components/security/local-captcha';
-
-const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <title>Google</title>
-        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.9-5.63 1.9-4.73 0-8.58-3.87-8.58-8.58s3.85-8.58 8.58-8.58c2.62 0 4.34 1.02 5.46 2.02l2.62-2.62C18.62 1.32 15.86 0 12.48 0 5.6 0 0 5.6 0 12.48s5.6 12.48 12.48 12.48c7.1 0 12.24-4.82 12.24-12.72 0-.8-.08-1.52-.24-2.22h-12z" fill="currentColor"/>
-    </svg>
-);
+import { GoogleAuthButton } from '@/components/google-auth-button';
 
 
 export default function LoginPage() {
@@ -129,10 +123,7 @@ export default function LoginPage() {
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Login
         </Button>
-        <Button variant="outline" className="w-full" type="button" disabled={isLoading}>
-          <GoogleIcon className="mr-2 h-4 w-4" />
-          Login with Google
-        </Button>
+        <GoogleAuthButton mode="login" disabled={isLoading} />
       </form>
       <div className="mt-4 text-center text-sm">
         Don&apos;t have an account?{" "}
