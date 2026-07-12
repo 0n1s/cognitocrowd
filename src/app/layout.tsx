@@ -1,4 +1,3 @@
-
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
@@ -20,12 +19,33 @@ const roboto = Roboto({
 const FAVICON_VERSION = '20260708-1';
 
 export const metadata: Metadata = {
-  title: 'TrainlyLabs',
-  description: 'Help train AI models by completing simple, gamified tasks.',
+  metadataBase: new URL('https://trainlylabs.com'),
+  title: {
+    default: 'TrainlyLabs — Train AI. Earn Rewards. Create with AI.',
+    template: '%s | TrainlyLabs',
+  },
+  description: 'A full-stack AI contributor platform. Complete paid AI training tasks, use AI workspace tools, manage your wallet, and earn rewards.',
   icons: {
     icon: [`/favicon.ico?v=${FAVICON_VERSION}`, `/icon.svg?v=${FAVICON_VERSION}`],
     shortcut: `/favicon.ico?v=${FAVICON_VERSION}`,
     apple: `/icon.svg?v=${FAVICON_VERSION}`,
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'TrainlyLabs',
+    title: 'TrainlyLabs — AI Contributor Platform',
+    description: 'Complete paid AI training tasks, use AI creative tools, and earn rewards.',
+    url: 'https://trainlylabs.com',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TrainlyLabs',
+    description: 'Earn rewards by training AI and using creative AI tools.',
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
