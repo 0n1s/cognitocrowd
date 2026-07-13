@@ -1,7 +1,7 @@
 import { PublicPageShell } from '@/components/public-page-shell';
-import { getAppSettings } from '@/lib/database';
+import { getPublicPage } from '@/lib/database';
 
 export default async function ContributorGuidelinesPage() {
-  const settings = await getAppSettings();
-  return <PublicPageShell page={settings.publicPages?.guidelines} />;
+  const page = await getPublicPage('guidelines');
+  return <PublicPageShell page={page} />;
 }

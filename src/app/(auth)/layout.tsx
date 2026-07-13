@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
-import { getAppSettings, getUserData } from "@/lib/database";
+import { getEmailVerificationSetting, getUserData } from "@/lib/database";
 
 const AuthLayoutSkeleton = () => (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -57,8 +57,8 @@ export default function AuthLayout({
 
       // Admins bypass email verification
       if (userData.role !== 'super_user_alpha_7' && !user.emailVerified) {
-        const settings = await getAppSettings().catch(() => null);
-        if (settings?.requireEmailVerification) {
+        const requireEmailVerification = await getEmailVerificationSetting();
+        if (requireEmailVerification) {
           router.replace('/verify-email');
           return;
         }

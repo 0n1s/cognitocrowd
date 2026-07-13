@@ -1,7 +1,7 @@
 import { PublicPageShell } from '@/components/public-page-shell';
-import { getAppSettings } from '@/lib/database';
+import { getPublicPage } from '@/lib/database';
 
 export default async function PrivacyPolicyPage() {
-  const settings = await getAppSettings();
-  return <PublicPageShell page={settings.publicPages?.privacy} />;
+  const page = await getPublicPage('privacy');
+  return <PublicPageShell page={page} />;
 }

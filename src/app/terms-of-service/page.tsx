@@ -1,7 +1,7 @@
 import { PublicPageShell } from '@/components/public-page-shell';
-import { getAppSettings } from '@/lib/database';
+import { getPublicPage } from '@/lib/database';
 
 export default async function TermsOfServicePage() {
-  const settings = await getAppSettings();
-  return <PublicPageShell page={settings.publicPages?.terms} />;
+  const page = await getPublicPage('terms');
+  return <PublicPageShell page={page} />;
 }

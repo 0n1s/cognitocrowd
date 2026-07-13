@@ -1,7 +1,6 @@
-
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, arrayUnion, updateDoc } from 'firebase/firestore';
-import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, Expense, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo, GeneratedMusic, DepositMethod, WithdrawalMethod, PackagePurchase, FAQItem } from './types';
+import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, Expense, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo, GeneratedMusic, DepositMethod, WithdrawalMethod, PackagePurchase, FAQItem, PublicPageKey, PublicPageContent } from './types';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 import { getPackageMoney, normalizeCurrencyCode } from './currency';
@@ -548,9 +547,31 @@ export async function getFinancialFlowAnalytics(rangeDays: number): Promise<Fina
     };
 }
 
+// ──────────────────────────────────────────────
+// Safe settings accessors — return only the fields each page needs
+// to avoid serializing sensitive data into RSC payloads.
+// ──────────────────────────────────────────────
+
+/**
+ * Returns a single public page's content by key.
+ * Calling this instead of getAppSettings() prevents the full settings
+ * object (with plisioApiKey, aiProviders, etc.) from being serialized.
+ */
+export async function getPublicPage(pageKey: PublicPageKey): Promise<PublicPageContent | undefined> {
+  const settings = await getAppSettings();
+  return settings.publicPages?.[pageKey];
+}
+
+/**
+ * Returns only the requireEmailVerification flag.
+ */
+export async function getEmailVerificationSetting(): Promise<boolean> {
+  const settings = await getAppSettings().catch(() => null);
+  return settings?.requireEmailVerification === true;
+}
+
 /**
  * Returns only the support-widget fields needed by the root layout.
- * This never pulls plisioApiKey, aiProviders, apiKeys, credentials, etc.
  */
 export async function getSupportWidgetSettings(): Promise<{
   supportWidgetEnabled: boolean;
@@ -576,8 +597,6 @@ export async function getSupportWidgetSettings(): Promise<{
 
 /**
  * Returns only the public-facing fields the landing page needs.
- * This never includes plisioApiKey, aiProviders, apiKeys, credentials, etc.
- * so those sensitive fields are never pulled into the RSC payload.
  */
 export async function getLandingPageSettings(): Promise<{
   landingPageContent: LandingPageContent | null;
@@ -608,38 +627,7 @@ export async function getLandingPageSettings(): Promise<{
   };
 }
 
-/**
- * Returns settings with sensitive fields stripped.
- * This is the safe version used by all public pages.
- * Use getAdminSettings() when you need the full object with API keys.
- */
 export async function getAppSettings(): Promise<AppSettings> {
-    const fullSettings = await getAdminSettings();
-    // Strip sensitive keys — these are never needed for rendering
-    (fullSettings as any).plisioApiKey = '';
-    (fullSettings as any).plisioPublicBaseUrl = '';
-    (fullSettings as any).openAiCompatibleApiKey = '';
-    (fullSettings as any).plisioPublicBaseUrl = '';
-    if (fullSettings.aiProviders) {
-        fullSettings.aiProviders = fullSettings.aiProviders.map((p) => ({
-            ...p,
-            apiKey: '',
-        }));
-    }
-    if (fullSettings.depositMethods) {
-        fullSettings.depositMethods = fullSettings.depositMethods.map((d) => ({
-            ...d,
-            credentials: {},
-        }));
-    }
-    return fullSettings;
-}
-
-/**
- * Returns the full settings object including sensitive keys.
- * Only call this from admin server components.
- */
-export async function getAdminSettings(): Promise<AppSettings> {
     const defaultSettings: AppSettings = {
         paymentMethods: [{ id: uuidv4(), name: 'Manual Withdrawal' }],
         depositMethods: [{ id: uuidv4(), name: 'Plisio', provider: 'plisio', enabled: true, processingMode: 'automatic', description: 'Crypto deposits via Plisio', credentials: {}, customFields: [] }],
@@ -777,7 +765,7 @@ export async function getAdminSettings(): Promise<AppSettings> {
                 { name: "Maria Garcia", role: "Creative Writer & Editor", quote: "I get to use my writing skills to shape how AI communicates. The tasks are engaging, and the platform is incredibly intuitive and fair." }
             ],
             hiringTitle: "Now hiring: researchers, innovators, and trainers",
-            hiringSubtitle: "Whether you have expertise in organic chemistry or creative writing, there’s a place for you.",
+            hiringSubtitle: "Whether you have expertise in organic chemistry or creative writing, there's a place for you.",
             ctaTitle: "Ready to Shape the Future?",
             ctaSubtitle: "Join a global community of experts and enthusiasts building the next generation of intelligence.",
             ctaButton: "Sign Up & Start Earning"

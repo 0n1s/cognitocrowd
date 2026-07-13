@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
-import { getAppSettings, getUserData } from "@/lib/database";
+import { getEmailVerificationSetting, getUserData } from "@/lib/database";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
@@ -39,8 +39,8 @@ export default function OnboardingLayout({
 
       // 2. Check email verification first (before any onboarding, skip for admins)
       if (!user.emailVerified) {
-        const settings = await getAppSettings().catch(() => null);
-        if (settings?.requireEmailVerification) {
+        const requireEmailVerification = await getEmailVerificationSetting();
+        if (requireEmailVerification) {
           router.replace('/verify-email');
           return;
         }

@@ -209,8 +209,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     // If there is a user, check their status in the database.
     async function checkUserStatus() {
-      const settings = await getAppSettings().catch(() => null);
-      setLeaderboardEnabled(settings?.leaderboardEnabled !== false);
+      const appSettings = await getAppSettings().catch(() => null);
+      setLeaderboardEnabled(appSettings?.leaderboardEnabled !== false);
 
       let userData = await getUserData(user!.uid);
 
@@ -229,7 +229,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
 
       // If email verification is required and the user has not verified (skip for admins)
-      if (userData.role !== 'super_user_alpha_7' && settings?.requireEmailVerification && !user!.emailVerified) {
+      if (userData.role !== 'super_user_alpha_7' && appSettings?.requireEmailVerification && !user!.emailVerified) {
         router.replace('/verify-email');
         return;
       }
