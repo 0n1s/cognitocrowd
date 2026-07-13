@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { ArrowRight, BrainCircuit, Code, Feather, FlaskConical, Globe, Palette, PencilRuler, Quote, Shield, ScrollText, Sigma, Stethoscope, Bot, Briefcase, MessageCircle, Image as ImageIcon, Video, Check, TrendingUp, Award, Clock, ShieldCheck, Sparkles, X, Music2, WandSparkles, HelpCircle } from 'lucide-react';
 import NextImage from 'next/image';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { getEnabledExpertiseAreas, getPackages, getAppSettings } from '@/lib/database';
+import { getEnabledExpertiseAreas, getPackages, getLandingPageSettings } from '@/lib/database';
 import { Package } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { getAiWorkspaceFeatures } from '@/lib/package-workspace';
@@ -80,7 +80,8 @@ export default async function Home() {
     "Health & Medicine": Stethoscope,
   };
   
-  const settings = await getAppSettings();
+  const landingData = await getLandingPageSettings();
+
   const enabledExpertise = await getEnabledExpertiseAreas();
   const packages = await getPackages();
   const sortedPackages = [...packages].sort((a, b) => {
@@ -113,17 +114,24 @@ export default async function Home() {
     },
   ];
 
-  const { landingPageContent } = settings;
-  const faqItems = (settings.faqItems || []).filter((item) =>
+  const {
+    landingPageContent,
+    faqEnabled: lpFaqEnabled,
+    faqTitle: lpFaqTitle,
+    faqSubtitle: lpFaqSubtitle,
+    faqItems: lpFaqItems,
+  } = landingData;
+
+  const faqItems = (lpFaqItems || []).filter((item: any) =>
     item.enabled !== false && item.question.trim() && item.answer.trim()
   );
-  const showFaq = settings.faqEnabled !== false && faqItems.length > 0;
-  
+  const showFaq = lpFaqEnabled !== false && faqItems.length > 0;
+
   if (!landingPageContent) {
     return <div>Landing page content not configured.</div>;
   }
-  
-  const { 
+
+  const {
     heroTitle, heroSubtitle, heroCtaButton,
     platformTitle, platformSubtitle, featureItems,
     whyUsTitle, whyUsSubtitle, whyUsItems,
@@ -410,9 +418,9 @@ export default async function Home() {
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
                   <HelpCircle className="h-6 w-6 text-primary" />
                 </div>
-                <h2 className="font-headline text-4xl font-bold">{settings.faqTitle || 'Frequently Asked Questions'}</h2>
-                {settings.faqSubtitle ? (
-                  <p className="text-muted-foreground mt-4 text-lg">{settings.faqSubtitle}</p>
+                <h2 className="font-headline text-4xl font-bold">{lpFaqTitle || 'Frequently Asked Questions'}</h2>
+                {lpFaqSubtitle ? (
+                  <p className="text-muted-foreground mt-4 text-lg">{lpFaqSubtitle}</p>
                 ) : null}
               </div>
               <div className="mx-auto grid max-w-4xl gap-4">

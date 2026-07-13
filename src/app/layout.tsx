@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Roboto } from 'next/font/google';
 import { SupportWidget } from '@/components/support-widget';
 import { ServiceWorkerRegister } from '@/components/service-worker-register';
-import { getAppSettings } from '@/lib/database';
+import { getSupportWidgetSettings } from '@/lib/database';
 
 const roboto = Roboto({
   weight: ['400', '500', '700'],
@@ -49,27 +49,15 @@ export const metadata: Metadata = {
   },
 };
 
-function sanitizeSettingsForClient(settings: any) {
-  if (!settings) return null;
-  // Only pass support-widget-related fields to the client
-  return {
-    supportWidgetEnabled: settings.supportWidgetEnabled,
-    supportWidgetProvider: settings.supportWidgetProvider,
-    supportWidgetTawkPropertyId: settings.supportWidgetTawkPropertyId,
-    supportWidgetTawkWidgetId: settings.supportWidgetTawkWidgetId,
-    supportWidgetCrispWebsiteId: settings.supportWidgetCrispWebsiteId,
-    supportWidgetScriptUrl: settings.supportWidgetScriptUrl,
-    supportWidgetCustomScript: settings.supportWidgetCustomScript,
-  };
-}
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const settings = await getAppSettings().catch(() => null);
-  const clientSettings = sanitizeSettingsForClient(settings);
+  // Fetch only the support-widget fields — never the full settings object.
+  // The full object includes sensitive keys (plisioApiKey, aiProviders[].apiKey)
+  // that would be serialized into the RSC payload if held in scope here.
+  const supportSettings = await getSupportWidgetSettings().catch(() => null);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -88,7 +76,7 @@ export default async function RootLayout({
               </AuthProvider>
             </SessionCurrencyProvider>
             <Toaster />
-            <SupportWidget settings={clientSettings} />
+            <SupportWidget settings={supportSettings} />
           </ThemeProvider>
       </body>
     </html>

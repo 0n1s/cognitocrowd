@@ -3,17 +3,18 @@
 import Script from "next/script";
 import type { AppSettings } from "@/lib/types";
 
+type SupportWidgetSettings = {
+  supportWidgetEnabled: boolean;
+  supportWidgetProvider: string;
+  supportWidgetTawkPropertyId: string;
+  supportWidgetTawkWidgetId: string;
+  supportWidgetCrispWebsiteId: string;
+  supportWidgetScriptUrl: string;
+  supportWidgetCustomScript: string;
+};
+
 type SupportWidgetProps = {
-  settings: Pick<
-    AppSettings,
-    | "supportWidgetEnabled"
-    | "supportWidgetProvider"
-    | "supportWidgetTawkPropertyId"
-    | "supportWidgetTawkWidgetId"
-    | "supportWidgetCrispWebsiteId"
-    | "supportWidgetScriptUrl"
-    | "supportWidgetCustomScript"
-  > | null;
+  settings: SupportWidgetSettings | null;
 };
 
 function cleanPathSegment(value?: string) {
