@@ -18,8 +18,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['var(--font-roboto)', 'sans-serif'],
-        headline: ['var(--font-roboto)', 'sans-serif'],
+        body: ['var(--font-comfortaa)', 'sans-serif'],
+        headline: ['var(--font-comfortaa)', 'sans-serif'],
         code: ['monospace'],
       },
       fontSize: {

@@ -4,16 +4,16 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from '@/hooks/use-auth';
 import { SessionCurrencyProvider } from '@/hooks/use-session-currency';
 import { ThemeProvider } from "@/components/theme-provider";
-import { Roboto } from 'next/font/google';
+import { Comfortaa } from 'next/font/google';
 import { SupportWidget } from '@/components/support-widget';
 import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import { getSupportWidgetSettings } from '@/lib/database';
 
-const roboto = Roboto({
-  weight: ['400', '500', '700'],
+const comfortaa = Comfortaa({
+  weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-roboto',
+  variable: '--font-comfortaa',
 });
 
 const FAVICON_VERSION = '20260708-1';
@@ -62,7 +62,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head />
-      <body className={`${roboto.variable} font-body antialiased`}>
+      <body className={`${comfortaa.variable} font-body antialiased`}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
