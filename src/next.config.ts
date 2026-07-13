@@ -1,13 +1,36 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.tawk.to https://embed.tawk.to",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self'",
+              "connect-src 'self' https: wss://*.tawk.to wss://tawk.to",
+              "frame-src 'self' https://*.tawk.to",
+              "worker-src 'self' blob:",
+              "media-src 'self' https:",
+            ].join('; '),
+          },
+        ],
+      },
+    ];
+  },
+
   images: {
     remotePatterns: [
       {

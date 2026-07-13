@@ -274,13 +274,13 @@ export default async function Home() {
                       <h3 className="text-2xl font-bold font-headline">{processSteps[0].title}</h3>
                       <p className="mt-4 text-muted-foreground">{processSteps[0].description}</p>
                   </div>
-                   <div className="w-full h-80 rounded-lg overflow-hidden">
-                       <NextImage src={processImage1} alt="Person taking a test online" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="person computer" />
+                  <div className="w-full h-80 rounded-lg overflow-hidden">
+                      <NextImage src={'/api/storage/proxy-image?url=' + encodeURIComponent(processImage1)} alt="Person taking a test online" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="person computer" />
                   </div>
               </div>
                <div className="grid md:grid-cols-2 gap-16 items-center mt-16">
                   <div className="w-full h-80 rounded-lg overflow-hidden md:order-last">
-                       <NextImage src={processImage2} alt="Dashboard showing tasks" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="dashboard screen" />
+                       <NextImage src={'/api/storage/proxy-image?url=' + encodeURIComponent(processImage2)} alt="Dashboard showing tasks" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="dashboard screen" />
                   </div>
                   <div className="md:order-first">
                       <h3 className="text-2xl font-bold font-headline">{processSteps[1].title}</h3>
@@ -293,7 +293,7 @@ export default async function Home() {
                       <p className="mt-4 text-muted-foreground">{processSteps[2].description}</p>
                   </div>
                    <div className="w-full h-80 rounded-lg overflow-hidden">
-                       <NextImage src={processImage3} alt="Wallet showing earnings" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="payment success" />
+                       <NextImage src={'/api/storage/proxy-image?url=' + encodeURIComponent(processImage3)} alt="Wallet showing earnings" width={800} height={600} className="object-cover w-full h-full" data-ai-hint="payment success" />
                   </div>
               </div>
            </div>
@@ -433,7 +433,7 @@ export default async function Home() {
         {/* Hiring Section */}
         <section id="hiring" className="py-20 bg-muted/20 dark:bg-card/40 border-y border-border/30 relative overflow-hidden">
             <div className="absolute inset-0 z-0 opacity-10">
-                <NextImage src={hiringBackgroundImage} alt="Abstract network background" fill className="object-cover" data-ai-hint="abstract network" />
+                <NextImage src={'/api/storage/proxy-image?url=' + encodeURIComponent(hiringBackgroundImage)} alt="Abstract network background" fill className="object-cover" data-ai-hint="abstract network" />
                 <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background/80"></div>
             </div>
             <div className="container relative z-10 text-center">

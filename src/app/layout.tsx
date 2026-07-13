@@ -49,12 +49,27 @@ export const metadata: Metadata = {
   },
 };
 
+function sanitizeSettingsForClient(settings: any) {
+  if (!settings) return null;
+  // Only pass support-widget-related fields to the client
+  return {
+    supportWidgetEnabled: settings.supportWidgetEnabled,
+    supportWidgetProvider: settings.supportWidgetProvider,
+    supportWidgetTawkPropertyId: settings.supportWidgetTawkPropertyId,
+    supportWidgetTawkWidgetId: settings.supportWidgetTawkWidgetId,
+    supportWidgetCrispWebsiteId: settings.supportWidgetCrispWebsiteId,
+    supportWidgetScriptUrl: settings.supportWidgetScriptUrl,
+    supportWidgetCustomScript: settings.supportWidgetCustomScript,
+  };
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const settings = await getAppSettings().catch(() => null);
+  const clientSettings = sanitizeSettingsForClient(settings);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -73,7 +88,7 @@ export default async function RootLayout({
               </AuthProvider>
             </SessionCurrencyProvider>
             <Toaster />
-            <SupportWidget settings={settings} />
+            <SupportWidget settings={clientSettings} />
           </ThemeProvider>
       </body>
     </html>
