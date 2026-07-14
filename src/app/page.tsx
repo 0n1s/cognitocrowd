@@ -12,14 +12,14 @@ import { cn } from '@/lib/utils';
 import { getAiWorkspaceFeatures } from '@/lib/package-workspace';
 import { LandingAuthButtons } from '@/components/landing-auth-buttons';
 import { formatMoney, getPackageMoney } from '@/lib/currency';
+import { BrandLogo } from '@/components/brand-logo';
 
 
 const LandingHeader = ({ showFaq = false }: { showFaq?: boolean }) => (
   <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div className="container flex h-16 items-center">
       <Link href="/" className="mr-6 flex items-center space-x-2">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-        <span className="font-bold font-headline text-lg">TrainlyLabs</span>
+        <BrandLogo />
       </Link>
       <nav className="hidden flex-1 items-center space-x-6 text-sm font-medium md:flex">
         <Link href="#why-trainly" className="text-muted-foreground transition-colors hover:text-foreground">Why Us</Link>
@@ -27,6 +27,7 @@ const LandingHeader = ({ showFaq = false }: { showFaq?: boolean }) => (
         <Link href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
         <Link href="#testimonials" className="text-muted-foreground transition-colors hover:text-foreground">Testimonials</Link>
         {showFaq && <Link href="#faq" className="text-muted-foreground transition-colors hover:text-foreground">FAQ</Link>}
+        <Link href="/faq" className="text-muted-foreground transition-colors hover:text-foreground">FAQ Page</Link>
       </nav>
       <div className="flex flex-1 items-center justify-end space-x-2">
         <ThemeToggle />
@@ -433,6 +434,12 @@ export default async function Home() {
                     <p className="mt-4 leading-relaxed text-muted-foreground">{item.answer}</p>
                   </details>
                 ))}
+                <div className="mt-8 text-center">
+                  <Link href="/faq" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                    Read all FAQs
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
               </div>
             </div>
           </section>

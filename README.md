@@ -1,6 +1,6 @@
 # TrainlyLabs — AI Contributor Platform
 
-A full-stack web platform where contributors can qualify for paid AI training tasks, use AI workspace tools (chat, image/video/music generation), manage wallet activity, and participate in community programs.
+TrainlyLabs is an AI training and creator platform that connects talent with opportunity. Contributors can build in-demand AI skills, qualify for paid AI projects, and create with an integrated AI workspace featuring chat, image generation, and video generation. Beyond the tools, TrainlyLabs fosters a collaborative community through learning programs, challenges, and events that help members grow, earn, and innovate with AI.
 
 Built with **Next.js 15**, **Firebase**, **Genkit AI**, and **Tailwind CSS**.
 

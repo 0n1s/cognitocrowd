@@ -329,7 +329,7 @@ export type FAQItem = {
     enabled?: boolean;
 };
 
-export type PublicPageKey = 'about' | 'contact' | 'privacy' | 'terms' | 'refund' | 'guidelines';
+export type PublicPageKey = 'about' | 'contact' | 'privacy' | 'terms' | 'refund' | 'guidelines' | 'faq';
 
 export type PublicPageContent = {
     title: string;
@@ -387,6 +387,7 @@ export type LandingPageContent = {
 
 export type AppSettings = {
   id?: 'main';
+  brandAssets?: BrandAssets;
   paymentMethods: PaymentMethod[];
   depositMethods: DepositMethod[];
   withdrawalMethods?: WithdrawalMethod[];
@@ -463,6 +464,16 @@ export type AppSettings = {
   requireEmailVerification?: boolean;
   emailNotificationsEnabled?: boolean;
   googleAuthEnabled?: boolean;
+};
+
+export type BrandAssets = {
+  logoLightUrl?: string;
+  logoDarkUrl?: string;
+  logoMarkUrl?: string;
+  faviconUrl?: string;
+  appleTouchIconUrl?: string;
+  socialImageUrl?: string;
+  emailLogoUrl?: string;
 };
 
 export type AiProviderConfig = {

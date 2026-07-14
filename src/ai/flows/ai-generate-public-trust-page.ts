@@ -7,7 +7,7 @@ import { resolveConfiguredModel, validateModelAvailability } from '@/ai/model-re
 import { extractTextFromGenerateResult } from '@/ai/extract-text';
 import { sanitizeTrustPageHtml } from '@/lib/trust-page-html';
 
-const PublicTrustPageKeySchema = z.enum(['about', 'contact', 'privacy', 'terms', 'refund', 'guidelines']);
+const PublicTrustPageKeySchema = z.enum(['about', 'contact', 'privacy', 'terms', 'refund', 'guidelines', 'faq']);
 
 const GeneratePublicTrustPageInputSchema = z.object({
   pageKey: PublicTrustPageKeySchema,
@@ -33,6 +33,7 @@ const pageLabels: Record<z.infer<typeof PublicTrustPageKeySchema>, string> = {
   privacy: 'Privacy Policy',
   terms: 'Terms of Service',
   refund: 'Refund and Deposit Policy',
+  faq: 'FAQ',
   guidelines: 'Contributor Guidelines',
 };
 
@@ -46,8 +47,8 @@ function fallbackDraft(input: GeneratePublicTrustPageInput): GeneratePublicTrust
   const label = pageLabels[input.pageKey];
   const context = input.companyContext || 'TrainlyLabs is an AI training and creative tools platform.';
   const title = input.currentTitle || label;
-  const subtitle = input.currentSubtitle || `Important information about ${label.toLowerCase()} at TrainlyLabs.`;
-  const content = input.currentContent || `${context}\n\nThis page should be reviewed and customized by the site administrator before launch.`;
+  const subtitle = input.currentSubtitle || `Information about ${label.toLowerCase()} at TrainlyLabs.`;
+  const content = input.currentContent || `${context}\n\nThis draft page is being prepared. Please use the AI generator to create content.`;
   return {
     title,
     subtitle,
@@ -82,13 +83,14 @@ Return JSON only:
 }
 
 Rules:
-- content is a plain text fallback, 2-5 short paragraphs.
+- content is a plain text fallback.
 - contentHtml is a polished HTML fragment only for the content area.
 - Do not include page header, footer, navigation, body, html, CSS, JavaScript, forms, iframe, style tags, script tags, images, or inline styles.
 - Only use these tags: section, div, h2, h3, p, ul, ol, li, strong, em, a, br.
 - Only use these classes: trust-section, trust-callout, trust-list, trust-muted, trust-grid, trust-card.
 - Use trust-section for major sections, trust-callout for important notices, trust-list on ul/ol, trust-grid with trust-card only when a compact two-column summary helps.
-- Do not invent legal entity names, jurisdictions, addresses, support emails, payment processors, refund guarantees, employment promises, or compliance claims.
+- For privacy, terms, and refund pages only: you MAY use standard legal section headings and general language that is typical for these types of pages. Do not include specific company names, addresses, or dates.
+- For other pages: Do not invent legal entity names, jurisdictions, addresses, support emails, payment processors, refund guarantees, employment promises, or compliance claims.
 - If details are missing, use bracketed placeholders such as [support email], [company legal name], [jurisdiction], or [refund review period].
 - Keep the tone trustworthy, clear, modern, concise, and human.
 - This is a draft for admin review, not legal advice.`;

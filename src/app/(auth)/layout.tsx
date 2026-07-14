@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase';
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { getEmailVerificationSetting, getUserData } from "@/lib/database";
+import { BrandLogo } from "@/components/brand-logo";
 
 const AuthLayoutSkeleton = () => (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -100,8 +101,7 @@ export default function AuthLayout({
       <div className="z-20 flex w-full items-center justify-center p-6 lg:p-12">
         <div className="mx-auto grid w-full max-w-sm gap-6">
             <Link href="/" className="flex items-center justify-center lg:justify-start space-x-2 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                <span className="font-bold font-headline text-lg">TrainlyLabs</span>
+                <BrandLogo />
             </Link>
             {!loading && !user && children}
         </div>

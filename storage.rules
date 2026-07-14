@@ -19,6 +19,11 @@ service firebase.storage {
       allow read: if true;
     }
 
+    // Writes are performed by the authenticated admin API.
+    match /brand-assets/{allPaths=**} {
+      allow read: if true;
+    }
+
     // Profile pictures: only the owner can write, anyone can read
     match /profile-pictures/{userId} {
       allow read: if true;

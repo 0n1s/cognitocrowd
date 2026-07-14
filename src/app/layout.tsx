@@ -8,6 +8,8 @@ import { Comfortaa } from 'next/font/google';
 import { SupportWidget } from '@/components/support-widget';
 import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import { getSupportWidgetSettings } from '@/lib/database';
+import { getBrandAssets } from '@/lib/database';
+import { BrandProvider } from '@/components/brand-provider';
 
 const comfortaa = Comfortaa({
   weight: ['400', '500', '600', '700'],
@@ -18,7 +20,7 @@ const comfortaa = Comfortaa({
 
 const FAVICON_VERSION = '20260708-1';
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   metadataBase: new URL('https://trainlylabs.com'),
   title: {
     default: 'TrainlyLabs — Train AI. Earn Rewards. Create with AI.',
@@ -49,6 +51,26 @@ export const metadata: Metadata = {
   },
 };
 
+export async function generateMetadata(): Promise<Metadata> {
+  const assets = await getBrandAssets();
+  return {
+    ...baseMetadata,
+    icons: {
+      icon: assets.faviconUrl || baseMetadata.icons?.icon,
+      shortcut: assets.faviconUrl || `/favicon.ico?v=${FAVICON_VERSION}`,
+      apple: assets.appleTouchIconUrl || assets.faviconUrl || `/icon.svg?v=${FAVICON_VERSION}`,
+    },
+    openGraph: {
+      ...baseMetadata.openGraph,
+      images: assets.socialImageUrl ? [{ url: assets.socialImageUrl }] : undefined,
+    },
+    twitter: {
+      ...baseMetadata.twitter,
+      images: assets.socialImageUrl ? [assets.socialImageUrl] : undefined,
+    },
+  };
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -58,11 +80,13 @@ export default async function RootLayout({
   // The full object includes sensitive keys (plisioApiKey, aiProviders[].apiKey)
   // that would be serialized into the RSC payload if held in scope here.
   const supportSettings = await getSupportWidgetSettings().catch(() => null);
+  const brandAssets = await getBrandAssets();
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className={`${comfortaa.variable} font-body antialiased`}>
+          <BrandProvider assets={brandAssets}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -78,6 +102,7 @@ export default async function RootLayout({
             <Toaster />
             <SupportWidget settings={supportSettings} />
           </ThemeProvider>
+          </BrandProvider>
       </body>
     </html>
   );

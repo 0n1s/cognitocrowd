@@ -1089,13 +1089,13 @@ export async function generateFaqItems(count = 6) {
 }
 
 export async function generatePublicTrustPage(input: {
-    pageKey: 'about' | 'contact' | 'privacy' | 'terms' | 'refund' | 'guidelines';
+    pageKey: 'about' | 'contact' | 'privacy' | 'terms' | 'refund' | 'guidelines' | 'faq';
     companyContext?: string;
     currentTitle?: string;
     currentSubtitle?: string;
     currentContent?: string;
     model?: string;
-}) {
+  }) {
     try {
         const result = await generatePublicTrustPageFlow(input);
         return { success: true, page: result };

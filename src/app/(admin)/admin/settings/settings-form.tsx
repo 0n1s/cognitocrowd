@@ -25,6 +25,7 @@ import { AVAILABLE_MODELS, type ModelModality, type ModelOption } from "@/ai/mod
 import { DepositMethodsManager } from "@/components/admin/deposit-methods-manager";
 import { WithdrawalMethodsManager } from "@/components/admin/withdrawal-methods-manager";
 import { plainTextToTrustPageHtml, sanitizeTrustPageHtml } from "@/lib/trust-page-html";
+import { BrandAssetsManager } from "@/components/admin/brand-assets-manager";
 
 type CustomModelType = 'uncensored' | 'vision' | 'hacking' | 'coding';
 
@@ -257,6 +258,7 @@ export function SettingsForm() {
     const [isOnboardingSettingsOpen, setIsOnboardingSettingsOpen] = useState(false);
     const [isFaqSettingsOpen, setIsFaqSettingsOpen] = useState(false);
     const [isSupportSettingsOpen, setIsSupportSettingsOpen] = useState(false);
+    const [isBrandAssetsOpen, setIsBrandAssetsOpen] = useState(false);
     const [isPublicPagesOpen, setIsPublicPagesOpen] = useState(false);
     const [isAiModelSettingsOpen, setIsAiModelSettingsOpen] = useState(false);
     const [faqAiAction, setFaqAiAction] = useState<string | null>(null);
@@ -265,6 +267,7 @@ export function SettingsForm() {
     const [testEmailTo, setTestEmailTo] = useState('');
     const [testEmailSubject, setTestEmailSubject] = useState('');
     const [testEmailBody, setTestEmailBody] = useState('');
+    const [openPublicPages, setOpenPublicPages] = useState<Record<string, boolean>>({});
     const [testResults, setTestResults] = useState<Record<ModelModality, {
         message?: string;
         text?: string;
@@ -287,6 +290,7 @@ export function SettingsForm() {
         { key: 'privacy', label: 'Privacy Policy' },
         { key: 'terms', label: 'Terms of Service' },
         { key: 'refund', label: 'Refund / Deposit Policy' },
+        { key: 'faq', label: 'FAQ' },
         { key: 'guidelines', label: 'Contributor Guidelines' },
     ];
 
@@ -1099,6 +1103,26 @@ export function SettingsForm() {
     return (
         <Card>
             <CardContent className="pt-6 space-y-12">
+                <Collapsible open={isBrandAssetsOpen} onOpenChange={setIsBrandAssetsOpen}>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">Brand Assets</h3>
+                            <p className="text-sm text-muted-foreground">Upload logos and icons used across TrainlyLabs. Uploads are applied immediately.</p>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="shrink-0">
+                                {isBrandAssetsOpen ? 'Hide' : 'Show'}
+                                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isBrandAssetsOpen ? 'rotate-180' : ''}`} />
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="mt-6">
+                        <BrandAssetsManager
+                            value={settings.brandAssets || {}}
+                            onChange={(brandAssets) => setSettings({ ...settings, brandAssets })}
+                        />
+                    </CollapsibleContent>
+                </Collapsible>
 
                 <Separator />
 
@@ -1573,65 +1597,83 @@ export function SettingsForm() {
                         {publicPageOptions.map(({ key, label }) => {
                             const page = settings.publicPages?.[key] || { title: label, subtitle: '', content: '', contentHtml: '', enabled: true };
                             const pageHtml = sanitizeTrustPageHtml(page.contentHtml || plainTextToTrustPageHtml(page.content || ''));
+                            const isOpen = openPublicPages[key] || false;
+                            const setIsOpen = (open: boolean) => setOpenPublicPages((prev) => ({ ...prev, [key]: open }));
                             return (
-                                <div key={key} className="rounded-lg border bg-muted/40 p-4 space-y-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <Label className="text-base font-semibold">{label}</Label>
-                                        <div className="flex items-center space-x-2">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={Boolean(publicTrustAiAction)}
-                                                onClick={() => handleGeneratePublicTrustPage(key)}
-                                            >
-                                                {publicTrustAiAction === key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                                Generate
-                                            </Button>
-                                            <Switch
-                                                id={`public-page-${key}-enabled`}
-                                                checked={page.enabled !== false}
-                                                onCheckedChange={(checked) => handlePublicPageChange(key, 'enabled', checked)}
-                                            />
-                                            <Label htmlFor={`public-page-${key}-enabled`} className="text-sm font-normal">Enabled</Label>
+                                <Collapsible key={key} open={isOpen} onOpenChange={setIsOpen}>
+                                    <div className="rounded-lg border bg-muted/40 p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <CollapsibleTrigger asChild>
+                                                    <Button type="button" variant="ghost" size="sm" className="p-1">
+                                                        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                                    </Button>
+                                                </CollapsibleTrigger>
+                                                <Label className="text-base font-semibold cursor-pointer" onClick={() => setIsOpen(!isOpen)}>{label}</Label>
+                                                {page.enabled !== false ? (
+                                                    <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">Active</span>
+                                                ) : (
+                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Disabled</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={Boolean(publicTrustAiAction)}
+                                                    onClick={() => handleGeneratePublicTrustPage(key)}
+                                                >
+                                                    {publicTrustAiAction === key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                                    Generate
+                                                </Button>
+                                                <Switch
+                                                    id={`public-page-${key}-enabled`}
+                                                    checked={page.enabled !== false}
+                                                    onCheckedChange={(checked) => handlePublicPageChange(key, 'enabled', checked)}
+                                                />
+                                                <Label htmlFor={`public-page-${key}-enabled`} className="text-sm font-normal sr-only">Enabled</Label>
+                                            </div>
                                         </div>
+                                        <CollapsibleContent className="mt-4 space-y-3">
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`public-page-${key}-title`}>Title</Label>
+                                                    <Input
+                                                        id={`public-page-${key}-title`}
+                                                        value={page.title || ''}
+                                                        onChange={(e) => handlePublicPageChange(key, 'title', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`public-page-${key}-subtitle`}>Subtitle</Label>
+                                                    <Input
+                                                        id={`public-page-${key}-subtitle`}
+                                                        value={page.subtitle || ''}
+                                                        onChange={(e) => handlePublicPageChange(key, 'subtitle', e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor={`public-page-${key}-content`}>Rich Content</Label>
+                                                <TrustPageRichTextEditor
+                                                    id={`public-page-${key}-content`}
+                                                    value={pageHtml}
+                                                    onChange={(value) => {
+                                                        handleFieldChange('publicPages', {
+                                                            ...(settings.publicPages || {}),
+                                                            [key]: {
+                                                                ...page,
+                                                                contentHtml: value,
+                                                                content: value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(),
+                                                            },
+                                                        });
+                                                    }}
+                                                />
+                                            </div>
+                                        </CollapsibleContent>
                                     </div>
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`public-page-${key}-title`}>Title</Label>
-                                            <Input
-                                                id={`public-page-${key}-title`}
-                                                value={page.title || ''}
-                                                onChange={(e) => handlePublicPageChange(key, 'title', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor={`public-page-${key}-subtitle`}>Subtitle</Label>
-                                            <Input
-                                                id={`public-page-${key}-subtitle`}
-                                                value={page.subtitle || ''}
-                                                onChange={(e) => handlePublicPageChange(key, 'subtitle', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`public-page-${key}-content`}>Rich Content</Label>
-                                        <TrustPageRichTextEditor
-                                            id={`public-page-${key}-content`}
-                                            value={pageHtml}
-                                            onChange={(value) => {
-                                                handleFieldChange('publicPages', {
-                                                    ...(settings.publicPages || {}),
-                                                    [key]: {
-                                                        ...page,
-                                                        contentHtml: value,
-                                                        content: value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(),
-                                                    },
-                                                });
-                                            }}
-                                        />
-                                    </div>
-                                </div>
+                                </Collapsible>
                             );
                         })}
                     </CollapsibleContent>

@@ -338,7 +338,6 @@ export function SettingsForm() {
     const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
     const [country, setCountry] = useState("");
     const [languagesText, setLanguagesText] = useState("");
-    const [expertiseText, setExpertiseText] = useState("");
 
     const profileForm = useForm<z.infer<typeof profileFormSchema>>({
         resolver: zodResolver(profileFormSchema),
@@ -359,7 +358,6 @@ export function SettingsForm() {
                 setAccountData(userData || null);
                 setCountry(userData?.country || "");
                 setLanguagesText((userData?.languages || []).join(", "));
-                setExpertiseText((userData?.expertise || []).join(", "));
                 if (userData?.packageId) {
                     getPackage(userData.packageId).then(pkg => {
                         setUserPackage(pkg);
@@ -424,7 +422,6 @@ export function SettingsForm() {
                 body: JSON.stringify({
                     country,
                     languages: parseCommaList(languagesText),
-                    expertise: parseCommaList(expertiseText),
                 }),
             });
 
@@ -437,7 +434,6 @@ export function SettingsForm() {
                 ...current,
                 country,
                 languages: parseCommaList(languagesText),
-                expertise: parseCommaList(expertiseText),
             } : current);
             toast({ title: "Success", description: "Your account details have been updated." });
             router.refresh();
@@ -549,10 +545,13 @@ export function SettingsForm() {
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2 rounded-md border p-3">
                             <Label className="text-xs uppercase text-muted-foreground">Account Status</Label>
-                            <div>
-                                <Badge variant={accountData?.onboardingStatus === 'approved' ? 'default' : accountData?.onboardingStatus === 'rejected' ? 'destructive' : 'secondary'}>
-                                    {accountData?.onboardingStatus || 'pending'}
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <Badge variant={accountData?.onboardingStatus === 'approved' ? 'default' : 'destructive'}>
+                                    {accountData?.onboardingStatus === 'approved' ? 'Approved' : 'Not Approved'}
                                 </Badge>
+                                {(accountData as any)?.emailVerified === false && (
+                                  <Badge variant="secondary">Email not verified</Badge>
+                                )}
                             </div>
                         </div>
                         <div className="space-y-2 rounded-md border p-3">
@@ -570,9 +569,18 @@ export function SettingsForm() {
                         <p className="text-xs text-muted-foreground">Separate multiple languages with commas.</p>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="settings-expertise">Expertise Areas</Label>
-                        <Textarea id="settings-expertise" value={expertiseText} onChange={(e) => setExpertiseText(e.target.value)} placeholder="Software Development, Mathematics, Creative Writing" rows={3} />
-                        <p className="text-xs text-muted-foreground">Separate expertise areas with commas.</p>
+                        <Label className="text-xs uppercase text-muted-foreground">Expertise Areas</Label>
+                        <p className="text-xs text-muted-foreground mb-2">Your verified expertise areas from the qualification test. These cannot be changed.</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(accountData?.expertise || []).length > 0 ? (accountData?.expertise || []).map((exp) => (
+                            <div key={exp} className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                              <input type="checkbox" checked disabled className="h-4 w-4 accent-primary" />
+                              <span className="text-sm">{exp}</span>
+                            </div>
+                          )) : (
+                            <p className="text-sm text-muted-foreground col-span-2">No expertise areas assigned yet.</p>
+                          )}
+                        </div>
                     </div>
                     <div className="space-y-2 rounded-md border p-3">
                         <Label className="text-xs uppercase text-muted-foreground">Referral Code</Label>

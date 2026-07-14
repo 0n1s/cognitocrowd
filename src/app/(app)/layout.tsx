@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -300,8 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarHeader>
           <Link href="/dashboard" className="group rounded-xl border border-sidebar-border/60 bg-sidebar-accent/30 px-3 py-2 transition-colors hover:bg-sidebar-accent/60">
             <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-sidebar-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-              <span className="font-headline font-semibold text-lg text-sidebar-foreground">TrainlyLabs</span>
+              <BrandLogo />
             </div>
             <p className="mt-1 text-xs text-sidebar-foreground/70">Contributor Workspace</p>
           </Link>

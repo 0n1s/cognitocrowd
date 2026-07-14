@@ -1,6 +1,7 @@
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, addDoc, query, where, DocumentData, writeBatch, setDoc, orderBy, limit, Timestamp, arrayUnion, updateDoc } from 'firebase/firestore';
 import type { Task, Package, User, TaskResponse, AdminUser, AppSettings, WithdrawalRequest, LeaderboardEntry, ChatSession, Deposit, Expense, QualificationTest, LandingPageContent, CountryPartner, GeneratedImage, GeneratedVideo, GeneratedMusic, DepositMethod, WithdrawalMethod, PackagePurchase, FAQItem, PublicPageKey, PublicPageContent } from './types';
+import { unstable_noStore as noStore } from 'next/cache';
 import { mockTasks, mockPackages } from './data';
 import { v4 as uuidv4 } from 'uuid';
 import { getPackageMoney, normalizeCurrencyCode } from './currency';
@@ -553,9 +554,9 @@ export async function getFinancialFlowAnalytics(rangeDays: number): Promise<Fina
 // ──────────────────────────────────────────────
 
 /**
- * Returns a single public page's content by key.
- * Calling this instead of getAppSettings() prevents the full settings
- * object (with plisioApiKey, aiProviders, etc.) from being serialized.
+ * Returns a single public page's content.
+ * Uses getAppSettings() but only returns the one page — never the full
+ * settings object with sensitive keys.
  */
 export async function getPublicPage(pageKey: PublicPageKey): Promise<PublicPageContent | undefined> {
   const settings = await getAppSettings();
@@ -595,6 +596,12 @@ export async function getSupportWidgetSettings(): Promise<{
   };
 }
 
+export async function getBrandAssets() {
+  noStore();
+  const settings = await getAppSettings().catch(() => null);
+  return settings?.brandAssets || {};
+}
+
 /**
  * Returns only the public-facing fields the landing page needs.
  */
@@ -629,6 +636,7 @@ export async function getLandingPageSettings(): Promise<{
 
 export async function getAppSettings(): Promise<AppSettings> {
     const defaultSettings: AppSettings = {
+        brandAssets: {},
         paymentMethods: [{ id: uuidv4(), name: 'Manual Withdrawal' }],
         depositMethods: [{ id: uuidv4(), name: 'Plisio', provider: 'plisio', enabled: true, processingMode: 'automatic', description: 'Crypto deposits via Plisio', credentials: {}, customFields: [] }],
         withdrawalMethods: [{ id: uuidv4(), name: 'Manual Withdrawal', provider: 'custom', enabled: true, processingMode: 'admin_verified', description: 'Withdrawal requests are reviewed by admin.', customFields: [] }],
@@ -686,26 +694,33 @@ export async function getAppSettings(): Promise<AppSettings> {
             privacy: {
                 title: 'Privacy Policy',
                 subtitle: 'How TrainlyLabs handles user information.',
-                content: 'TrainlyLabs collects account, profile, contribution, wallet, and usage information needed to operate the platform. This page should be reviewed and customized by your legal team before launch to describe data collection, storage, third-party services, user rights, and retention practices.',
-                enabled: true,
+                content: 'This page is being prepared. Please check back later.',
+                enabled: false,
             },
             terms: {
                 title: 'Terms of Service',
                 subtitle: 'Rules for using TrainlyLabs.',
-                content: 'By using TrainlyLabs, users agree to follow platform rules, provide accurate account information, complete work honestly, respect intellectual property, and avoid misuse of AI tools or payment systems. This page should be reviewed and customized by your legal team before launch.',
-                enabled: true,
+                content: 'This page is being prepared. Please check back later.',
+                enabled: false,
             },
             refund: {
                 title: 'Refund and Deposit Policy',
                 subtitle: 'How deposits, packages, and refunds are handled.',
-                content: 'Deposits and package purchases are processed according to the payment methods available in the wallet. This page should explain confirmation timing, failed payments, package access, refund eligibility, and support escalation before launch.',
+                content: 'This page is being prepared. Please check back later.',
+                enabled: false,
+            },
+            faq: {
+                title: 'Frequently Asked Questions',
+                subtitle: 'Answers to common questions about earning, qualifying, and using TrainlyLabs.',
+                content: '',
+                contentHtml: '',
                 enabled: true,
             },
             guidelines: {
                 title: 'Contributor Guidelines',
                 subtitle: 'Quality standards for TrainlyLabs contributors.',
-                content: 'Contributors should follow task instructions carefully, submit original and accurate work, avoid spam or low-effort responses, protect confidential information, and use AI assistance only where allowed by task rules.',
-                enabled: true,
+                content: 'This page is being prepared. Please check back later.',
+                enabled: false,
             },
         },
         landingPageContent: {
@@ -816,6 +831,10 @@ export async function getAppSettings(): Promise<AppSettings> {
         const mergedSettings = { 
             ...defaultSettings, 
             ...data,
+            brandAssets: {
+                ...defaultSettings.brandAssets,
+                ...(data.brandAssets || {}),
+            },
             landingPageContent: {
                 ...defaultSettings.landingPageContent,
                 ...data.landingPageContent,

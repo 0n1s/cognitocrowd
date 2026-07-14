@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
@@ -72,8 +73,7 @@ export default function OnboardingLayout({
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <div className="absolute top-4 left-4">
             <Link href="/" className="flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                <span className="font-bold font-headline text-lg">TrainlyLabs</span>
+                <BrandLogo />
             </Link>
         </div>
         <div className="w-full max-w-2xl">

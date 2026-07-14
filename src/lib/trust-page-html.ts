@@ -1,6 +1,27 @@
 const ALLOWED_TAGS = new Set(['section', 'div', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'br']);
 const ALLOWED_CLASSES = new Set(['trust-section', 'trust-callout', 'trust-list', 'trust-muted', 'trust-grid', 'trust-card']);
 
+function normalizeHtmlInput(value: string) {
+  let normalized = String(value || '').trim();
+
+  normalized = normalized
+    .replace(/^```(?:html)?/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  if (normalized.includes('&lt;') && normalized.includes('&gt;')) {
+    normalized = normalized
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&');
+  }
+
+  return normalized;
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -29,7 +50,7 @@ function sanitizeAttributes(tag: string, attrs: string) {
 }
 
 export function sanitizeTrustPageHtml(html: string) {
-  const withoutDangerousBlocks = String(html || '')
+  const withoutDangerousBlocks = normalizeHtmlInput(html)
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|link|meta)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
     .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|link|meta)\b[^>]*\/?\s*>/gi, '');
