@@ -86,7 +86,7 @@ const AppHeader = ({ isAdmin }: { isAdmin: boolean }) => {
     <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
       {isMobile && <SidebarTrigger />}
       <div className="flex-1">
-        <h1 className="font-headline text-lg font-semibold">TrainlyLabs</h1>
+        <h1 className="font-headline text-lg font-semibold"></h1>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
         <SessionCurrencyPicker />

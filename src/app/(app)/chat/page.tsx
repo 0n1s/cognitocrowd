@@ -16,9 +16,9 @@ type ChatSessionPayload = {
 };
 
 type ChatModelKey = "normal" | "uncensored" | "coding" | "hacking";
+const MAX_CONTEXT_MESSAGES = 16;
 const CHAT_MODEL_STORAGE_KEY = "trainly.chat.selectedModel";
 const CHAT_MODEL_MESSAGES_STORAGE_KEY = "trainly.chat.messagesByModel";
-const CHAT_SHOW_REASONING_STORAGE_KEY = "trainly.chat.showReasoning";
 
 function getAllowedChatModels(userPackage: Package | null): ChatModelKey[] {
     const legacyTypes = userPackage?.allowedModelTypes || [];
@@ -52,7 +52,6 @@ export default function ChatPage() {
     const [chatId, setChatId] = useState<string | null>(null);
     const [allowedChatModels, setAllowedChatModels] = useState<ChatModelKey[]>(["normal"]);
     const [selectedChatModel, setSelectedChatModel] = useState<ChatModelKey>("normal");
-    const [showReasoningSummary, setShowReasoningSummary] = useState(false);
     const { user } = useAuth();
     const { toast } = useToast();
 
@@ -66,11 +65,6 @@ export default function ChatPage() {
     const persistMessagesByModel = (next: Record<ChatModelKey, Message[]>) => {
         if (typeof window === "undefined") return;
         window.localStorage.setItem(CHAT_MODEL_MESSAGES_STORAGE_KEY, JSON.stringify(next));
-    };
-
-    const persistShowReasoning = (next: boolean) => {
-        if (typeof window === "undefined") return;
-        window.localStorage.setItem(CHAT_SHOW_REASONING_STORAGE_KEY, next ? "1" : "0");
     };
 
     const readPersistedChatModel = (): ChatModelKey | null => {
@@ -99,11 +93,6 @@ export default function ChatPage() {
         }
     };
 
-    const readPersistedShowReasoning = () => {
-        if (typeof window === "undefined") return false;
-        return window.localStorage.getItem(CHAT_SHOW_REASONING_STORAGE_KEY) === "1";
-    };
-    
     useEffect(() => {
         async function fetchHistoryAndPackage() {
             if (!user) return;
@@ -126,9 +115,6 @@ export default function ChatPage() {
             if (persistedMessages) {
                 setMessagesByModel(persistedMessages);
             }
-
-            const persistedReasoningToggle = readPersistedShowReasoning();
-            setShowReasoningSummary(persistedReasoningToggle);
 
             const persistedModel = readPersistedChatModel();
             const nextModel = persistedModel && allowedModels.includes(persistedModel)
@@ -181,19 +167,25 @@ export default function ChatPage() {
         setIsLoading(true);
 
         try {
-            const result = await aiAssistantTaskGuidance({ query: currentInput, chatModel: selectedChatModel });
+            const history = messages
+                .slice(-MAX_CONTEXT_MESSAGES)
+                .map((message) => ({
+                    role: message.sender === "user" ? "user" as const : "assistant" as const,
+                    content: message.text,
+                }));
+            const result = await aiAssistantTaskGuidance({
+                query: currentInput,
+                chatModel: selectedChatModel,
+                history,
+            });
             const aiResponse = result.response;
-            const reasoningSummary = result.reasoningSummary;
-            const combinedText = showReasoningSummary && reasoningSummary
-                ? `${aiResponse}\n\nReasoning summary: ${reasoningSummary}`
-                : aiResponse;
             
-            const logResult = await logChatInteraction(user.uid, chatId, currentInput, combinedText);
+            const logResult = await logChatInteraction(user.uid, chatId, currentInput, aiResponse);
             if (logResult.success && logResult.newChatId) {
                 setChatId(logResult.newChatId);
             }
 
-            const aiMessage: Message = { id: (Date.now() + 1).toString(), text: combinedText, sender: "ai" };
+            const aiMessage: Message = { id: (Date.now() + 1).toString(), text: aiResponse, sender: "ai" };
             setMessagesByModel((prev) => {
                 const next = {
                     ...prev,
@@ -253,42 +245,62 @@ export default function ChatPage() {
     };
 
     // Track visual viewport height for mobile keyboard handling
-    const viewportHeightRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 0);
-    const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+    const fullViewportHeightRef = useRef(
+        typeof window !== 'undefined' ? (window.visualViewport?.height || window.innerHeight) : 0
+    );
+    const viewportWidthRef = useRef(
+        typeof window !== 'undefined' ? (window.visualViewport?.width || window.innerWidth) : 0
+    );
+    const [viewportMetrics, setViewportMetrics] = useState<{
+        height: number;
+        offsetTop: number;
+    } | null>(null);
 
     useEffect(() => {
         const handler = () => {
-            const vh = window.visualViewport?.height || window.innerHeight;
-            viewportHeightRef.current = vh;
-            setViewportHeight(vh);
+            const viewport = window.visualViewport;
+            const vh = viewport?.height || window.innerHeight;
+            const vw = viewport?.width || window.innerWidth;
+            const orientationChanged = Math.abs(vw - viewportWidthRef.current) > 50;
+
+            if (orientationChanged) {
+                fullViewportHeightRef.current = vh;
+            } else if (vh >= fullViewportHeightRef.current * 0.8) {
+                // Only refresh the baseline while the keyboard is closed.
+                fullViewportHeightRef.current = Math.max(fullViewportHeightRef.current, vh);
+            }
+
+            viewportWidthRef.current = vw;
+            setViewportMetrics({
+                height: vh,
+                offsetTop: viewport?.offsetTop || 0,
+            });
         };
         handler(); // Set initial
         window.visualViewport?.addEventListener('resize', handler);
+        window.visualViewport?.addEventListener('scroll', handler);
         window.addEventListener('resize', handler);
         return () => {
             window.visualViewport?.removeEventListener('resize', handler);
+            window.visualViewport?.removeEventListener('scroll', handler);
             window.removeEventListener('resize', handler);
         };
     }, []);
 
-    // Close keyboard when sending
-    useEffect(() => {
-        if (isLoading && typeof window !== 'undefined') {
-            window.scrollTo(0, 0);
-            document.activeElement && (document.activeElement as HTMLElement)?.blur();
-        }
-    }, [isLoading]);
-
-    // The header height offset differs on mobile (3.5rem = 56px) vs desktop (5.5rem = 88px)
-    // We only use the dynamic height on mobile when the keyboard is detected
+    // Only use the dynamic mobile height while the keyboard is detected.
     const headerOffsetSm = 56; // 3.5rem
-    const headerOffsetLg = 88; // 5.5rem
-    const isMobileKeyboardOpen = viewportHeight !== null && viewportHeight < viewportHeightRef.current * 0.8;
+    const isMobileKeyboardOpen = viewportMetrics !== null
+        && viewportMetrics.height < fullViewportHeightRef.current * 0.8;
 
     let containerStyle: React.CSSProperties | undefined;
-    if (isMobileKeyboardOpen && viewportHeight !== null) {
-        // When keyboard is open, use the visual viewport height exactly
-        containerStyle = { height: viewportHeight - headerOffsetSm, overflow: 'hidden' };
+    if (isMobileKeyboardOpen && viewportMetrics !== null) {
+        // The browser may pan the visual viewport when focusing the composer.
+        // Only subtract the part of the header that is still inside that viewport.
+        const visibleHeaderHeight = Math.max(0, headerOffsetSm - viewportMetrics.offsetTop);
+        containerStyle = {
+            height: Math.max(0, viewportMetrics.height - visibleHeaderHeight),
+            overflow: 'hidden',
+        };
     }
 
     return (
@@ -313,11 +325,6 @@ export default function ChatPage() {
                 onChatModelChange={(value) => {
                     setSelectedChatModel(value);
                     persistChatModel(value);
-                }}
-                showReasoningSummary={showReasoningSummary}
-                onShowReasoningSummaryChange={(next) => {
-                    setShowReasoningSummary(next);
-                    persistShowReasoning(next);
                 }}
                 onClearChats={handleClearChats}
                 isClearingHistory={isClearingHistory}

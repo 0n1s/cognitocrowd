@@ -27,9 +27,7 @@ const LandingHeader = ({ showFaq = false }: { showFaq?: boolean }) => (
         <Link href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
         <Link href="#testimonials" className="text-muted-foreground transition-colors hover:text-foreground">Testimonials</Link>
         {showFaq && <Link href="#faq" className="text-muted-foreground transition-colors hover:text-foreground">FAQ</Link>}
-       
-     
-     
+      
       </nav>
       <div className="flex flex-1 items-center justify-end space-x-2">
         <ThemeToggle />

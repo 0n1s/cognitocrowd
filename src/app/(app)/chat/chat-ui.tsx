@@ -1,20 +1,16 @@
-
 "use client";
 
-import { Fragment } from "react";
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { User } from "firebase/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Sparkles, Flame, Code2, TerminalSquare, Loader2, Trash2, Copy, Check } from "lucide-react";
+import { Send, Sparkles, Flame, Code2, TerminalSquare, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
 import {
     Select,
     SelectContent,
@@ -97,7 +93,7 @@ const CHAT_MODE_PERSONA = {
         icon: Sparkles,
         iconClass: "text-sky-500",
         aiBubble: "border-sky-200/70 bg-white/80 dark:bg-sky-950/30 dark:border-sky-900/60",
-        inputPlaceholder: "Ask me anything, I'm here to help",
+        inputPlaceholder: "Normal...",
     },
     uncensored: {
         title: "Raw Mode",
@@ -105,7 +101,7 @@ const CHAT_MODE_PERSONA = {
         icon: Flame,
         iconClass: "text-rose-500",
         aiBubble: "border-rose-300/70 bg-rose-50/70 dark:bg-rose-950/30 dark:border-rose-900/70",
-        inputPlaceholder: "Ask me anything, no holds barred",
+        inputPlaceholder: "Uncensored...",
     },
     coding: {
         title: "Dev Console",
@@ -113,7 +109,7 @@ const CHAT_MODE_PERSONA = {
         icon: Code2,
         iconClass: "text-emerald-500",
         aiBubble: "border-emerald-300/70 bg-emerald-50/70 dark:bg-emerald-950/25 dark:border-emerald-900/70 font-mono",
-        inputPlaceholder: "Write a Hello World Python script",
+        inputPlaceholder: "Coder...",
     },
     hacking: {
         title: "Offensive Simulator",
@@ -121,7 +117,7 @@ const CHAT_MODE_PERSONA = {
         icon: TerminalSquare,
         iconClass: "text-lime-400",
         aiBubble: "border-lime-500/30 bg-zinc-950/95 text-lime-200",
-        inputPlaceholder: "How to scan hidden wifi networks",
+        inputPlaceholder: "Hacker...",
     },
 } satisfies Record<ChatModelKey, {
     title: string;
@@ -138,240 +134,17 @@ export type Message = {
     sender: "user" | "ai";
 };
 
-type ContentSegment =
-    | { type: "text"; value: string }
-    | { type: "code"; value: string; language: string }
-    | { type: "json"; value: string }
-    | { type: "html"; value: string };
-
-function isLikelyHtml(value: string) {
-    const trimmed = value.trim();
-    if (!trimmed.startsWith("<") || !trimmed.endsWith(">")) return false;
-    return /<\/?[a-z][\w-]*\b[^>]*>/i.test(trimmed);
-}
-
-function tryFormatJson(value: string): string | null {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return null;
-    try {
-        const parsed = JSON.parse(trimmed);
-        return JSON.stringify(parsed, null, 2);
-    } catch {
-        return null;
-    }
-}
-
-function sanitizeHtml(html: string): string {
-    if (typeof window === "undefined") return html;
-
-    const parser = new DOMParser();
-    const document = parser.parseFromString(html, "text/html");
-
-    document.querySelectorAll("script, style, iframe, object, embed, link, meta").forEach((node) => node.remove());
-
-    document.querySelectorAll("*").forEach((element) => {
-        Array.from(element.attributes).forEach((attribute) => {
-            const name = attribute.name.toLowerCase();
-            const value = attribute.value;
-
-            if (name.startsWith("on") || name === "srcdoc") {
-                element.removeAttribute(attribute.name);
-                return;
-            }
-
-            if ((name === "href" || name === "src") && /^\s*javascript:/i.test(value)) {
-                element.removeAttribute(attribute.name);
-            }
-        });
-    });
-
-    return document.body.innerHTML;
-}
-
-function splitMessageContent(value: string): ContentSegment[] {
-    const codeFenceRegex = /```([a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g;
-    const segments: ContentSegment[] = [];
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = codeFenceRegex.exec(value)) !== null) {
-        const [fullMatch, language = "", codeBody = ""] = match;
-        const index = match.index;
-
-        if (index > lastIndex) {
-            const textBefore = value.slice(lastIndex, index);
-            const maybeJson = tryFormatJson(textBefore);
-            if (maybeJson) {
-                segments.push({ type: "json", value: maybeJson });
-            } else if (isLikelyHtml(textBefore)) {
-                segments.push({ type: "html", value: textBefore });
-            } else {
-                segments.push({ type: "text", value: textBefore });
-            }
-        }
-
-        segments.push({ type: "code", value: codeBody.trimEnd(), language: language.toLowerCase() || "code" });
-        lastIndex = index + fullMatch.length;
-    }
-
-    if (lastIndex < value.length) {
-        const textAfter = value.slice(lastIndex);
-        const maybeJson = tryFormatJson(textAfter);
-        if (maybeJson) {
-            segments.push({ type: "json", value: maybeJson });
-        } else if (isLikelyHtml(textAfter)) {
-            segments.push({ type: "html", value: textAfter });
-        } else {
-            segments.push({ type: "text", value: textAfter });
-        }
-    }
-
-    return segments;
-}
-
-function shouldRenderMarkdown(value: string) {
-    const trimmed = value.trim();
-    if (!trimmed) return false;
-    if (/\[render:markdown\]/i.test(trimmed)) return true;
-
-    return (
-        /^#{1,6}\s/m.test(trimmed)
-        || /^\s*[-*+]\s+/m.test(trimmed)
-        || /^\s*\d+\.\s+/m.test(trimmed)
-        || /\|.+\|/.test(trimmed)
-        || /```/.test(trimmed)
-        || /\*\*[^*]+\*\*/.test(trimmed)
-        || /`[^`]+`/.test(trimmed)
-        || /\[[^\]]+\]\([^\)]+\)/.test(trimmed)
-    );
-}
-
-function cleanMarkdownRequestMarker(value: string) {
-    return value.replace(/\[render:markdown\]/gi, "").trim();
-}
-
-function renderCodeBlock({
-    key,
-    label,
-    value,
-    copied,
-    onCopy,
-}: {
-    key: string;
-    label: string;
-    value: string;
-    copied: boolean;
-    onCopy: () => void;
-}) {
-    return (
-        <div key={key} className="overflow-hidden rounded-lg border bg-zinc-950 text-zinc-100">
-            <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
-                <span>{label}</span>
-                <button
-                    type="button"
-                    onClick={onCopy}
-                    className="inline-flex items-center gap-1 rounded border border-white/15 px-1.5 py-0.5 text-[10px] normal-case text-zinc-200 hover:bg-white/10"
-                    aria-label={`Copy ${label} block`}
-                >
-                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    {copied ? "Copied" : "Copy"}
-                </button>
-            </div>
-            <div className="text-xs leading-relaxed break-words">
-                <SyntaxHighlighter
-                    language={label === "json" ? "json" : label}
-                    style={oneDark}
-                    customStyle={{
-                        margin: 0,
-                        padding: "0.75rem",
-                        background: "transparent",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere",
-                    }}
-                    wrapLongLines
-                >
-                    {value}
-                </SyntaxHighlighter>
-            </div>
-        </div>
-    );
-}
-
 function MessageContent({ text }: { text: string }) {
-    const segments = splitMessageContent(text);
-    const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    // Preserve whitespace: trimming can corrupt indented code blocks and lists.
+    const content = text.replace(/\[render:markdown\]/gi, "");
 
-    const handleCopy = async (value: string, key: string) => {
-        try {
-            await navigator.clipboard.writeText(value);
-            setCopiedKey(key);
-            window.setTimeout(() => {
-                setCopiedKey((current) => (current === key ? null : current));
-            }, 1200);
-        } catch {
-            setCopiedKey(null);
-        }
-    };
+    if (!content.trim()) return null;
 
     return (
-        <div className="space-y-2">
-            {segments.map((segment, index) => {
-                if (segment.type === "code") {
-                    const key = `segment-${index}`;
-                    return renderCodeBlock({
-                        key,
-                        label: segment.language,
-                        value: segment.value,
-                        copied: copiedKey === key,
-                        onCopy: () => void handleCopy(segment.value, key),
-                    });
-                }
-
-                if (segment.type === "json") {
-                    const key = `segment-${index}`;
-                    return renderCodeBlock({
-                        key,
-                        label: "json",
-                        value: segment.value,
-                        copied: copiedKey === key,
-                        onCopy: () => void handleCopy(segment.value, key),
-                    });
-                }
-
-                if (segment.type === "html") {
-                    return (
-                        <div
-                            key={`segment-${index}`}
-                            className="prose prose-sm max-w-none rounded-lg border bg-background/70 p-3 text-foreground dark:prose-invert"
-                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(segment.value) }}
-                        />
-                    );
-                }
-
-                if (!segment.value.trim()) {
-                    return <Fragment key={`segment-${index}`} />;
-                }
-
-                const markdownRequested = shouldRenderMarkdown(segment.value);
-                if (markdownRequested) {
-                    const markdown = cleanMarkdownRequestMarker(segment.value);
-                    return (
-                        <div key={`segment-${index}`} className="prose prose-sm max-w-none break-words dark:prose-invert prose-pre:rounded-lg prose-pre:border prose-pre:bg-zinc-950 prose-pre:text-zinc-100 prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:[overflow-wrap:anywhere] prose-code:break-words prose-code:[overflow-wrap:anywhere] prose-code:text-emerald-400">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {markdown}
-                            </ReactMarkdown>
-                        </div>
-                    );
-                }
-
-                return (
-                    <p key={`segment-${index}`} className="break-words whitespace-pre-wrap leading-relaxed">
-                        {segment.value}
-                    </p>
-                );
-            })}
+        <div className="min-w-0 max-w-full overflow-hidden">
+            <Streamdown className="w-full min-w-0 max-w-full" plugins={{ code }}>
+                {content}
+            </Streamdown>
         </div>
     );
 }
@@ -442,7 +215,7 @@ export function ChatUI({
     isClearingHistory,
     hasChatHistory,
 }: ChatUIProps) {
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
     const formRef = useRef<HTMLFormElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const canChat = allowedChatModels.length > 0;
@@ -453,9 +226,20 @@ export function ChatUI({
     const isHacking = selectedChatModel === "hacking";
 
     useEffect(() => {
-        setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 100);
+        const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+            "[data-radix-scroll-area-viewport]"
+        );
+
+        if (!viewport) return;
+
+        const frame = window.requestAnimationFrame(() => {
+            viewport.scrollTo({
+                top: viewport.scrollHeight,
+                behavior: "smooth",
+            });
+        });
+
+        return () => window.cancelAnimationFrame(frame);
     }, [messages, isLoading]);
 
     useEffect(() => {
@@ -464,9 +248,9 @@ export function ChatUI({
 
 
     return (
-        <div className={cn("relative flex min-h-0 flex-1 flex-col overflow-hidden border-y bg-card shadow-sm sm:rounded-2xl sm:border", theme.shell, isHacking && "font-mono") }>
+        <div className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-y bg-card shadow-sm sm:rounded-2xl sm:border", theme.shell, isHacking && "font-mono") }>
             <div className={cn("shrink-0 border-b bg-gradient-to-r px-3 py-2.5 sm:px-4 sm:py-3 md:px-5", theme.header)}>
-                <div className="flex items-center gap-2 sm:flex-col sm:items-stretch sm:gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0 space-y-1">
                         <p className={cn("flex items-center gap-2 truncate text-sm font-semibold text-foreground", isHacking && "tracking-wide text-lime-300")}>
                             <PersonaIcon className={cn("h-4 w-4", persona.iconClass)} />
@@ -475,10 +259,10 @@ export function ChatUI({
                         <p className={cn("hidden text-xs text-muted-foreground sm:block", isHacking && "text-lime-300/75")}>{persona.subtitle}</p>
                         <p className="hidden text-xs text-muted-foreground sm:block">Model: <span className={cn("rounded-full px-2 py-0.5 font-semibold", CHAT_MODEL_ACCENTS[selectedChatModel])}>{selectedModelLabel}</span></p>
                     </div>
-                    <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:ml-0">
+                    <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
                         <span className="hidden text-xs font-medium text-muted-foreground sm:inline">Chat Model</span>
                         <Select value={selectedChatModel} onValueChange={(value) => onChatModelChange(value as ChatModelKey)} disabled={isLoading || isLoadingHistory || !canChat}>
-                            <SelectTrigger className="h-8 w-[112px] text-xs min-[390px]:w-[132px] sm:w-[220px]">
+                            <SelectTrigger className="h-10 min-w-0 flex-1 text-sm md:w-[220px] md:flex-none">
                                 <SelectValue placeholder="Select chat model" />
                             </SelectTrigger>
                             <SelectContent>
@@ -493,7 +277,7 @@ export function ChatUI({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                    className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
                                     disabled={isLoading || isLoadingHistory || isClearingHistory || !hasChatHistory}
                                     aria-label="Clear chat history"
                                     title="Clear chat history"
@@ -501,7 +285,7 @@ export function ChatUI({
                                     {isClearingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                                 </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="w-[calc(100%-2rem)] max-w-lg rounded-xl">
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Clear all chat history?</AlertDialogTitle>
                                     <AlertDialogDescription>
@@ -566,14 +350,15 @@ export function ChatUI({
                 </div>
             </div>
 
-            <div className={cn("relative min-h-0 flex-1", theme.surface)}>
+            <div className={cn("relative min-h-0 min-w-0 flex-1 overflow-hidden", theme.surface)}>
                 {isHacking && (
                     <>
                         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(132,204,22,0.06)_1px,transparent_1px)] bg-[size:100%_3px] opacity-35" />
                         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(132,204,22,0.12),transparent_55%)]" />
                     </>
                 )}
-                <ScrollArea className="h-full overflow-y-auto overscroll-contain">
+                <div ref={scrollAreaRef} className="h-full w-full overflow-hidden">
+                    <ScrollArea className="h-full w-full overscroll-contain">
                     {isLoadingHistory ? <div className="px-3 py-4"><ChatSkeleton /></div> : (
                         <div className="space-y-3 px-2.5 py-3 pb-2 sm:space-y-4 sm:px-4 sm:py-4 md:px-6">
                             {messages.length === 0 && !isLoading && (
@@ -584,7 +369,7 @@ export function ChatUI({
                             )}
 
                             {messages.map((message) => (
-                                <div key={message.id} className={cn("flex items-end gap-1.5 sm:gap-3", message.sender === "user" ? "justify-end" : "")}> 
+                                <div key={message.id} className={cn("flex min-w-0 items-end gap-1.5 sm:gap-3", message.sender === "user" ? "justify-end" : "")}>
                                     {message.sender === "ai" && (
                                         <Avatar className="hidden h-8 w-8 border bg-background sm:flex">
                                             <AvatarFallback>AI</AvatarFallback>
@@ -592,7 +377,7 @@ export function ChatUI({
                                     )}
                                     <div
                                         className={cn(
-                                            "max-w-[94%] overflow-hidden rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[88%] sm:px-4 sm:py-2.5 md:max-w-[72%]",
+                                            "min-w-0 max-w-[92%] overflow-hidden rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[85%] sm:px-4 sm:py-2.5 md:max-w-[72%]",
                                             message.sender === "user"
                                                 ? cn("rounded-br-md", theme.userBubble)
                                                 : cn("border bg-card rounded-bl-md", persona.aiBubble)
@@ -620,10 +405,10 @@ export function ChatUI({
                                     </div>
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
                     )}
-                </ScrollArea>
+                    </ScrollArea>
+                </div>
             </div>
 
             <div className={cn("shrink-0 border-t bg-background/95 px-2.5 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur sm:p-3 md:p-4", isHacking && "border-lime-500/35 bg-black/95") }>
@@ -645,11 +430,17 @@ export function ChatUI({
                             }
                         }}
                         placeholder={canChat ? persona.inputPlaceholder : "No chat models are enabled in your package."}
-                        disabled={isLoading || isLoadingHistory || !canChat}
+                        disabled={isLoadingHistory || !canChat}
                         rows={1}
                         className={cn("max-h-28 !min-h-11 min-w-0 flex-1 resize-none overflow-y-auto rounded-xl py-2.5 text-base sm:text-sm", isHacking && "border-lime-500/40 bg-zinc-950 text-lime-100 placeholder:text-lime-400/50 focus-visible:ring-lime-500")}
                     />
-                    <Button type="submit" size="icon" className={cn("h-11 w-11 shrink-0 rounded-xl", theme.sendButton)} disabled={isLoading || isLoadingHistory || !input.trim() || !canChat}>
+                    <Button
+                        type="submit"
+                        size="icon"
+                        className={cn("h-11 w-11 shrink-0 rounded-xl", theme.sendButton)}
+                        disabled={isLoading || isLoadingHistory || !input.trim() || !canChat}
+                        onPointerDown={(event) => event.preventDefault()}
+                    >
                         <Send className="h-4 w-4" />
                     </Button>
                 </form>

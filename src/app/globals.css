@@ -1,4 +1,5 @@
 @import "tom-select/dist/css/tom-select.css";
+@import "streamdown/styles.css";
 
 @tailwind base;
 @tailwind components;
